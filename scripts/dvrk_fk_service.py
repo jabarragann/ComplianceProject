@@ -1,3 +1,13 @@
+"""
+DVRK forward kinematic service example
+To find service name look with the command
+
+rosservice list
+
+Juan Antonio Barragan
+jbarrag3@jh.edu
+"""
+
 import rospy
 from cisst_msgs.srv import QueryForwardKinematics
 from sensor_msgs.msg import JointState
