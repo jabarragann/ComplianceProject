@@ -1,9 +1,10 @@
 # Compliance and Kinematic error repository
 
+# Package installation
+
+`pip install -e .`
+
 # Commands
-
-
-
 `rosservice list` --> List active services.
 
 `rossrv list` --> List all srv files.
