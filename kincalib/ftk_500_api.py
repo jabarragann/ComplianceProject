@@ -15,6 +15,7 @@ from typing import List
 import scipy
 from scipy.spatial import distance
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -132,4 +133,11 @@ if __name__ == "__main__":
     # Plot data
     p = Path("./data/atracsys_recordings/single_ball.npy")
     data = np.load(p)
-    print(data[0])
+    print(data.shape)
+    print(data[0:3])
+
+    fig, axis = plt.subplots(1, 3, sharey=True, tight_layout=True)
+    axis[0].hist(data[:, 0, 0], bins=15)
+    axis[1].hist(data[:, 0, 1], bins=15)
+    axis[2].hist(data[:, 0, 2], bins=15)
+    plt.show()
