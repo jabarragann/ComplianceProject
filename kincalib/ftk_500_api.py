@@ -16,6 +16,7 @@ import scipy
 from scipy.spatial import distance
 from pathlib import Path
 import matplotlib.pyplot as plt
+from kincalib.utils.Logger import Logger
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -78,7 +79,8 @@ class ftk_500:
 
         return recorded, markers_mismatch
 
-    def sort_measurements(self, measurement_list: List[List[float]]) -> np.ndarray:
+    @staticmethod
+    def sort_measurements(measurement_list: List[List[float]]) -> np.ndarray:
         if len(measurement_list) < 10:
             print("Not enough records (10 minimum)")  # this is totally arbitrary
             return None
@@ -113,7 +115,7 @@ class ftk_500:
 
 
 if __name__ == "__main__":
-
+    log = Logger("utils_log").log
     ftk_handler = ftk_500()
 
     print(__name__)
@@ -131,13 +133,31 @@ if __name__ == "__main__":
     # np.save(filename, sorted_cp)
 
     # Plot data
-    p = Path("./data/atracsys_recordings/single_ball.npy")
-    data = np.load(p)
-    print(data.shape)
-    print(data[0:3])
+    # p = Path("./data/atracsys_recordings/single_ball.npy")
+    # data = np.load(p)
+    # print(data.shape)
+    # print(data[0:3])
 
-    fig, axis = plt.subplots(1, 3, sharey=True, tight_layout=True)
-    axis[0].hist(data[:, 0, 0], bins=15)
-    axis[1].hist(data[:, 0, 1], bins=15)
-    axis[2].hist(data[:, 0, 2], bins=15)
-    plt.show()
+    # fig, axis = plt.subplots(1, 3, sharey=True, tight_layout=True)
+    # axis[0].hist(data[:, 0, 0], bins=15)
+    # axis[1].hist(data[:, 0, 1], bins=15)
+    # axis[2].hist(data[:, 0, 2], bins=15)
+    # plt.show()
+
+    # ------------------------------------------------------------
+    # Obtain measurements
+    # ------------------------------------------------------------
+    expected_markers = 1
+    measurements, miss_match = ftk_handler.collect_measurements(
+        expected_markers, t=1000, sample_time=20
+    )
+    measurements = np.array(measurements)
+    log.debug(f"collected samples: {measurements.shape[0]}")
+    log.debug(f"drop samples:      {miss_match}")
+    log.debug(f"Measurement shape: {measurements.shape}")
+    log.debug(f"sample values \n {measurements.squeeze()[:3, :]}")
+
+    mean_value = measurements.squeeze().mean(axis=0)
+    std_value = measurements.squeeze().std(axis=0)
+    log.debug(f"mean value: {mean_value}")
+    log.debug(f"std value:  {std_value}")

@@ -4,6 +4,7 @@
 cisstLog.txt
 documents
 Marker_design
+temp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

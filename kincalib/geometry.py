@@ -6,6 +6,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from kincalib.utils.Logger import Logger
+import pandas as pd
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -139,17 +140,29 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Create and plot data
     # ------------------------------------------------------------
-    circle = Circle3D(np.array([20, 25, 25]), np.array([3, 3, 5]), 5)
-    samples = circle.generate_pts(40)
-    noise = np.random.normal(0, 0.5, samples.shape)
-    samples = samples + noise
-    # Plotter3D.scatter_3d(samples)
+    # circle = Circle3D(np.array([20, 25, 25]), np.array([3, 3, 5]), 5)
+    # samples = circle.generate_pts(40)
+    # noise = np.random.normal(0, 0.5, samples.shape)
+    # samples = samples + noise
+    # # Plotter3D.scatter_3d(samples)
 
+    # est_circle = Circle3D.from_sphere_lstsq(samples)
+    # log.info(f"estimated radius \n{est_circle.radius:.02f}")
+    # log.info(f"estimated center \n {est_circle.center.squeeze()}")
+    # log.info(f"estimated normal \n {est_circle.normal}")
+
+    # log.info(f"true radius \n{circle.radius:.02f}")
+    # log.info(f"true center \n {circle.center.squeeze()}")
+    # log.info(f"true normal \n {circle.normal}")
+
+    # ------------------------------------------------------------
+    # Create and plot data
+    # ------------------------------------------------------------
+    df = pd.read_csv("./data/01_pitch_experiment/pitch_exp02.txt")
+
+    samples = df[["x", "y", "z"]].to_numpy().T
+    Plotter3D.scatter_3d(samples)
     est_circle = Circle3D.from_sphere_lstsq(samples)
-    log.info(f"estimated radius \n{est_circle.radius:.02f}")
+    log.info(f"estimated radius \n{est_circle.radius:.04f}")
     log.info(f"estimated center \n {est_circle.center.squeeze()}")
     log.info(f"estimated normal \n {est_circle.normal}")
-
-    log.info(f"true radius \n{circle.radius:.02f}")
-    log.info(f"true center \n {circle.center.squeeze()}")
-    log.info(f"true normal \n {circle.normal}")
