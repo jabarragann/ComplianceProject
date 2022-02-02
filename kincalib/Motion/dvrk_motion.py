@@ -20,7 +20,7 @@ class DvrkMotions:
         return trajectory
 
     @staticmethod
-    def pitch_experiment(psm_handler, log, expected_markers=1):
+    def pitch_experiment(psm_handler, log, expected_markers=1, save=False):
 
         ftk_handler = ftk_500()
         trajectory = DvrkMotions.generate_pitch_motion()
@@ -60,27 +60,33 @@ class DvrkMotions:
 
         # Save experiment
         log.debug(df_vals)
-        df_vals.to_csv("./data/01_pitch_experiment/pitch_exp02.txt", index=None)
+        if save:
+            df_vals.to_csv("./data/01_pitch_experiment/pitch_exp02.txt", index=None)
 
 
 if __name__ == "__main__":
     log = Logger("utils_log").log
-    ## Create a Python proxy for PSM2, name must match ros namespace
-    psm_handler = dvrk.psm("PSM2")
-    jp = np.array([0.0, 0.0, 0.071, 1.615, 0.0, 0.0])
-    psm_handler.move_jp(jp).wait()
-    time.sleep(0.5)
+    psm_handler = dvrk.psm("PSM2", expected_interval=0.001)
 
-    jp = psm_handler.measured_jp()
-    log.info(f"Joints current state \n {jp}")
+    # ------------------------------------------------------------
+    # Execute trajectory in joint space
+    # ------------------------------------------------------------
 
-    # Pitch axis joint range
-    trajectory = DvrkMotions.generate_pitch_motion()
-    DvrkMotions.pitch_experiment(psm_handler=psm_handler, log=log)
+    # jp = np.array([0.0, 0.0, 0.071, 1.615, 0.0, 0.0])
+    # psm_handler.move_jp(jp).wait()
+    # time.sleep(0.5)
 
-    # ftk_handler = ftk_500()
-    # records = ftk_handler.collect_measurements(m, t=1000, sample_time=25)
-    # clean_values = ftk_500.sort_measurements(records)
+    # jp = psm_handler.measured_jp()
+    # log.info(f"Joints current state \n {jp}")
 
-    # print(clean_values.shape)
-    # print(clean_values)
+    # # Pitch axis joint range
+    # trajectory = DvrkMotions.generate_pitch_motion()
+    # # Move robot
+    # DvrkMotions.pitch_experiment(psm_handler=psm_handler, log=log)
+
+    # ------------------------------------------------------------
+    # Execute trajectory in cartesian space
+    # ------------------------------------------------------------
+
+    pose = psm_handler.measured_cp()
+    print(pose)
