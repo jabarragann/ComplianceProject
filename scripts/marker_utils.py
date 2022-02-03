@@ -7,10 +7,12 @@ https://www.mathsisfun.com/algebra/trig-solving-sss-triangles.html
 
 """
 
+from re import I
 import numpy as np
 from typing import Tuple, List
 from pathlib import Path
 import json
+from kincalib.utils.Logger import Logger
 
 
 def convert_ini2json(file_name: Path) -> None:
@@ -103,29 +105,71 @@ def create_ini_file(
 
 
 if __name__ == "__main__":
-    a, b, c = 50.0, 67.5, 83.5
+
+    log = Logger("marker_utils").log
+    # ------------------------------------------------------------
+    # Marker 110 and 111 design
+    # ------------------------------------------------------------
+
+    # a, b, c = 50.0, 67.5, 83.5
+    # A, B, C = angle_from_sides(a, b, c)
+
+    # p1 = (0.0, 0.0, 0.0)
+    # p2 = (83.5, 0.0, 0.0)
+    # p3 = (b * np.cos(A * np.pi / 180), b * np.sin(A * np.pi / 180), 0.0)
+
+    # print("triangle info")
+    # print("A angle: {:0.2f} deg, a side: {:0.2f}mm".format(A, a))
+    # print("B angle: {:0.2f} deg, b side: {:0.2f}mm".format(B, b))
+    # print("C angle: {:0.2f} deg, c side: {:0.2f}mm".format(C, c))
+
+    # print("triangle coordinates")
+    # print("p1: ({:6.03f},{:6.03f},{:6.03f})".format(*p1))
+    # print("p2: ({:6.03f},{:6.03f},{:6.03f})".format(*p2))
+    # print("p3: ({:6.03f},{:6.03f},{:6.03f})".format(*p3))
+
+    # create_ini_file(3, [p1, p2, p3], 110)
+
+    # # Custom marker shaft
+    # shaft_pt = [[55, 14.37, 0.0], [-14.42, 28.51, 0], [35, 1.49, 0], [0.0, -35.0, 0.0]]
+    # create_ini_file(4, shaft_pt, 111)
+
+    # # Convert to json
+    # convert_ini2json(Path("./share/custom_marker_id_110.ini"))
+    # convert_ini2json(Path("./share/custom_marker_id_111.ini"))
+
+    # ------------------------------------------------------------
+    # Marker 112 design
+    # - Compliance project shaft tool with only 3 balls
+    # - 3 balls only
+    # - Diagram
+    #               P3(36.98,20.94,0)
+    #            -  |\ -
+    #            |  | \ \
+    #            |  |  \ \
+    #       42.5m|  |   \ \ 57.0mm
+    #            |  |    \ \
+    #            -  |     \ \
+    #               |______\ -
+    #     P1(0,0,0) |-90.0-| P2(90,0,0)
+    # ------------------------------------------------------------
+
+    a, b, c = 90.0, 57.0, 42.5
     A, B, C = angle_from_sides(a, b, c)
-
     p1 = (0.0, 0.0, 0.0)
-    p2 = (83.5, 0.0, 0.0)
-    p3 = (b * np.cos(A * np.pi / 180), b * np.sin(A * np.pi / 180), 0.0)
+    p2 = (90.0, 0.0, 0.0)
+    p3 = (c * np.cos(B * np.pi / 180), c * np.sin(B * np.pi / 180), 0.0)
 
-    print("triangle info")
-    print("A angle: {:0.2f} deg, a side: {:0.2f}mm".format(A, a))
-    print("B angle: {:0.2f} deg, b side: {:0.2f}mm".format(B, b))
-    print("C angle: {:0.2f} deg, c side: {:0.2f}mm".format(C, c))
+    log.info("Triangle info")
+    log.info("A angle: {:7.2f} deg, a side: {:0.2f} mm".format(A, a))
+    log.info("B angle: {:7.2f} deg, b side: {:0.2f} mm".format(B, b))
+    log.info("C angle: {:7.2f} deg, c side: {:0.2f} mm".format(C, c))
 
-    print("triangle coordinates")
-    print("p1: ({:6.03f},{:6.03f},{:6.03f})".format(*p1))
-    print("p2: ({:6.03f},{:6.03f},{:6.03f})".format(*p2))
-    print("p3: ({:6.03f},{:6.03f},{:6.03f})".format(*p3))
+    log.info("triangle coordinates")
+    log.info("p1: ({:+7.03f},{:+7.03f},{:+7.03f})".format(*p1))
+    log.info("p2: ({:+7.03f},{:+7.03f},{:+7.03f})".format(*p2))
+    log.info("p3: ({:+7.03f},{:+7.03f},{:+7.03f})".format(*p3))
 
-    create_ini_file(3, [p1, p2, p3], 110)
-
-    # Custom marker shaft
-    shaft_pt = [[55, 14.37, 0.0], [-14.42, 28.51, 0], [35, 1.49, 0], [0.0, -35.0, 0.0]]
-    create_ini_file(4, shaft_pt, 111)
-
-    # Conver to json
-    convert_ini2json(Path("./share/custom_marker_id_110.ini"))
-    convert_ini2json(Path("./share/custom_marker_id_111.ini"))
+    # Custom marker shaft and convert to json
+    create_ini_file(3, [p1, p2, p3], 112)
+    convert_ini2json(Path("./share/custom_marker_id_112.ini"))
