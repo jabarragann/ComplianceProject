@@ -158,7 +158,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Create and plot data
     # ------------------------------------------------------------
-    df = pd.read_csv("./data/01_pitch_experiment/pitch_exp02.txt")
+    df = pd.read_csv("./data/01_pitch_experiment/pitch_exp01.txt")
 
     samples = df[["x", "y", "z"]].to_numpy().T
     Plotter3D.scatter_3d(samples)

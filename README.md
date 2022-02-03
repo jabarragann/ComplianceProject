@@ -12,3 +12,9 @@
 
 http://wiki.ros.org/rosservice
 http://wiki.ros.org/action/show/rosmsg?action=show&redirect=rossrv
+
+
+
+# To do 
+
+* Multiple marker problem solutions. 
