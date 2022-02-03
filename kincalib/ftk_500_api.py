@@ -17,6 +17,7 @@ from scipy.spatial import distance
 from pathlib import Path
 import matplotlib.pyplot as plt
 from kincalib.utils.Logger import Logger
+import sys
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -114,6 +115,27 @@ class ftk_500:
         return np.array(sorted_records)
 
 
+def clean_avg_measurements(measurements, expected_markers=1):
+    if len(measurements) > 0:
+        if expected_markers == 1:
+            measurements = np.array(measurements)
+            mean_value = measurements.squeeze().mean(axis=0)
+            std_value = measurements.squeeze().std(axis=0)
+            log.debug(f"sample values \n {measurements.squeeze()[:1, :]}")
+            log.debug(f"mean value: {mean_value}")
+            log.debug(f"std value:  {std_value}")
+        elif expected_markers > 1:
+            sorted = ftk_500.sort_measurements(measurements)
+            mean_value = sorted.mean(axis=0)
+            std_value = sorted.std(axis=0)
+            log.debug(f"sample values \n {sorted.squeeze()[:1, :]}")
+            log.debug(f"mean value:\n{mean_value}")
+            log.debug(f"std value:\n{std_value}")
+        else:
+            print("expected markers needs to be a positive number")
+            sys.exit(0)
+
+
 if __name__ == "__main__":
     log = Logger("utils_log").log
     ftk_handler = ftk_500()
@@ -147,17 +169,12 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Obtain measurements
     # ------------------------------------------------------------
-    expected_markers = 1
-    measurements, miss_match = ftk_handler.collect_measurements(
+    expected_markers = 4
+    measure_list, miss_match = ftk_handler.collect_measurements(
         expected_markers, t=1000, sample_time=20
     )
-    measurements = np.array(measurements)
+    measurements = np.array(measure_list)
     log.debug(f"collected samples: {measurements.shape[0]}")
     log.debug(f"drop samples:      {miss_match}")
     log.debug(f"Measurement shape: {measurements.shape}")
-    log.debug(f"sample values \n {measurements.squeeze()[:3, :]}")
-
-    mean_value = measurements.squeeze().mean(axis=0)
-    std_value = measurements.squeeze().std(axis=0)
-    log.debug(f"mean value: {mean_value}")
-    log.debug(f"std value:  {std_value}")
+    clean_avg_measurements(measure_list, expected_markers=expected_markers)
