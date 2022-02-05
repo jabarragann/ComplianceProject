@@ -3,6 +3,8 @@ Does the atracsys tells me what balls/detected pose correspond to which marker?
 """
 
 from re import I
+
+from sympy import O
 import rospy
 import PyKDL
 import std_msgs
@@ -19,25 +21,39 @@ import matplotlib.pyplot as plt
 from kincalib.utils.Logger import Logger
 import sys
 
-np.set_printoptions(precision=3, suppress=True)
+np.set_printoptions(precision=4, suppress=True)
 
 
 class ftk_500:
-    def __init__(self) -> None:
-        # create node
+    def __init__(self, marker_name: str = None) -> None:
+        # Init variables
+        self.marker_name = None
+
+        # Create node
         if not rospy.get_node_uri():
             rospy.init_node("ftk_500", anonymous=True, log_level=rospy.WARN)
         else:
             rospy.logdebug(rospy.get_caller_id() + " -> ROS already initialized")
 
-        # suscriber
+        # subscribers
         self.__trajectory_j_ratio_sub = rospy.Subscriber(
             "/atracsys/Controller/measured_cp_array",
             geometry_msgs.msg.PoseArray,
             self.pose_array_callback,
         )
+        if marker_name is not None:
+            self.marker_name = marker_name
+            self.marker_pose = None
+            self.__marker_subs_list = rospy.Subscriber(
+                "/atracsys/" + marker_name + "/measured_cp",
+                geometry_msgs.msg.PoseStamped,
+                self.marker_pose_callback,
+            )
 
         self.poses_arr = []
+
+    def marker_pose_callback(self, msg):
+        self.marker_pose = pm.fromMsg(msg.pose)
 
     def pose_array_callback(self, msg):
         record = []
@@ -54,7 +70,14 @@ class ftk_500:
     def collect_measurements(
         self, m: int, t: float = 1000, sample_time: float = 50
     ) -> List[List[float]]:
-        """collectect measurements from `m` markers for a specific amount of time.
+        """Collectect measurements from `m` fiducials for a specific amount of time.
+        Marker pose will also be collected if it is provided when initializing the class.
+
+        Output dict keys:
+        * "fiducials": recorded,
+        * "fiducials_dropped": records_removed,
+        * "marker": marker_pose_arr,
+        * "markers_dropped": markers_dropped,
 
         Args:
             m (int):  Expected number of markers
@@ -62,23 +85,37 @@ class ftk_500:
             sample_time (float): Sample time in (ms)
 
         Returns:
-            -List: List of measurements
-            -markers_mismatch (int): number of times the detected markers did not match the expected number
+            measurement_dict (dict): Dictionary with measurements
         """
 
         init_time = time.time()
-        markers_mismatch = 0
+        records_removed = 0
         recorded = []
+        marker_pose_arr = []
+        markers_dropped = 0
+        self.marker_pose = None
         while time.time() - init_time < t / 1000:
-            # Check number of markers
+            # Collect fiducials pose if they match the expected number
             if len(self.poses_arr) == m:
                 recorded.append(self.poses_arr)
             else:
-                markers_mismatch += 1
+                records_removed += 1
                 # print("marker mismatch")
+            # Collect marker pose if available
+            if self.marker_name is not None:
+                if self.marker_pose is not None:
+                    marker_pose_arr.append(self.marker_pose)
+                else:
+                    markers_dropped += 1
+
             time.sleep(sample_time / 1000)
 
-        return recorded, markers_mismatch
+        return {
+            "fiducials": recorded,
+            "fiducials_dropped": records_removed,
+            "markers": marker_pose_arr,
+            "markers_dropped": markers_dropped,
+        }
 
     @staticmethod
     def sort_measurements(measurement_list: List[List[float]]) -> np.ndarray:
@@ -114,6 +151,28 @@ class ftk_500:
 
         return np.array(sorted_records)
 
+    @staticmethod
+    def average_marker_pose(pose_arr):
+        if len(pose_arr) < 10:
+            print("Not enough records (10 minimum)")  # this is totally arbitrary
+            return None, None, None
+        position = []
+        orientation = []
+        for k in range(len(pose_arr)):
+            position.append(np.array(list(pose_arr[k].p)))
+            orientation.append(np.array(list(pose_arr[k].M.GetQuaternion())))
+
+        position_mean = np.array(position).mean(axis=0)
+        orientation_mean = np.array(orientation).mean(axis=0)
+        position_std = np.array(position).std(axis=0)
+        orientation_std = np.array(orientation).std(axis=0)
+        orientation_mean = orientation_mean / np.linalg.norm(orientation_mean)
+
+        mean_frame = PyKDL.Frame(
+            PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
+        )
+        return mean_frame, position_std, orientation_std
+
 
 def clean_avg_measurements(measurements, expected_markers=1):
     if len(measurements) > 0:
@@ -126,11 +185,12 @@ def clean_avg_measurements(measurements, expected_markers=1):
             log.debug(f"std value:  {std_value}")
         elif expected_markers > 1:
             sorted = ftk_500.sort_measurements(measurements)
-            mean_value = sorted.mean(axis=0)
-            std_value = sorted.std(axis=0)
-            log.debug(f"sample values \n {sorted.squeeze()[:1, :]}")
-            log.debug(f"mean value:\n{mean_value}")
-            log.debug(f"std value:\n{std_value}")
+            if sorted is not None:
+                mean_value = sorted.mean(axis=0)
+                std_value = sorted.std(axis=0)
+                log.debug(f"sample values \n {sorted.squeeze()[:1, :]}")
+                log.debug(f"mean value:\n{mean_value}")
+                log.debug(f"std value:\n{std_value}")
         else:
             print("expected markers needs to be a positive number")
             sys.exit(0)
@@ -138,10 +198,10 @@ def clean_avg_measurements(measurements, expected_markers=1):
 
 if __name__ == "__main__":
     log = Logger("utils_log").log
-    ftk_handler = ftk_500()
 
     print(__name__)
 
+    # ftk_handler = ftk_500()
     # Obtain and sort measurements
     # measurements, miss_match = ftk_handler.collect_measurements(2, t=10000, sample_time=20)
     # sorted_cp = ftk_handler.sort_measurements(measurements)
@@ -167,14 +227,31 @@ if __name__ == "__main__":
     # plt.show()
 
     # ------------------------------------------------------------
-    # Obtain measurements
+    # Obtain measurements - example
     # ------------------------------------------------------------
-    expected_markers = 4
-    measure_list, miss_match = ftk_handler.collect_measurements(
-        expected_markers, t=1000, sample_time=20
-    )
+    input("Enter to collect data ")
+    marker_name = "custom_marker_112"
+    expected_markers = 5
+    ftk_handler = ftk_500(marker_name=marker_name)
+
+    measurement_dict = ftk_handler.collect_measurements(expected_markers, t=1000, sample_time=20)
+
+    measure_list = measurement_dict["fiducials"]
+    miss_match = measurement_dict["fiducials_dropped"]
+    marker_list = measurement_dict["markers"]
+    marker_dropped = measurement_dict["markers_dropped"]
+
     measurements = np.array(measure_list)
-    log.debug(f"collected samples: {measurements.shape[0]}")
-    log.debug(f"drop samples:      {miss_match}")
+    log.debug(f"collected fiducials samples: {measurements.shape[0]}")
+    log.debug(f"drop fiducials samples:      {miss_match}")
     log.debug(f"Measurement shape: {measurements.shape}")
     clean_avg_measurements(measure_list, expected_markers=expected_markers)
+
+    log.debug(f"collected marker:  {len(marker_list)}")
+    log.debug(f"Dropped markers:   {marker_dropped}")
+    mean_frame, p_std, r_std = ftk_500.average_marker_pose(marker_list)
+
+    if mean_frame is not None:
+        log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
+        log.debug(f"position std:\n{p_std}")
+        log.debug(f"orientation std:\n{r_std}")
