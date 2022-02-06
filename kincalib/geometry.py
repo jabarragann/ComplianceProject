@@ -29,6 +29,41 @@ class Plotter3D:
         plt.show()
 
 
+# ------------------------------------------------------------
+# Geometric entities
+# - Triangle 3D
+# - Circle 3D
+# - Plane 3D
+# ------------------------------------------------------------
+
+
+class Triangle3D:
+    def __init__(self, vertices_list: List[np.ndarray]) -> None:
+
+        self.v_list = vertices_list
+
+        self.area = self.calculate_area()
+
+        self.segments_list: np.ndarray = None
+
+    def calculate_area(self):
+        AB = self.v_list[1] - self.v_list[0]
+        AC = self.v_list[2] - self.v_list[0]
+
+        return np.linalg.norm(np.cross(AB, AC)) / 2
+
+    def __str__(self) -> None:
+        str_rep = (
+            f"Triangle\n"
+            f"P1: {self.v_list[0][0]:+8.4f},{self.v_list[0][1]:+8.4f},{self.v_list[0][2]:+8.4f} \n"
+            f"P2: {self.v_list[1][0]:+8.4f},{self.v_list[1][1]:+8.4f},{self.v_list[1][2]:+8.4f} \n"
+            f"P3: {self.v_list[2][0]:+8.4f},{self.v_list[2][1]:+8.4f},{self.v_list[2][2]:+8.4f} \n"
+            f"Area: {self.area*1e6:0.4f} mm^2"
+        )
+
+        return str_rep
+
+
 class Circle3D:
     def __init__(self, center, normal, radius):
         self.center = center
@@ -166,3 +201,5 @@ if __name__ == "__main__":
     log.info(f"estimated radius \n{est_circle.radius:.04f}")
     log.info(f"estimated center \n {est_circle.center.squeeze()}")
     log.info(f"estimated normal \n {est_circle.normal}")
+
+    ##TODO: show the estimated circle in a plot with the samples

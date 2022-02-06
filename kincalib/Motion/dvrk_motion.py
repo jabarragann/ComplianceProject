@@ -3,7 +3,7 @@ import dvrk
 import time
 import sys
 import numpy as np
-from kincalib.ftk_500_api import ftk_500
+from kincalib.Atracsys.ftk_500_api import ftk_500
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 import pandas as pd

@@ -2,9 +2,7 @@
 Does the atracsys tells me what balls/detected pose correspond to which marker?
 """
 
-from re import I
 
-from sympy import O
 import rospy
 import PyKDL
 import std_msgs
@@ -13,7 +11,7 @@ from sensor_msgs.msg import JointState
 import geometry_msgs.msg
 import time
 import numpy as np
-from typing import List
+from typing import List, Tuple
 import scipy
 from scipy.spatial import distance
 from pathlib import Path
@@ -152,7 +150,17 @@ class ftk_500:
         return np.array(sorted_records)
 
     @staticmethod
-    def average_marker_pose(pose_arr):
+    def average_marker_pose(
+        pose_arr: List[PyKDL.Frame],
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """[summary]
+
+        Args:
+            pose_arr (List[PyKDL.Frame]): [description]
+
+        Returns:
+            Tuple[np.ndarray,np.ndarray,np.ndarray]: mean_frame, position_std, orientation_std
+        """
         if len(pose_arr) < 10:
             print("Not enough records (10 minimum)")  # this is totally arbitrary
             return None, None, None
