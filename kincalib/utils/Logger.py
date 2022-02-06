@@ -7,9 +7,9 @@ class Logger:
 
     FORMAT = "%(message)s"
 
-    def __init__(self, name: str = "autonomy_utils"):
+    def __init__(self, name: str = "autonomy_utils", log_level="DEBUG"):
         self.log = logging.getLogger(name)
-        self.level = logging.DEBUG
+        self.level = log_level
 
         # File handler
         # f_handler = logging.FileHandler("./assignment4/logs/icp_log.log", mode="w")
