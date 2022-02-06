@@ -231,7 +231,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     input("Enter to collect data ")
     marker_name = "custom_marker_112"
-    expected_markers = 5
+    expected_markers = 4
     ftk_handler = ftk_500(marker_name=marker_name)
 
     measurement_dict = ftk_handler.collect_measurements(expected_markers, t=1000, sample_time=20)
