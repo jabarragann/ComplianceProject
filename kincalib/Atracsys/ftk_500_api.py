@@ -3,6 +3,7 @@ Does the atracsys tells me what balls/detected pose correspond to which marker?
 """
 
 
+from re import I
 import rospy
 import PyKDL
 import std_msgs
@@ -65,7 +66,7 @@ class ftk_500:
             )
         self.poses_arr = record
 
-    def collect_measurements(
+    def collect_measurements_raw(
         self, m: int, t: float = 1000, sample_time: float = 50
     ) -> List[List[float]]:
         """Collectect measurements from `m` fiducials for a specific amount of time.
@@ -114,6 +115,41 @@ class ftk_500:
             "markers": marker_pose_arr,
             "markers_dropped": markers_dropped,
         }
+
+    def obtain_processed_measurement(
+        self, m: int, t: float = 1000, sample_time: float = 50
+    ) -> dict:
+        """[summary]
+
+        Args:
+            m (int):  Expected number of markers
+            t (float, optional): [description]. Defaults to 1000.
+            sample_time (float, optional): [description]. Defaults to 50.
+
+        Returns:
+            dict: [description]
+        """
+        records_dict = ftk_handler.collect_measurements_raw(m, t, sample_time)
+        sensor_vals = records_dict["fiducials"]
+        fidu_dropped = records_dict["fiducials_dropped"]
+        marker_pose = records_dict["markers"]
+        marker_dropped = records_dict["markers_dropped"]
+
+        log.debug(f"collected samples: {len(sensor_vals)}")
+        if len(sensor_vals) >= 10 and len(marker_pose) >= 10:
+            # Sanity check - make sure the fiducials are reported in the same order
+            sensor_vals = ftk_500.sort_measurements(sensor_vals)
+            sensor_vals = np.array(sensor_vals)
+            # Get the average position of each detected fiducial
+            mean_value = sensor_vals.squeeze().mean(axis=0)
+            std_value = sensor_vals.squeeze().std(axis=0)
+            log.debug(f"mean value:\n{mean_value}")
+            log.debug(f"std value:\n{std_value}")
+            # Get mean pose of the marker
+            mean_frame, _, _ = ftk_500.average_marker_pose(marker_pose)
+            log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
+
+        return mean_frame, mean_value
 
     @staticmethod
     def sort_measurements(measurement_list: List[List[float]]) -> np.ndarray:
@@ -242,7 +278,7 @@ if __name__ == "__main__":
     expected_markers = 4
     ftk_handler = ftk_500(marker_name=marker_name)
 
-    measurement_dict = ftk_handler.collect_measurements(expected_markers, t=1000, sample_time=20)
+    measurement_dict = ftk_handler.collect_measurements_raw(expected_markers, t=500, sample_time=15)
 
     measure_list = measurement_dict["fiducials"]
     miss_match = measurement_dict["fiducials_dropped"]
@@ -263,3 +299,11 @@ if __name__ == "__main__":
         log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
         log.debug(f"position std:\n{p_std}")
         log.debug(f"orientation std:\n{r_std}")
+
+    # ------------------------------------------------------------
+    # Obtain processed measurements
+    # ------------------------------------------------------------
+    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(
+        expected_markers, t=500, sample_time=15
+    )
+    log.debug(f"Mean value shape {mean_value.shape}")

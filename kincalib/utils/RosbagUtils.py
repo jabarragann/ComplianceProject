@@ -4,7 +4,7 @@ Recording rosbag record with regex to capture the a subset of topics
 - rosbag record -O test -e "/PSM2/(measured|setpoint).*"
 
 Rosbag record regex do not use escape characters. The following command will not work as intended.
-- rosbag record -O test -a  -e "/PSM2/\(measured\|setpoint\).*
+- rosbag record -O test -e "/PSM2/\(measured\|setpoint\).*
 
 Util webpage to use rosbag package
 http://wiki.ros.org/rosbag/Cookbook
@@ -12,6 +12,10 @@ http://wiki.ros.org/rosbag/Cookbook
 Python rosbag module documentation
 http://docs.ros.org/en/diamondback/api/rosbag/html/python/rosbag.bag.Bag-class.html
 
+Interesting python package for rosbag manipulation
+https://jmscslgroup.github.io/bagpy/installation.html
+
+medium tutorial: https://rahulbhadani.medium.com/reading-ros-messages-from-a-bagfile-in-python-b006538bb520
 """
 import rosbag
 import rospy

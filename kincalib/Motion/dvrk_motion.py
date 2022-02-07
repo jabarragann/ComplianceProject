@@ -45,31 +45,12 @@ class DvrkMotions:
 
             # Read atracsys data for 1 second - fiducials data
             # Sensor_vals will have several measurements of the static fiducials
-            records_dict = ftk_handler.collect_measurements(
-                expected_markers, t=1000, sample_time=20
-            )
-            sensor_vals = records_dict["fiducials"]
-            fidu_dropped = records_dict["fiducials_dropped"]
-            marker_pose = records_dict["markers"]
-            marker_dropped = records_dict["markers_dropped"]
+            mean_frame, mean_value = ftk_handler.obtain_processed_measurement()
 
-            log.debug(f"collected samples: {len(sensor_vals)}")
-            if len(sensor_vals) >= 10 and len(marker_pose) >= 10:
-                # Sanity check - make sure the fiducials are reported in the same order
-                sensor_vals = ftk_500.sort_measurements(sensor_vals)
-                sensor_vals = np.array(sensor_vals)
-                # Get the average position of each detected fiducial
-                mean_value = sensor_vals.squeeze().mean(axis=0)
-                std_value = sensor_vals.squeeze().std(axis=0)
-                log.debug(f"mean value:\n{mean_value}")
-                log.debug(f"std value:\n{std_value}")
-                # Get mean pose of the marker
-                mean_frame, _, _ = ftk_500.average_marker_pose(marker_pose)
-                log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
-
+            if mean_frame is not None and mean_value is not None:
                 # Add fiducials to dataframe
                 # df columns: ["step", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
-                for mid, k in enumerate(range(sensor_vals.shape[1])):
+                for mid, k in enumerate(range(mean_value.shape[0])):
                     # fmt:off
                     d = [ idx, q5, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
                     # fmt:on
