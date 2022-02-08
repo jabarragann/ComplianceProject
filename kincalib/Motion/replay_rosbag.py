@@ -229,7 +229,7 @@ class RosbagReplay:
                 )
                 if marker_pose is not None:
                     # Add marker pose to df_cp
-                    self.log.debug(f"Maker pose \n{pm.toMatrix(marker_pose)}")
+                    self.log.debug(f"Step {index:02d} Maker pose \n{pm.toMatrix(marker_pose)}")
                     p = list(marker_pose.p)
                     q = marker_pose.M.GetQuaternion()
                     d = [index, 0, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
@@ -240,7 +240,9 @@ class RosbagReplay:
                     # Columns format: ["step", "q1", "q2", "q3", "q4", "q5", "q6"]
                     jp = replay_device.measured_jp()
                     jp = [index, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5]]
-                    new_pt = pd.DataFrame(jp, df_cols_jp)
+                    jp = np.array(jp).reshape((1, 7))
+                    self.log.debug(f"Step {index:02d} joint pose \n{jp}")
+                    new_pt = pd.DataFrame(jp, columns=df_cols_jp)
                     df_vals_jp = df_vals_jp.append(new_pt)
                 else:
                     self.log.warning("No marker pose detected.")
@@ -258,8 +260,7 @@ class RosbagReplay:
         save_without_overwritting(df_vals_cp, cp_filename)
         save_without_overwritting(df_vals_jp, jp_filename)
 
-        self.log.info("\n--> Time to replay trajectory: %f seconds" % (time.time() - start_time))
-        self.log.info("--> Done!")
+        self.log.info("Time to replay trajectory: %f seconds" % (time.time() - start_time))
 
 
 if __name__ == "__main__":
@@ -272,7 +273,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Create replay class
     # ------------------------------------------------------------
-    root = Path("temp/bags/")
+    root = Path("data/psm2_trajectories/")
     file_p = root / "pitch_exp_traj_01_test_cropped.bag"
     replay = RosbagReplay(file_p)
     replay.rosbag_utils.print_topics_info()

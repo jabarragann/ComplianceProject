@@ -135,8 +135,9 @@ class ftk_500:
         marker_pose = records_dict["markers"]
         marker_dropped = records_dict["markers_dropped"]
 
+        mean_frame, mean_value = None, None
         # self.log.debug(f"collected samples: {len(sensor_vals)}")
-        if len(sensor_vals) >= 10 and len(marker_pose) >= 10:
+        if len(sensor_vals) >= 10:
             # Sanity check - make sure the fiducials are reported in the same order
             sensor_vals = ftk_500.sort_measurements(sensor_vals)
             sensor_vals = np.array(sensor_vals)
@@ -145,13 +146,12 @@ class ftk_500:
             std_value = sensor_vals.squeeze().std(axis=0)
             # self.log.debug(f"mean value:\n{mean_value}")
             # self.log.debug(f"std value:\n{std_value}")
+        if len(marker_pose) >= 10:
             # Get mean pose of the marker
             mean_frame, _, _ = ftk_500.average_marker_pose(marker_pose)
             # self.log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
 
-            return mean_frame, mean_value
-        else:
-            return None, None
+        return mean_frame, mean_value
 
     @staticmethod
     def sort_measurements(measurement_list: List[List[float]]) -> np.ndarray:

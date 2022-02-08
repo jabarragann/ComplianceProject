@@ -28,7 +28,7 @@ def main():
     # ------------------------------------------------------------
     parser = argparse.ArgumentParser()
     #fmt:off
-    parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/rec-04_traj-01.txt", 
+    parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/d03-rec-03_traj-01.txt", 
                          help="filename to save the data") 
     args = parser.parse_args()
 
@@ -37,14 +37,14 @@ def main():
         print("filename root directory does not exists.")
         sys.exit(0)
 
-    expected_spheres = 3
+    expected_spheres = 4
     marker_name = "custom_marker_112"
     rospy.init_node("dvrk_bag_replay", anonymous=True)
 
     # ------------------------------------------------------------
     # Create replay class and specify the rosbag path
     # ------------------------------------------------------------
-    root = Path("temp/bags/")
+    root = Path("data/psm2_trajectories/")
     file_p = root / "pitch_exp_traj_01_test_cropped.bag"
     replay = RosbagReplay(file_p)
     replay.rosbag_utils.print_topics_info()
@@ -75,7 +75,7 @@ def main():
 
     input('---> Make sure arm is ready to move. Press "Enter" to move to start position')
     arm.move_jp(np.array(setpoints[0].position)).wait()
-    input('-> Press "Enter" to replay trajectory')
+    input('-> Press "Enter" to start data collection trajectory')
 
     # ------------------------------------------------------------
     # Execute trajectory
