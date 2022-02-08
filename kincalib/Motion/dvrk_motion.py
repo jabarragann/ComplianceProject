@@ -24,7 +24,7 @@ class DvrkMotions:
 
     @staticmethod
     def pitch_experiment(
-        init_pos, psm_handler, log, expected_markers=4, save: bool = True, filename: Path = None
+        init_jp, psm_handler, log, expected_markers=4, save: bool = True, filename: Path = None
     ):
 
         ftk_handler = ftk_500("custom_marker_112")
@@ -34,18 +34,20 @@ class DvrkMotions:
         df_vals = pd.DataFrame(columns=df_cols)
 
         # Move to initial position
-        psm_handler.move_jp(init_pos).wait()
+        psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
         # Move pitch joint from min_pitch to max_pitch
         for idx, q5 in enumerate(trajectory):
             log.info(f"q5-{idx}@{q5*180/np.pi:0.2f}(deg)@{q5:0.2f}(rad)")
-            jp[4] = q5  ##Only move pitch axis (joint 5) - joint in index 4
-            psm_handler.move_jp(jp).wait()
+            init_jp[4] = q5  ##Only move pitch axis (joint 5) - joint in index 4
+            psm_handler.move_jp(init_jp).wait()
             time.sleep(0.5)
 
             # Read atracsys data for 1 second - fiducials data
             # Sensor_vals will have several measurements of the static fiducials
-            mean_frame, mean_value = ftk_handler.obtain_processed_measurement()
+            mean_frame, mean_value = ftk_handler.obtain_processed_measurement(
+                expected_markers, t=500, sample_time=15
+            )
 
             if mean_frame is not None and mean_value is not None:
                 # Add fiducials to dataframe
@@ -64,7 +66,8 @@ class DvrkMotions:
                 d = np.array(d).reshape((1, 11))
                 new_pt = pd.DataFrame(d, columns=df_cols)
                 df_vals = df_vals.append(new_pt)
-
+            else:
+                log.warning("No markers found")
         # Save experiment
         log.debug(df_vals.head())
         if save:

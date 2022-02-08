@@ -29,10 +29,7 @@ def main():
     # ------------------------------------------------------------
 
     # Initital position
-    # init_jp = np.array([0.0, 0.0, 0.127, -1.615, 0.0, 0.0]) #01,02
-    # init_jp = np.array([-0.3202, -0.264, 0.1275, -1.5599, 0.0118, 0.0035]) #03,04
-    # init_jp = np.array([[-0.0362, -0.5643, 0.1317, -0.7681, -0.1429, 0.2971]]) #05
-    init_jp = np.array([[0.1364, 0.2608, 0.1314, -1.4911, 0.216, 0.1738]])  # 06
+    init_jp = np.array([-0.0036, -0.0345, 0.1429, 0.1413, -0.1920, -0.4051])
     psm_handler.move_jp(init_jp).wait()
 
     time.sleep(0.5)
@@ -41,7 +38,7 @@ def main():
     log.info(f"Joints current state \n {jp}")
 
     # Move wrist pitch axis of the robot
-    filename = Path("./data/02_pitch_experiment/pitch_exp06.txt")
+    filename = Path("./data/02_pitch_experiment/d02-pitch_exp03.txt")
     DvrkMotions.pitch_experiment(
         init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     )
