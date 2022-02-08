@@ -2,6 +2,7 @@
 Rosbag replay script for PSM arm
 """
 from __future__ import annotations
+from random import sample
 import dvrk
 import crtk
 import sys
@@ -16,7 +17,11 @@ from pathlib import Path
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
 import tf_conversions.posemath as pm
-
+from kincalib.Atracsys.ftk_500_api import ftk_500
+from kincalib.utils.SavingUtilities import save_without_overwritting
+import pandas as pd
+from rich.logging import RichHandler
+from rich.progress import track
 
 # simplified arm class to replay motion, better performance than
 # dvrk.arm since we're only subscribing to topics we need
@@ -138,6 +143,11 @@ class RosbagReplay:
             self.log.error("-- No trajectory found!")
 
     def execute_trajectory(self, replay_device: RosbagReplay):
+        """Normal trajectory execution based on Anton example.
+
+        Args:
+            replay_device (RosbagReplay): [description]
+        """
         last_bag_time = self.setpoints[0].header.stamp.to_sec()
         counter = 0
         total = len(self.setpoints)
@@ -170,22 +180,41 @@ class RosbagReplay:
         print("\n--> Time to replay trajectory: %f seconds" % (time.time() - start_time))
         print("--> Done!")
 
-    def execute_measure(self, replay_device: RosbagReplay):
+    def execute_measure(
+        self,
+        replay_device: RosbagReplay,
+        filename: Path,
+        marker_name: str,
+        expected_spheres: int,
+        save=False,
+    ):
         """Stop every `n` number of setpoints to take a measurement while replaying the trajectory.
+        Measurements will be saved in two different dataframes: a pose (cp) df (markers,fiducials, and robot
+        end-effector pose) and a joint position (jp) df (joint position of the robot.)
 
         Args:
-            replay_device (RosbagReplay): [description]
+            replay_device (RosbagReplay): replay device handler.
+            filename (Path): filename for the the pose_df and joint_df. The files will be saved as 'filename_pose.txt' and
+            'filename_jp.txt'.
+            marker_name (str): Marker name.
+            expected_spheres (int, optional): Expected number of fiducials. Defaults to 3.
+            save (bool, optional): [description]. Defaults to False.
         """
         last_bag_time = self.setpoints[0].header.stamp.to_sec()
         counter = 0
         total = len(self.setpoints)
-
         start_time = time.time()
-        # for the replay, use the jp/cp setpoint for the arm to control the
-        # execution time.  Jaw positions are picked in order without checking
-        # time.  There might be better ways to synchronized the two
-        # sequences...
-        for index in range(total):
+
+        # Create ftk handler
+        ftk_handler = ftk_500(marker_name=marker_name)
+
+        # Create data frames
+        df_cols_cp = ["step", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+        df_vals_cp = pd.DataFrame(columns=df_cols_cp)
+        df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6"]
+        df_vals_jp = pd.DataFrame(columns=df_cols_jp)
+
+        for index in track(range(total), "-- Trajectory Progress -- "):
             # record start time
             loop_start_time = time.time()
             # compute expected dt
@@ -195,11 +224,27 @@ class RosbagReplay:
             # replay
             if index % 20 == 0:
                 replay_device.move_jp(numpy.array(self.setpoints[index].position)).wait()
-                time.sleep(0.5)
-            # update progress
-            counter = counter + 1
-            sys.stdout.write("\r-- Progress %02.1f%%" % (float(counter) / float(total) * 100.0))
-            sys.stdout.flush()
+                marker_pose, fiducials_pose = ftk_handler.obtain_processed_measurement(
+                    expected_spheres, t=500, sample_time=15
+                )
+                if marker_pose is not None:
+                    # Add marker pose to df_cp
+                    self.log.debug(f"Maker pose \n{pm.toMatrix(marker_pose)}")
+                    p = list(marker_pose.p)
+                    q = marker_pose.M.GetQuaternion()
+                    d = [index, 0, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
+                    d = np.array(d).reshape((1, 11))
+                    new_pt = pd.DataFrame(d, columns=df_cols_cp)
+                    df_vals_cp = df_vals_cp.append(new_pt)
+                    # Add robot joints to df_jp
+                    # Columns format: ["step", "q1", "q2", "q3", "q4", "q5", "q6"]
+                    jp = replay_device.measured_jp()
+                    jp = [index, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5]]
+                    new_pt = pd.DataFrame(jp, df_cols_jp)
+                    df_vals_jp = df_vals_jp.append(new_pt)
+                else:
+                    self.log.warning("No marker pose detected.")
+
             # try to keep motion synchronized
             loop_end_time = time.time()
             sleep_time = delta_bag_time - (loop_end_time - loop_start_time)
@@ -207,8 +252,14 @@ class RosbagReplay:
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-        print("\n--> Time to replay trajectory: %f seconds" % (time.time() - start_time))
-        print("--> Done!")
+        # Save data frames
+        cp_filename = filename.parent / (filename.with_suffix("").name + "_cp.txt")
+        jp_filename = filename.parent / (filename.with_suffix("").name + "_jp.txt")
+        save_without_overwritting(df_vals_cp, cp_filename)
+        save_without_overwritting(df_vals_jp, jp_filename)
+
+        self.log.info("\n--> Time to replay trajectory: %f seconds" % (time.time() - start_time))
+        self.log.info("--> Done!")
 
 
 if __name__ == "__main__":
@@ -260,5 +311,4 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Execute trajectory
     # ------------------------------------------------------------
-    # replay.execute_trajectory(arm)
-    replay.execute_measure(arm)
+    replay.execute_trajectory(arm)
