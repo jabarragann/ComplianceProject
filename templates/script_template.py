@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import List, Tuple, Set
+from rich.logging import RichHandler
+from rich.progress import track
 
 # ROS and DVRK imports
 import dvrk
@@ -20,6 +22,9 @@ from kincalib.utils.RosbagUtils import RosbagUtils
 
 
 def main():
+    # ------------------------------------------------------------
+    # Sample comment
+    # ------------------------------------------------------------
     pass
 
 
