@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser()
     #fmt:off
     parser.add_argument( "-a", "--arm", type=str, choices=["ECM", "MTML", "MTMR", "PSM1", "PSM2", "PSM3"],
-                           default="PSM1", help="arm name corresponding to ROS topics without namespace.") #fmt:on
+                           default="PSM2", help="arm name corresponding to ROS topics without namespace.") #fmt:on
     args = parser.parse_args()
 
     log = Logger("utils_log").log
