@@ -7,26 +7,72 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from kincalib.utils.Logger import Logger
 import pandas as pd
+from numpy import linalg, cross, dot
 
 np.set_printoptions(precision=3, suppress=True)
 
 
 class Plotter3D:
     def __init__(self) -> None:
-        pass
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(projection="3d")
+        self.ax.set_xlabel("X Label")
+        self.ax.set_ylabel("Y Label")
+        self.ax.set_zlabel("Z Label")
 
-    @staticmethod
-    def scatter_3d(points: np.ndarray, marker="^") -> None:
+    def scatter_3d(self, points: np.ndarray, marker="^", color=None) -> None:
+        """[summary]
 
-        fig = plt.figure()
-        ax = fig.add_subplot(projection="3d")
+        Args:
+            points (np.ndarray): Size (3,N)
+            marker (str, optional): [description]. Defaults to "^".
+            color ([type], optional): [description]. Defaults to None.
+        """
+        self.ax.scatter(points[0, :], points[1, :], points[2, :], marker=marker, c=color)
 
-        ax.scatter(points[0, :], points[1, :], points[2, :], marker=marker)
-        ax.set_xlabel("X Label")
-        ax.set_ylabel("Y Label")
-        ax.set_zlabel("Z Label")
-
+    def plot():
         plt.show()
+
+
+def rodrigues_rot(P, n0, n1):
+
+    # If P is only 1d array (coords of single point), fix it to be matrix
+    if P.ndim == 1:
+        P = P.reshape((1, 3))
+
+    # Get vector of rotation k and angle theta
+    n0 = n0 / linalg.norm(n0)
+    n1 = n1 / linalg.norm(n1)
+    k = cross(n0, n1)
+    k = k / linalg.norm(k)
+    theta = np.arccos(dot(n0, n1))
+
+    # Compute rotated points
+    P_rot = np.zeros((len(P), 3))
+    for i in range(len(P)):
+        P_rot[i] = (
+            P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
+        )
+
+    return P_rot
+
+
+def fit_3d_sphere(samples: np.ndarray) -> Tuple[float]:
+    # ------------------------------------------------------------
+    # Obtain center and radius by fitting a sphere - See "Efficiently
+    # Calibrating Cable-Driven Surgical Robots With RGBD Fiducial Sensing
+    # and Recurrent Neural Networks" for the least-squares formulation.
+    # ------------------------------------------------------------
+    N = samples.shape[1]
+    samples = samples.T
+    A = np.hstack((samples, np.ones((N, 1))))
+    b = samples[:, 0] ** 2 + samples[:, 1] ** 2 + samples[:, 2] ** 2
+    b = b.reshape(N, 1)
+    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
+    center = x[0:3] / 2
+    radius = (x[3] + center[0] ** 2 + center[1] ** 2 + center[2] ** 2) ** 0.5
+
+    return center, radius
 
 
 # ------------------------------------------------------------
@@ -88,9 +134,8 @@ class Circle3D:
         Returns:
             [type]: [description]
         """
-        pts = np.zeros((3, N))
         theta = np.linspace(0, 2 * pi, N).reshape(-1, 1)
-        pts = self.center + self.radius * cos(theta) * self.a + self.radius * sin(theta) * self.b
+        pts = self.center.T + self.radius * cos(theta) * self.a + self.radius * sin(theta) * self.b
         pts = pts.T
         return pts
 
@@ -101,32 +146,57 @@ class Circle3D:
             and not a circle as a model function.
 
         Args:
-            samples (np.ndarray): points with the shape (3,N) where `N` is the number of points
+            samples (np.ndarray): points with the shape (N,3) where `N` is the number of points
 
         Returns:
-            Circle3D: Circle that minimizes the lsm problem
+            Circle3D: Circle that minimizes the lstsq problem
         """
 
+        P_mean = samples.mean(axis=0)
+        P_centered = samples - P_mean
+
         # ------------------------------------------------------------
-        # Fit Plane
+        # (1) Fit Plane
         # ------------------------------------------------------------
         plane = Plane3D.from_data(samples)
 
-        # ------------------------------------------------------------
-        # Obtain center and radius by fitting a sphere - See "Efficiently
-        # Calibrating Cable-Driven Surgical Robots With RGBD Fiducial Sensing
-        # and Recurrent Neural Networks" for the least-squares formulation.
-        # ------------------------------------------------------------
-        N = samples.shape[1]
-        samples = samples.T
-        A = np.hstack((samples, np.ones((N, 1))))
-        b = samples[:, 0] ** 2 + samples[:, 1] ** 2 + samples[:, 2] ** 2
-        b = b.reshape(N, 1)
-        x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
-        center = x[0:3] / 2
-        radius = (x[3] + center[0] ** 2 + center[1] ** 2 + center[2] ** 2) ** 0.5
+        # -------------------------------------------------------------------------------
+        # (2) Project points to coords X-Y in 2D plane
+        # -------------------------------------------------------------------------------
+        P_xy = rodrigues_rot(P_centered, plane.normal, [0, 0, 1])
 
-        return Circle3D(center, plane.normal, radius[0])
+        # -------------------------------------------------------------------------------
+        # (3) Fit circle in new 2D coords
+        # -------------------------------------------------------------------------------
+        xc, yc, radius = Circle3D.fit_circle_2d(P_xy[:, 0], P_xy[:, 1])
+
+        # -------------------------------------------------------------------------------
+        # (4) Go back to 3D
+        # -------------------------------------------------------------------------------
+        C = rodrigues_rot(np.array([xc, yc, 0]), [0, 0, 1], plane.normal) + P_mean
+        C = C.flatten()
+
+        return Circle3D(C, plane.normal, radius)
+
+    @staticmethod
+    def fit_circle_2d(x, y, w=[]):
+        A = np.array([x, y, np.ones(len(x))]).T
+        b = x ** 2 + y ** 2
+
+        # Modify A,b for weighted least squares
+        if len(w) == len(x):
+            W = np.diag(w)
+            A = dot(W, A)
+            b = dot(W, b)
+
+        # Solve by method of least squares
+        c = linalg.lstsq(A, b, rcond=None)[0]
+
+        # Get circle parameters from solution c
+        xc = c[0] / 2
+        yc = c[1] / 2
+        r = np.sqrt(c[2] + xc ** 2 + yc ** 2)
+        return xc, yc, r
 
 
 class Plane3D:
@@ -143,7 +213,7 @@ class Plane3D:
             https://meshlogic.github.io/posts/jupyter/curve-fitting/fitting-a-circle-to-cluster-of-3d-points/
 
         Args:
-            samples (np.ndarray): points stored in an array with the shape (3,N) where `N` is the number of points.
+            samples (np.ndarray): points stored in an array with the shape (N,3) where `N` is the number of points.
 
         Returns:
             Plane3D: Best fitted plane
@@ -152,7 +222,7 @@ class Plane3D:
         # (1) Fitting plane by SVD for the mean-centered data
         # Eq. of plane is <p,n> + d = 0, where p is a point on plane and n is normal vector
         # -------------------------------------------------------------------------------
-        P = samples.T
+        P = samples
         P_mean = P.mean(axis=0)
         P_centered = P - P_mean
         U, s, V = svd(P_centered)
@@ -195,11 +265,16 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     df = pd.read_csv("./data/01_pitch_experiment/pitch_exp01.txt")
 
-    samples = df[["x", "y", "z"]].to_numpy().T
-    Plotter3D.scatter_3d(samples)
+    samples = df[["x", "y", "z"]].to_numpy()
+    log.info(f"Samples shape {samples.shape}")
     est_circle = Circle3D.from_sphere_lstsq(samples)
     log.info(f"estimated radius \n{est_circle.radius:.04f}")
     log.info(f"estimated center \n {est_circle.center.squeeze()}")
     log.info(f"estimated normal \n {est_circle.normal}")
 
     ##TODO: show the estimated circle in a plot with the samples
+
+    plotter = Plotter3D()
+    plotter.scatter_3d(samples.T, marker="o")
+    plotter.scatter_3d(est_circle.generate_pts(40), marker="^")
+    plt.show()
