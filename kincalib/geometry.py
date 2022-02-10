@@ -140,10 +140,10 @@ class Circle3D:
         return pts
 
     @classmethod
-    def from_sphere_lstsq(cls, samples: np.ndarray) -> Circle3D:
+    def from_lstsq_fit(cls, samples: np.ndarray) -> Circle3D:
         """Minimize a least-square problem with the sphere equation.
-            This approach is just an approximation as we are using a sphere
-            and not a circle as a model function.
+           Based on:
+           https://meshlogic.github.io/posts/jupyter/curve-fitting/fitting-a-circle-to-cluster-of-3d-points/
 
         Args:
             samples (np.ndarray): points with the shape (N,3) where `N` is the number of points
@@ -267,13 +267,12 @@ if __name__ == "__main__":
 
     samples = df[["x", "y", "z"]].to_numpy()
     log.info(f"Samples shape {samples.shape}")
-    est_circle = Circle3D.from_sphere_lstsq(samples)
+    est_circle = Circle3D.from_lstsq_fit(samples)
     log.info(f"estimated radius \n{est_circle.radius:.04f}")
     log.info(f"estimated center \n {est_circle.center.squeeze()}")
     log.info(f"estimated normal \n {est_circle.normal}")
 
-    ##TODO: show the estimated circle in a plot with the samples
-
+    # Plot samples and resulting fit
     plotter = Plotter3D()
     plotter.scatter_3d(samples.T, marker="o")
     plotter.scatter_3d(est_circle.generate_pts(40), marker="^")
