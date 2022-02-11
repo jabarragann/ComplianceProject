@@ -20,7 +20,7 @@ class Plotter3D:
         self.ax.set_ylabel("Y Label")
         self.ax.set_zlabel("Z Label")
 
-    def scatter_3d(self, points: np.ndarray, marker="^", color=None) -> None:
+    def scatter_3d(self, points: np.ndarray, marker="^", color=None, marker_size=20) -> None:
         """[summary]
 
         Args:
@@ -28,7 +28,9 @@ class Plotter3D:
             marker (str, optional): [description]. Defaults to "^".
             color ([type], optional): [description]. Defaults to None.
         """
-        self.ax.scatter(points[0, :], points[1, :], points[2, :], marker=marker, c=color)
+        self.ax.scatter(
+            points[0, :], points[1, :], points[2, :], marker=marker, c=color, s=marker_size
+        )
 
     def plot():
         plt.show()
@@ -80,6 +82,7 @@ def fit_3d_sphere(samples: np.ndarray) -> Tuple[float]:
 # - Triangle 3D
 # - Circle 3D
 # - Plane 3D
+# - Line 3D
 # ------------------------------------------------------------
 
 
@@ -233,6 +236,147 @@ class Plane3D:
         d = -P_mean.dot(normal)  # d = -<p,n>s
 
         return Plane3D(normal, d)
+
+
+class Line3D:
+    def __init__(self, ref_point: np.ndarray, direction: np.ndarray) -> None:
+        """[summary]
+
+        Args:
+            ref_point (np.ndarray): [description]
+            direction (np.ndarray): [description]
+        """
+        self.ref_point = ref_point
+        # Save normalized direction
+        self.direction = direction / np.linalg.norm(direction)
+
+    def __call__(self, param: float) -> np.ndarray:
+        """Return a point on the line at parameter `param`.
+            p(t) = self.ref_point + (t)*self.direction
+
+        Args:
+            param ([float]): parameter
+
+        Returns:
+            np.ndarray: point at parameter `param`
+        """
+        return self.ref_point + param * self.direction
+
+    def __str__(self) -> str:
+        return f"x0 {self.ref_point} dir: {self.direction}"
+
+    def intersect(self, other_l: Line3D, intersect_params: List = []) -> bool:
+        """Check if other intersects with self
+        https://rjallain.medium.com/where-do-two-lines-intersect-in-3-dimensions-d28f738de36a
+
+        Try to solve the system of equations Ax=b where A is a 3x2 matrix. Since this is a over constraint problem
+        solve first the for A 2x2 and the check if the solution satisfies the remaining row. Check link above for more
+        details. If the there is intersection the intersection params will be filled.
+
+        I included a random rotation to avoid singular matrices. Might not be the most appropriate solution.
+
+        Seems to be working but needs more testing.
+        Args:
+            other_l ([Line3D]): [description]
+
+        Returns:
+            bool: [description]
+        """
+        from scipy.spatial.transform import Rotation as R
+
+        rot = R.from_euler("zy", [25, -20], degrees=True).as_matrix()
+
+        A = np.hstack((self.direction.reshape((-1, 1)), other_l.direction.reshape((-1, 1))))
+        b = (other_l.ref_point - self.ref_point).reshape((-1, 1))
+        x = np.linalg.solve((rot @ A)[1:, :], (rot @ b)[1:])
+
+        if all(np.isclose(np.dot(A[0, :], x) - b[0], 0)):
+            intersect_params.append(x)
+            return True
+        else:
+            return False
+
+    def generate_pts(self, N, tmin, tmax):
+        """Generate `N` sample point from the parametric representation of the 3D circle
+        Args:
+            numb_pt ([type]): [description]
+        Returns:
+            [type]: [description]
+        """
+        t = np.linspace(tmin, tmax, N).reshape(-1, 1)
+        pts = np.zeros((N, 3))
+        for n in range(N):
+            pts[n, :] = self(t[n])
+        return pts
+
+    @classmethod
+    def is_skew(cls, l1: Line3D, l2: Line3D) -> bool:
+        """Return true is the `l1` and `l2` are skew. Skew 3D lines are lines that do not intersect and are not
+        parallel.
+
+        Args:
+            l1 (Line3D):
+            l2 (Line3D):
+
+        Returns:
+            bool:
+        """
+        # Check if they are parallel
+        are_parallel = np.isclose(np.dot(l1.direction, l2.direction), 1.0)
+        # Check if they intersect
+        intersect = l1.intersect(l2)
+
+        if not are_parallel and not intersect:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def perpendicular_to_skew(cls, l1: Line3D, l2: Line3D, intersect_params: List = []) -> Line3D:
+        """Returns a 3D line perpendicular `l1` and `l2` whose ref point lies on l1.
+        Returns None if 'l1' and `l2` are not skew.
+
+        Video explaining method
+        https://www.youtube.com/watch?v=yMSx_CdYl1Y
+
+        Args:
+            l1 (Line3D): [description]
+            l2 (Line3D): [description]
+            intersect_params (List): List of 3 values showing the solutions of the system Ax=b. The first value is the parameter
+            at which l1 intersects l3 [l1(lambda1)=l3(0)]. The second value is the parameter at which l2 intersects l3 [l2(lambda2)=l2(lambda3)].
+            The third value is the parameter at which l3 intersects l2.
+
+        Returns:
+            Line3D: [description]
+        """
+
+        l3_dir = np.cross(l1.direction, l2.direction)
+        l3_dir = l3_dir / np.linalg.norm(l3_dir)
+        A = np.hstack(
+            (
+                -l1.direction.reshape((-1, 1)),
+                l2.direction.reshape((-1, 1)),
+                -l3_dir.reshape((-1, 1)),
+            )
+        )
+        b = (l1.ref_point - l2.ref_point).reshape((-1, 1))
+        x = np.linalg.solve(A, b)
+        intersect_params.append(x)
+
+        return Line3D(ref_point=l1(x[0]), direction=l3_dir)
+
+    @classmethod
+    def dist_between_skew(cls, l1: Line3D, l2: Line3D) -> float:
+        """Find minimum distance between two lines.
+
+        Args:
+            l1 (Line3D): [description]
+            l2 (Line3D): [description]
+
+        Returns:
+            float: [description]
+        """
+        pass
 
 
 if __name__ == "__main__":
