@@ -30,9 +30,12 @@ def main():
     #fmt:off
     parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/d03-rec-03_traj-01.txt", 
                          help="filename to save the data") 
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-00", 
+                         help="root dir to save the data")                     
     args = parser.parse_args()
 
     filename = Path(args.file)
+    root = Path(args.root)
     if not filename.parent.exists():
         print("filename root directory does not exists.")
         sys.exit(0)
@@ -44,8 +47,8 @@ def main():
     # ------------------------------------------------------------
     # Create replay class and specify the rosbag path
     # ------------------------------------------------------------
-    root = Path("data/psm2_trajectories/")
-    file_p = root / "pitch_exp_traj_01_test_cropped.bag"
+    rosbag_root = Path("data/psm2_trajectories/")
+    file_p = rosbag_root / "pitch_exp_traj_01_test_cropped.bag"
     replay = RosbagReplay(file_p)
     replay.rosbag_utils.print_topics_info()
 
@@ -80,7 +83,8 @@ def main():
     # ------------------------------------------------------------
     # Execute trajectory
     # ------------------------------------------------------------
-    replay.execute_measure(arm, filename,marker_name,expected_spheres=expected_spheres)
+    # replay.execute_measure(arm, filename,marker_name,expected_spheres=expected_spheres)
+    replay.robot_registration(arm,root,marker_name,expected_spheres=expected_spheres,save=True)
 
 
 if __name__ == "__main__":

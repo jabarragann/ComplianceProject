@@ -64,20 +64,26 @@ def precision_analysis():
     pitch_m_ave = []
     for ti in train_idx:
         pose_arr, wrist_fiducials = separate_markerandfiducial(root/files[ti],marker_file)
-        est_circle = Circle3D.from_sphere_lstsq(wrist_fiducials)
+        est_circle = Circle3D.from_lstsq_fit(wrist_fiducials.T)
         mean_frame, pos_std, r_std = ftk_500.average_marker_pose(pose_arr)
         pit_m = np.array(est_circle.center.squeeze()- list(mean_frame.p) ) 
         pitch_m_ave.append(pit_m)
+
+        if False:
+            plotter = Plotter3D()
+            plotter.scatter_3d(wrist_fiducials,marker="^")
+            plotter.scatter_3d(est_circle.generate_pts(40),marker="o",color='black')
+            plt.show()
+
         log.debug(f"p-m in index {ti}: {pit_m}")
     pitch_m_ave = np.array(pitch_m_ave)
     pitch_m_mean = pitch_m_ave.mean(axis=0) 
     pitch_m_std =  pitch_m_ave.std(axis=0) 
-    
 
     results = []
     for testi in test_idx:
         pose_arr, wrist_fiducials = separate_markerandfiducial(root/files[testi],marker_file)
-        est_circle = Circle3D.from_sphere_lstsq(wrist_fiducials)
+        est_circle = Circle3D.from_lstsq_fit(wrist_fiducials.T)
         mean_frame, pos_std, r_std = ftk_500.average_marker_pose(pose_arr)
         est_pitch = pit_m + np.array(list(mean_frame.p))
         error = np.linalg.norm(est_circle.center.squeeze()-est_pitch) 
@@ -88,10 +94,10 @@ def precision_analysis():
     error_std  = results.std(axis=0)
     
     log.info(f"Error Results: {1000*results} mm")
-    log.info(f"pitch_marker mean (mm): {pitch_m_mean*1000}")
-    log.info(f"pitch_marker std  (mm): {pitch_m_std*1000}")
-    log.info(f"error mean: {1000*error_mean:0.4f} mm")
-    log.info(f"error std:  {1000*error_std:0.4f} mm")
+    log.info(f"pitchorig_markerorig mean (mm): {pitch_m_mean*1000}")
+    log.info(f"pitchorig_markerorig std  (mm): {pitch_m_std*1000}")
+    log.info(f"error mean: {1000*error_mean:8.4f} mm")
+    log.info(f"error std:  {1000*error_std:8.4f} mm")
     
 
 
