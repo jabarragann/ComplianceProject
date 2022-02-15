@@ -26,14 +26,14 @@ class DvrkMotions:
 
     @staticmethod
     def generate_roll_motion(steps: int = 22) -> np.ndarray:
-        min_pitch = -0.6
-        max_pitch = 0.2
+        min_pitch = -0.45
+        max_pitch = 0.9
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
     @staticmethod
     def create_df_with_measurements(
-        ftk_handler, expected_markers, idx, q4, q5, df_cols
+        ftk_handler, expected_markers, idx, q4, q5, df_cols, log
     ) -> pd.DataFrame:
 
         # Read atracsys data for 1 second - fiducials data
@@ -46,23 +46,26 @@ class DvrkMotions:
         # Add fiducials to dataframe
         # df columns: ["step","q4" "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
         if mean_value is not None:
-            log.warning("No fiducial found")
             for mid, k in enumerate(range(mean_value.shape[0])):
                 # fmt:off
                 d = [ idx, q4, q5, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
                 # fmt:on
-                d = np.array(d).reshape((1, 11))
+                d = np.array(d).reshape((1, 12))
                 new_pt = pd.DataFrame(d, columns=df_cols)
                 df_vals = df_vals.append(new_pt)
+        else:
+            log.warning("No fiducial found")
         # Add marker pose to dataframe
         if mean_frame is not None:
-            log.warning("No markers found")
             p = list(mean_frame.p)
             q = mean_frame.M.GetQuaternion()
             d = [idx, q4, q5, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
-            d = np.array(d).reshape((1, 11))
+            d = np.array(d).reshape((1, 12))
             new_pt = pd.DataFrame(d, columns=df_cols)
             df_vals = df_vals.append(new_pt)
+        else:
+            log.warning("No markers found")
+
         if mean_frame is None and mean_value is None:
             return None
         else:
@@ -97,7 +100,8 @@ class DvrkMotions:
         pitch_file = filename.parent / (filename.with_suffix("").name + "_pitch.txt")
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
-        DvrkMotions.pitch_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file, trajectory=pitch_trajectory)
+        #DvrkMotions.pitch_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file, trajectory=pitch_trajectory)
+        DvrkMotions.pitch_roll_together_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file)
         DvrkMotions.roll_motion(  init_jp, psm_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
         # fmt:on
 
@@ -116,7 +120,7 @@ class DvrkMotions:
             filename (Path, optional): [description]. Defaults to None.
         """
         pitch_trajectory = DvrkMotions.generate_pitch_motion()
-        roll_trajectory = [0.2, -0.6]
+        roll_trajectory = [0.2, -0.3]
         total = len(roll_trajectory) * len(pitch_trajectory)
 
         ftk_handler = ftk_500("custom_marker_112")
@@ -144,7 +148,7 @@ class DvrkMotions:
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, counter, q4, q5, df_cols
+                    ftk_handler, expected_markers, counter, q4, q5, df_cols, log
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
@@ -168,7 +172,7 @@ class DvrkMotions:
 
         ftk_handler = ftk_500("custom_marker_112")
         if trajectory is None:
-            trajectory = DvrkMotions.generate_pitch_motion()
+            trajectory = DvrkMotions.generate_roll_motion()
 
         df_cols = ["step", "q4", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
         df_vals = pd.DataFrame(columns=df_cols)
@@ -180,7 +184,9 @@ class DvrkMotions:
         q4 = init_jp[3]
         q5 = init_jp[4]
         # Move roll joint from min_roll to max_roll
-        for idx, q4 in enumerate(trajectory):
+        idx = -1
+        for q4 in track(trajectory, "-- Trajectory Progress -- "):
+            idx += 1
             log.info(f"q4-{idx}@{q4*180/np.pi:0.2f}(deg)@{q4:0.2f}(rad)")
             # Move only q4 and q5
             init_jp[3] = q4
@@ -191,7 +197,7 @@ class DvrkMotions:
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, idx, q4, q5, df_cols
+                    ftk_handler, expected_markers, idx, q4, q5, df_cols, log
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
@@ -224,7 +230,9 @@ class DvrkMotions:
         q4 = init_jp[3]
         q5 = init_jp[4]
         # Move pitch joint from min_pitch to max_pitch
-        for idx, q5 in enumerate(trajectory):
+        idx = -1
+        for q5 in track(trajectory, "-- Trajectory Progress -- "):
+            idx += 1
             log.info(f"q5-{idx}@{q5*180/np.pi:0.2f}(deg)@{q5:0.2f}(rad)")
             # Move only q4 and q5
             init_jp[3] = q4
@@ -294,34 +302,42 @@ class DvrkMotions:
 if __name__ == "__main__":
     log = Logger("utils_log").log
     psm_handler = dvrk.psm("PSM2", expected_interval=0.01)
-    log.info(f"Enable status: {psm_handler.enable(10)}")
-    log.info(f"Home status:   {psm_handler.home(10)}")
+    is_enabled = psm_handler.enable(10)
+    if not is_enabled:
+        sys.exit(0)
+    is_homed = psm_handler.home(10)
+    if not is_homed:
+        sys.exit(0)
+    log.info(f"Enable status: {is_enabled}")
+    log.info(f"Home status:   {is_homed}")
 
     # ------------------------------------------------------------
     # Pitch identification exp 01
     # ------------------------------------------------------------
-    # init_jp = np.array([0.1364, 0.2608, 0.1314, -1.4911, 0.216, 0.1738])  # 06
+    input("Press enter to start motion")
+    # init_jp = np.array([0.0, 0.0, 0.1417, -1.4911, 0.216, 0.0])  # 06
+    # init_jp = np.array([-0.1712, -0.0001, 0.1417, -1.4911, 0.216, 0.0])
+    # psm_handler.move_jp(init_jp).wait()
     init_jp = psm_handler.measured_jp()
     log.info(f"Joints current state \n {init_jp}")
-    input("Press enter to start motion")
     time.sleep(0.5)
 
     # ------------------------------------------------------------
     # Pitch identification exp 02
     # ------------------------------------------------------------
-    filename = Path("./data/02_pitch_experiment/d05-pitch-yaw_exp10.txt")
+    filename = Path("./data/02_pitch_experiment/d06-2xpitch-1xroll_exp06.txt")
 
     # Only uncomment one of the motions at the same time
-    DvrkMotions.pitch_roll_together_motion(
-        init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
-    )
-
-    # DvrkMotions.pitch_roll_independent_motion(
+    # DvrkMotions.pitch_roll_together_motion(
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     # )
 
+    DvrkMotions.pitch_roll_independent_motion(
+        init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
+    )
+
     # DvrkMotions.pitch_motion(
-    #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
+    #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=False, filename=filename
     # )
 
     # DvrkMotions.roll_motion(
