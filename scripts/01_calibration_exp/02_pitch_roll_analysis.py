@@ -36,7 +36,7 @@ np.set_printoptions(precision=4,suppress=True, sign=' ')
 def three_axis_analysis():
     """ Given two pitch swings and a roll swing identify the pitch origin.
     """
-     # ------------------------------------------------------------
+    # ------------------------------------------------------------
     # Setup 
     # ------------------------------------------------------------
     parser = argparse.ArgumentParser()
@@ -128,6 +128,8 @@ def three_axis_analysis():
     log.info(f"dist pitch-roll2 {1000*np.linalg.norm(midpoint-midpoint_r2):0.4f} (mm)")
     log.info(f"dist roll1-roll2 {1000*np.linalg.norm(midpoint_r1-midpoint_r2):0.4f} (mm)")
 
+    area = 0.5*np.linalg.norm(np.cross(1000*(midpoint_r1 -midpoint),1000*(midpoint_r2-midpoint)))
+    log.info(f"triangle area {area:0.4f} mm^2")
     # ------------------------------------------------------------
     # Plotting 
     # ------------------------------------------------------------
