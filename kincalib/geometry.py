@@ -342,7 +342,8 @@ class Line3D:
         Args:
             l1 (Line3D): [description]
             l2 (Line3D): [description]
-            intersect_params (List): List of 3 values showing the solutions of the system Ax=b. The first value is the parameter
+            intersect_params (List): This should be a empty list that will get populated with the system of equations'
+            solutions. List of 3 values showing the solutions of the system Ax=b. The first value is the parameter
             at which l1 intersects l3 [l1(lambda1)=l3(0)]. The second value is the parameter at which l2 intersects l3 [l2(lambda2)=l2(lambda3)].
             The third value is the parameter at which l3 intersects l2.
 
