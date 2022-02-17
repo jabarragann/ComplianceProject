@@ -30,7 +30,7 @@ def main():
     #fmt:off
     parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/d03-rec-03_traj-01.txt", 
                          help="filename to save the data") 
-    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-00", 
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-01", 
                          help="root dir to save the data")                     
     args = parser.parse_args()
 

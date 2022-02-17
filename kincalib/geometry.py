@@ -90,16 +90,22 @@ class Triangle3D:
     def __init__(self, vertices_list: List[np.ndarray]) -> None:
 
         self.v_list = vertices_list
-
         self.area = self.calculate_area()
-
         self.segments_list: np.ndarray = None
 
-    def calculate_area(self):
+    def calculate_area(self, scale=1):
         AB = self.v_list[1] - self.v_list[0]
         AC = self.v_list[2] - self.v_list[0]
+        return np.linalg.norm(np.cross(scale * AB, scale * AC)) / 2
 
-        return np.linalg.norm(np.cross(AB, AC)) / 2
+    def calculate_sides(self, scale=1) -> np.ndarray:
+        s1 = scale * np.linalg.norm(self.v_list[0] - self.v_list[1])
+        s2 = scale * np.linalg.norm(self.v_list[0] - self.v_list[2])
+        s3 = scale * np.linalg.norm(self.v_list[1] - self.v_list[2])
+        return np.array([s1, s2, s3])
+
+    def calculate_centroid(self, scale=1):
+        return scale * (self.v_list[0] + self.v_list[1] + self.v_list[2]) / 3
 
     def __str__(self) -> None:
         str_rep = (
