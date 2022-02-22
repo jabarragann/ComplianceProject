@@ -28,10 +28,10 @@ def main():
     # ------------------------------------------------------------
     parser = argparse.ArgumentParser()
     #fmt:off
-    parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/d03-rec-03_traj-01.txt", 
+    parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/d03-rec-03_traj-02.txt", 
                          help="filename to save the data") 
-    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-01", 
-                         help="root dir to save the data")                     
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-02", 
+                         help="root dir to save the data. Used for robot registration method.")                     
     args = parser.parse_args()
 
     filename = Path(args.file)
@@ -48,7 +48,7 @@ def main():
     # Create replay class and specify the rosbag path
     # ------------------------------------------------------------
     rosbag_root = Path("data/psm2_trajectories/")
-    file_p = rosbag_root / "pitch_exp_traj_01_test_cropped.bag"
+    file_p = rosbag_root / "pitch_exp_traj_02_test_cropped.bag"
     replay = RosbagReplay(file_p)
     replay.rosbag_utils.print_topics_info()
 
@@ -64,7 +64,7 @@ def main():
     # Get robot ready
     # ------------------------------------------------------------
     arm = replay_device(device_namespace=arm_name, expected_interval=0.01)
-    arm = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
+    # arm2 = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
     setpoints = replay.setpoints
 
     # make sure the arm is powered

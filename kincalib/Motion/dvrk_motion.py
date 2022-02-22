@@ -33,7 +33,7 @@ class DvrkMotions:
 
     @staticmethod
     def create_df_with_measurements(
-        ftk_handler, expected_markers, idx, q4, q5, df_cols, log
+        ftk_handler, expected_markers, idx, q4, q5, q6, q7, df_cols, log
     ) -> pd.DataFrame:
 
         # Read atracsys data for 1 second - fiducials data
@@ -44,13 +44,13 @@ class DvrkMotions:
         df_vals = pd.DataFrame(columns=df_cols)
 
         # Add fiducials to dataframe
-        # df columns: ["step","q4" "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+        # df columns: ["step","q4","q5","q6","q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
         if mean_value is not None:
             for mid, k in enumerate(range(mean_value.shape[0])):
                 # fmt:off
-                d = [ idx, q4, q5, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
+                d = [ idx, q4,q5,q6,q7, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
                 # fmt:on
-                d = np.array(d).reshape((1, 12))
+                d = np.array(d).reshape((1, 14))
                 new_pt = pd.DataFrame(d, columns=df_cols)
                 df_vals = df_vals.append(new_pt)
         else:
@@ -59,8 +59,8 @@ class DvrkMotions:
         if mean_frame is not None:
             p = list(mean_frame.p)
             q = mean_frame.M.GetQuaternion()
-            d = [idx, q4, q5, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
-            d = np.array(d).reshape((1, 12))
+            d = [idx, q4, q5, q6, q7, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
+            d = np.array(d).reshape((1, 14))
             new_pt = pd.DataFrame(d, columns=df_cols)
             df_vals = df_vals.append(new_pt)
         else:
@@ -83,6 +83,8 @@ class DvrkMotions:
         init_jp, psm_handler, log, expected_markers=4, save: bool = False, filename: Path = None
     ):
         """Move each axis independently. Save the measurements from each movement in different df.
+        First the swing the pitch axis with two different roll values.
+        Then swing the roll axis. This will allow you to fit three different circles to the markers data.
 
         Args:
             init_jp ([type]): [description]
@@ -124,7 +126,9 @@ class DvrkMotions:
         total = len(roll_trajectory) * len(pitch_trajectory)
 
         ftk_handler = ftk_500("custom_marker_112")
-        df_cols = ["step", "q4", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+        # fmt: off
+        df_cols = ["step", "q4", "q5", "q6", "q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+        # fmt: on
         df_vals = pd.DataFrame(columns=df_cols)
 
         # Move to initial position
@@ -143,12 +147,14 @@ class DvrkMotions:
             init_jp[3] = q4
             init_jp[4] = q5
             init_jp[5] = 0.0
+            q6 = init_jp[5]
+            q7 = psm_handler.jaw_jp()
             psm_handler.move_jp(init_jp).wait()
             time.sleep(0.5)
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, counter, q4, q5, df_cols, log
+                    ftk_handler, expected_markers, counter, q4, q5, q6, q7, df_cols, log
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
@@ -174,15 +180,17 @@ class DvrkMotions:
         if trajectory is None:
             trajectory = DvrkMotions.generate_roll_motion()
 
-        df_cols = ["step", "q4", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+        # fmt: off
+        df_cols = ["step", "q4", "q5", "q6", "q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+        # fmt: on
         df_vals = pd.DataFrame(columns=df_cols)
 
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
 
-        q4 = init_jp[3]
-        q5 = init_jp[4]
+        q4 = 0.0
+        q5 = 0.0
         # Move roll joint from min_roll to max_roll
         idx = -1
         for q4 in track(trajectory, "-- Trajectory Progress -- "):
@@ -192,12 +200,14 @@ class DvrkMotions:
             init_jp[3] = q4
             init_jp[4] = q5
             init_jp[5] = 0.0
+            q6 = init_jp[5]
+            q7 = psm_handler.jaw_jp()
             psm_handler.move_jp(init_jp).wait()
             time.sleep(0.5)
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, idx, q4, q5, df_cols, log
+                    ftk_handler, expected_markers, idx, q4, q5, q6, q7, df_cols, log
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
@@ -238,12 +248,14 @@ class DvrkMotions:
             init_jp[3] = q4
             init_jp[4] = q5
             init_jp[5] = 0.0
+            q6 = init_jp[5]
+            q7 = psm_handler.jaw_jp()
             psm_handler.move_jp(init_jp).wait()
             time.sleep(0.5)
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, idx, q4, q5, df_cols
+                    ftk_handler, expected_markers, idx, q4, q5, q6, q7, df_cols
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
