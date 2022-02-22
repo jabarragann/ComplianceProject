@@ -20,6 +20,7 @@ from collections import defaultdict
 # ROS and DVRK imports
 import dvrk
 import rospy
+import PyKDL
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
@@ -61,9 +62,14 @@ def three_axis_analysis():
                     files[i]['pitch'] = f
                 if len(re.findall(f"exp{i:02d}_roll.txt",f)) > 0:
                     files[i]['roll'] = f
-    log.info(files)
 
-    exp_id = 6 
+    # Print available files
+    keys = list(files.keys())
+    keys.sort()
+    for k in keys:
+        log.info(f"key {k}: {files[k]['pitch']}")
+
+    exp_id = 3 
     # ------------------------------------------------------------
     # Roll axis analysis 
     # ------------------------------------------------------------
@@ -74,12 +80,21 @@ def three_axis_analysis():
     #roll values
     roll = df.q4.unique()
     marker_orig_arr = []
+    fid_markerf = []
     for r in roll:
         df_temp = df.loc[df["q4"]==r]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None,marker_file,df=df_temp)
         if len(pose_arr)>0:
             marker_orig_arr.append(list(pose_arr[0].p))
+
+            # Calculate sphere location from marker frame.
+            # This vector should be the same always.
+            if len(wrist_fiducials)>0: 
+                sphere_markerf = pose_arr[0].Inverse() * PyKDL.Vector(*wrist_fiducials.squeeze())
+                fid_markerf.append(list(sphere_markerf))
+
     marker_orig_arr =np.array(marker_orig_arr) 
+    fid_markerf = np.array(fid_markerf)
     roll_circle =  Circle3D.from_lstsq_fit(marker_orig_arr)
     roll_l = Line3D(ref_point=roll_circle.center, direction=roll_circle.normal)
 
@@ -119,7 +134,10 @@ def three_axis_analysis():
     inter_params = []
     roll_l2 = Line3D.perpendicular_to_skew(roll_l, l2, intersect_params=inter_params)
     midpoint_r2 = roll_l2(inter_params[0][2] / 2)
-
+    
+    log.info(f"fiducial from marker frame")
+    log.info(f"mean {fid_markerf.mean(axis=0)*1000} mm")
+    log.info(f"std  {fid_markerf.std(axis=0)*1000} mm")
     log.info(f"Midpoints")
     log.info(f"pitch midpoint       {1000*midpoint}")
     log.info(f"roll-pitch midpoint1 {1000*midpoint_r1}")

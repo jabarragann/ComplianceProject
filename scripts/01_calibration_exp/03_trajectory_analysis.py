@@ -121,5 +121,5 @@ def plot_results():
     create_histogram(results)
 
 if __name__ == "__main__":
-    # main()
+    main()
     plot_results()
