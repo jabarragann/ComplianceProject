@@ -37,6 +37,7 @@ class replay_device:
             )
             self.__crtk_utils.add_move_jp()
             self.__crtk_utils.add_servo_jp()
+            self.__crtk_utils.add_measured_js()
 
     def __init__(self, device_namespace, expected_interval):
         # populate this class with all the ROS topics we need
@@ -46,9 +47,14 @@ class replay_device:
         self.crtk_utils.add_move_jp()
         self.crtk_utils.add_servo_cp()
         self.crtk_utils.add_move_cp()
+        self.crtk_utils.add_measured_js()
+        self.crtk_utils.add_measured_cp()
         self.jaw = self.__jaw_device(
             device_namespace + "/jaw", expected_interval, operating_state_instance=self
         )
+
+    def jaw_jp(self):
+        return self.jaw.measured_jp()[0]
 
 
 class RosbagReplay:
@@ -306,7 +312,7 @@ class RosbagReplay:
         # Create data frames
         df_cols_cp = ["step", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
         df_vals_cp = pd.DataFrame(columns=df_cols_cp)
-        df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6"]
+        df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7"]
         df_vals_jp = pd.DataFrame(columns=df_cols_jp)
 
         # for index in track(range(total), "-- Trajectory Progress -- "):
@@ -334,10 +340,11 @@ class RosbagReplay:
                     new_pt = pd.DataFrame(d, columns=df_cols_cp)
                     df_vals_cp = df_vals_cp.append(new_pt)
                     # Add robot joints to df_jp
-                    # Columns format: ["step", "q1", "q2", "q3", "q4", "q5", "q6"]
+                    # Columns format: ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7"]
                     jp = replay_device.measured_jp()
-                    jp = [index, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5]]
-                    jp = np.array(jp).reshape((1, 7))
+                    jaw_jp = replay_device.jaw_jp()
+                    jp = [index, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
+                    jp = np.array(jp).reshape((1, 8))
                     self.log.debug(f"Step {index:02d} joint pose \n{jp}")
                     new_pt = pd.DataFrame(jp, columns=df_cols_jp)
                     df_vals_jp = df_vals_jp.append(new_pt)
@@ -402,7 +409,6 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
 
     arm = replay_device(device_namespace=arm_name, expected_interval=0.01)
-    arm = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
     setpoints = replay.setpoints
 
     # make sure the arm is powered
