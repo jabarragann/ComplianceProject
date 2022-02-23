@@ -24,21 +24,25 @@ from kincalib.Motion.replay_rosbag import RosbagReplay, replay_device
 
 def main():
     # ------------------------------------------------------------
-    # Script configuration 
+    # Script configuration
     # ------------------------------------------------------------
     parser = argparse.ArgumentParser()
-    #fmt:off
-    parser.add_argument( "-f", "--file", type=str, default="data/03_replay_trajectory/d03-rec-03_traj-02.txt", 
-                         help="filename to save the data") 
-    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-02", 
-                         help="root dir to save the data. Used for robot registration method.")                     
-    args = parser.parse_args()
 
-    filename = Path(args.file)
+    # fmt: off
+    parser.add_argument("-b", "--rosbag",type=str,
+                        default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
+                        help="rosbag trajectory to replay")
+    parser.add_argument( "-f", "--file", type=str, default="test_trajectories/test_traj01", 
+                         help="filename to save the data from a test trajectory. execute_measure() func") 
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-02", 
+                         help="root dir to save the data.")                     
+    args = parser.parse_args()
+    # fmt: on
+
     root = Path(args.root)
-    if not filename.parent.exists():
-        print("filename root directory does not exists.")
-        sys.exit(0)
+    if not root.exists():
+        root.mkdir(parents=True)
+        print(f"creating root: {root}")
 
     expected_spheres = 4
     marker_name = "custom_marker_112"
@@ -47,9 +51,8 @@ def main():
     # ------------------------------------------------------------
     # Create replay class and specify the rosbag path
     # ------------------------------------------------------------
-    rosbag_root = Path("data/psm2_trajectories/")
-    file_p = rosbag_root / "pitch_exp_traj_02_test_cropped.bag"
-    replay = RosbagReplay(file_p)
+    rosbag = Path(args.rosbag)
+    replay = RosbagReplay(rosbag)
     replay.rosbag_utils.print_topics_info()
 
     # ------------------------------------------------------------
@@ -64,14 +67,13 @@ def main():
     # Get robot ready
     # ------------------------------------------------------------
     arm = replay_device(device_namespace=arm_name, expected_interval=0.01)
-    # arm2 = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
+    # arm = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
     setpoints = replay.setpoints
 
     # make sure the arm is powered
     print("-- Enabling arm")
     if not arm.enable(10):
         sys.exit("-- Failed to enable within 10 seconds")
-
     print("-- Homing arm")
     if not arm.home(10):
         sys.exit("-- Failed to home within 10 seconds")
@@ -83,8 +85,13 @@ def main():
     # ------------------------------------------------------------
     # Execute trajectory
     # ------------------------------------------------------------
-    # replay.execute_measure(arm, filename,marker_name,expected_spheres=expected_spheres)
-    replay.robot_registration(arm,root,marker_name,expected_spheres=expected_spheres,save=True)
+    filename = root / args.file
+
+    # Collect a testing trajectory.
+    replay.execute_measure(arm, filename, marker_name, expected_spheres=expected_spheres)
+
+    # Collect calibration data.
+    # replay.robot_registration(arm,root,marker_name,expected_spheres=expected_spheres,save=True)
 
 
 if __name__ == "__main__":

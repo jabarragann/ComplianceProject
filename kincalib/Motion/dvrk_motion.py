@@ -11,11 +11,26 @@ import tf_conversions.posemath as pm
 from pathlib import Path
 from itertools import product
 from rich.progress import track
+from kincalib.Motion.ReplayDevice import replay_device
 
 
 class DvrkMotions:
-    def __init__(self) -> None:
-        pass
+    """Data collection formats
+
+    step: step in the trajectory
+    qi:   Joint value
+    m_t: type of object. This can be 'm' (marker), 'f' (fiducial) or 'r' (robot)
+    m_id: obj id. This is only meaningful for markers and fiducials
+    px,py,pz: position of frame
+    qx,qy,qz,qz: Quaternion orientation of frame
+
+    """
+
+    # fmt: off
+    df_cols_cp = [ "step", "q4", "q5", "q6", "q7", "m_t", "m_id",
+                    "px", "py", "pz", "qx", "qy", "qz", "qw"] 
+    df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7"]
+    # fmt: on
 
     @staticmethod
     def generate_pitch_motion(steps: int = 22) -> np.ndarray:
@@ -31,9 +46,40 @@ class DvrkMotions:
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
+    def create_df_with_robot_jp(robot_handler: replay_device, idx) -> pd.DataFrame:
+        jp = robot_handler.measured_jp()
+        jaw_jp = robot_handler.jaw_jp()
+        jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
+        jp = np.array(jp).reshape((1, 8))
+        new_pt = pd.DataFrame(jp, columns=DvrkMotions.df_cols_jp)
+        return new_pt
+
+    @staticmethod
+    def create_df_with_robot_cp(robot_handler: replay_device, idx, q4, q5, q6, q7) -> pd.DataFrame:
+        """Create a df with the robot end-effector cartesian position. Use this functions for
+         data collecitons
+
+        Args:
+            robot_handler (replay_device): robot handler
+            idx ([type]): Step of the trajectory
+
+        Returns:
+            - pd.DataFrame with cp of the robot.
+        """
+
+        robot_frame = replay_device.measured_cp()
+        r_p = list(robot_frame.p)
+        r_q = robot_frame.M.GetQuaternion()
+        # fmt: off
+        d = [idx,q4,q5,q6,q7,"r", 11, r_p[0], r_p[1], r_p[2], r_q[0], r_q[1], r_q[2], r_q[3]]
+        # fmt: on
+        d = np.array(d).reshape((1, 14))
+        new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
+        return new_pt
+
     @staticmethod
     def create_df_with_measurements(
-        ftk_handler, expected_markers, idx, q4, q5, q6, q7, df_cols, log
+        ftk_handler, expected_markers, idx, q4, q5, q6, q7, log
     ) -> pd.DataFrame:
 
         # Read atracsys data for 1 second - fiducials data
@@ -41,7 +87,7 @@ class DvrkMotions:
         mean_frame, mean_value = ftk_handler.obtain_processed_measurement(
             expected_markers, t=500, sample_time=15
         )
-        df_vals = pd.DataFrame(columns=df_cols)
+        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
 
         # Add fiducials to dataframe
         # df columns: ["step","q4","q5","q6","q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
@@ -51,7 +97,7 @@ class DvrkMotions:
                 d = [ idx, q4,q5,q6,q7, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
                 # fmt:on
                 d = np.array(d).reshape((1, 14))
-                new_pt = pd.DataFrame(d, columns=df_cols)
+                new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
                 df_vals = df_vals.append(new_pt)
         else:
             log.warning("No fiducial found")
@@ -61,7 +107,7 @@ class DvrkMotions:
             q = mean_frame.M.GetQuaternion()
             d = [idx, q4, q5, q6, q7, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
             d = np.array(d).reshape((1, 14))
-            new_pt = pd.DataFrame(d, columns=df_cols)
+            new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
             df_vals = df_vals.append(new_pt)
         else:
             log.warning("No markers found")
@@ -126,10 +172,7 @@ class DvrkMotions:
         total = len(roll_trajectory) * len(pitch_trajectory)
 
         ftk_handler = ftk_500("custom_marker_112")
-        # fmt: off
-        df_cols = ["step", "q4", "q5", "q6", "q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
-        # fmt: on
-        df_vals = pd.DataFrame(columns=df_cols)
+        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
 
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
@@ -154,7 +197,7 @@ class DvrkMotions:
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, counter, q4, q5, q6, q7, df_cols, log
+                    ftk_handler, expected_markers, counter, q4, q5, q6, q7, log
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
@@ -180,10 +223,7 @@ class DvrkMotions:
         if trajectory is None:
             trajectory = DvrkMotions.generate_roll_motion()
 
-        # fmt: off
-        df_cols = ["step", "q4", "q5", "q6", "q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
-        # fmt: on
-        df_vals = pd.DataFrame(columns=df_cols)
+        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
 
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
@@ -207,7 +247,7 @@ class DvrkMotions:
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, idx, q4, q5, q6, q7, df_cols, log
+                    ftk_handler, expected_markers, idx, q4, q5, q6, q7, log
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
@@ -230,8 +270,7 @@ class DvrkMotions:
         ftk_handler = ftk_500("custom_marker_112")
         if trajectory is None:
             trajectory = DvrkMotions.generate_pitch_motion()
-        df_cols = ["step", "q4", "q5", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
-        df_vals = pd.DataFrame(columns=df_cols)
+        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
 
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
@@ -255,7 +294,7 @@ class DvrkMotions:
 
             if save:
                 new_pt = DvrkMotions.create_df_with_measurements(
-                    ftk_handler, expected_markers, idx, q4, q5, q6, q7, df_cols
+                    ftk_handler, expected_markers, idx, q4, q5, q6, q7
                 )
                 if df_vals is not None:
                     df_vals = df_vals.append(new_pt)
