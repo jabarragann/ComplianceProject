@@ -11,7 +11,7 @@ import tf_conversions.posemath as pm
 from pathlib import Path
 from itertools import product
 from rich.progress import track
-from kincalib.Motion.ReplayDevice import replay_device
+from kincalib.Motion.ReplayDevice import ReplayDevice
 
 
 class DvrkMotions:
@@ -46,7 +46,7 @@ class DvrkMotions:
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
-    def create_df_with_robot_jp(robot_handler: replay_device, idx) -> pd.DataFrame:
+    def create_df_with_robot_jp(robot_handler: ReplayDevice, idx) -> pd.DataFrame:
         jp = robot_handler.measured_jp()
         jaw_jp = robot_handler.jaw_jp()
         jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
@@ -55,19 +55,19 @@ class DvrkMotions:
         return new_pt
 
     @staticmethod
-    def create_df_with_robot_cp(robot_handler: replay_device, idx, q4, q5, q6, q7) -> pd.DataFrame:
+    def create_df_with_robot_cp(robot_handler: ReplayDevice, idx, q4, q5, q6, q7) -> pd.DataFrame:
         """Create a df with the robot end-effector cartesian position. Use this functions for
          data collecitons
 
         Args:
-            robot_handler (replay_device): robot handler
+            robot_handler (ReplayDevice): robot handler
             idx ([type]): Step of the trajectory
 
         Returns:
             - pd.DataFrame with cp of the robot.
         """
 
-        robot_frame = replay_device.measured_cp()
+        robot_frame = ReplayDevice.measured_cp()
         r_p = list(robot_frame.p)
         r_q = robot_frame.M.GetQuaternion()
         # fmt: off

@@ -20,6 +20,7 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.Motion.replay_rosbag import RosbagReplay, replay_device
+from kincalib.Motion.ReplayDevice import ReplayDevice
 
 
 def main():
@@ -66,7 +67,7 @@ def main():
     # ------------------------------------------------------------
     # Get robot ready
     # ------------------------------------------------------------
-    arm = replay_device(device_namespace=arm_name, expected_interval=0.01)
+    arm = ReplayDevice(device_namespace=arm_name, expected_interval=0.01)
     # arm = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
     setpoints = replay.setpoints
 

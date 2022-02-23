@@ -1,7 +1,7 @@
 import crtk
 
 
-class replay_device:
+class ReplayDevice:
     """Simplified arm class to replay motion, better performance than
     dvrk.arm since we're only subscribing to topics we need.
     """
