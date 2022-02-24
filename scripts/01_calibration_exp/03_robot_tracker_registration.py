@@ -34,27 +34,32 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 log = Logger("registration").log
 
 
-def calculate_registration():
+def calculate_registration(df: pd.DataFrame, root: Path):
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
 
-    filename = Path("scripts/01_calibration_exp/results")
-    root = Path(args.root)
-    filename = filename / (root.name + "_registration_data.txt")
-    df = pd.read_csv(filename)
+    # filename = Path("scripts/01_calibration_exp/results")
+    # root = Path(args.root)
+    # filename = filename / (root.name + "_registration_data.txt")
+    # df = pd.read_csv(filename)
 
     # Choose entries were the area is lower is than 6mm
     df = df.loc[df["area"] < 10]
     robot_p = df[["rpx", "rpy", "rpz"]].to_numpy().T
-    pitch_p = df[["tpx", "tpy", "tpz"]].to_numpy().T
+    tracker_p = df[["tpx", "tpy", "tpz"]].to_numpy().T
     log.info(f"Points used for the registration {df.shape}")
 
-    trans = Frame.find_transformation_direct(robot_p, pitch_p)
-    error = Frame.evaluation(robot_p, pitch_p, trans)
+    trans = Frame.find_transformation_direct(robot_p, tracker_p)
+    error = Frame.evaluation(robot_p, tracker_p, trans)
 
     log.info(f"transformation between robot and tracker\n{trans}")
     log.info(f"mean square error: {1000*error:0.05f}")
+
+    dst_f = root / "registration_results/robot2tracker_t.npy"
+
+    np.save(dst_f, trans)
+    return trans
 
 
 def pitch_orig_in_robot(
@@ -126,18 +131,7 @@ def pitch_orig_in_tracker(root: Path):
     return df_results
 
 
-def main():
-    # ------------------------------------------------------------
-    # Setup
-    # ------------------------------------------------------------
-
-    # Important paths
-    log_level = args.log
-    log = Logger("pitch_exp_analize2", log_level=log_level).log
-    root = Path(args.root)
-    marker_file = Path("./share/custom_marker_id_112.json")
-    regex = ""
-
+def obtain_registration_data(root: Path):
     # Robot points
     robot_jp = root / "robot_mov" / "robot_jp_temp.txt"
     robot_jp = pd.read_csv(robot_jp)
@@ -150,11 +144,38 @@ def main():
     final_df = pd.merge(pitch_robot, pitch_tracker, on="step")
 
     # Save df
-    dst_f = Path("scripts/01_calibration_exp/results")
-    dst_f = dst_f / (root.name + "_registration_data.txt")
+    dst_f = root / "registration_results"
+    if not dst_f.exists():
+        dst_f.mkdir(parents=True)
+
+    dst_f = dst_f / "registration_data.txt"
     final_df.to_csv(dst_f, index=None)
 
-    return None
+    return final_df
+
+
+def main():
+    # ------------------------------------------------------------
+    # Setup
+    # ------------------------------------------------------------
+
+    # Important paths
+    log_level = args.log
+    log = Logger("pitch_exp_analize2", log_level=log_level).log
+    root = Path(args.root)
+    marker_file = Path("./share/custom_marker_id_112.json")
+    regex = ""
+
+    registration_data_path = root / "registration_results/registration_data.txt"
+    if registration_data_path.exists():
+        log.info("Loading registration data ...")
+        registration_data = pd.read_csv(registration_data_path)
+    else:
+        log.info("Extracting registration data")
+        registration_data = obtain_registration_data(root)
+
+    # Calculate registration
+    robot2tracker_t = calculate_registration(registration_data, root)
 
 
 parser = argparse.ArgumentParser()
@@ -168,4 +189,3 @@ args = parser.parse_args()
 if __name__ == "__main__":
 
     main()
-    calculate_registration()
