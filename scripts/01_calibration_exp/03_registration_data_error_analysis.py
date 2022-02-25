@@ -24,6 +24,7 @@ from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial, calculate_midpoints
 from kincalib.geometry import Line3D, Circle3D, Triangle3D
+import kincalib.utils.CmnUtils as utils
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -65,11 +66,40 @@ def main():
     keys = sorted(list(dict_files.keys()))
     x = 0
     list_area = []
+    pitch_orig1 = []
+    pitch_orig2 = []
+    roll_axis_M = []
+    pitch_axis1_M = []
+    pitch_axis2_M = []
     for k in keys:
         if len(list(dict_files[k].keys())) < 2:
             log.warning(f"files for step {k} are not available")
             continue
-        m1, m2, m3 = calculate_midpoints(dict_files[k]["roll"], dict_files[k]["pitch"])
+
+        intermediate_values = {}
+        m1, m2, m3 = calculate_midpoints(
+            dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
+        )
+        # ---------------------------
+        # Marker to pitch frame error metrics
+        # ---------------------------
+        pitch_ori_T = (m1 + m2 + m3) / 3
+        # Marker2Tracker
+        T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
+        pitch_ori_M1 = T_TM1.inv() @ pitch_ori_T
+        pitch_orig1.append(pitch_ori_M1.squeeze())
+        pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
+        pitch_axis1_M.append(pitch_ax1)
+
+        T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
+        pitch_ori_M2 = T_TM2.inv() @ pitch_ori_T
+        pitch_orig2.append(pitch_ori_M2.squeeze())
+        pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
+        pitch_axis2_M.append(pitch_ax2)
+
+        # ---------------------------
+        # Mid point error metrics
+        # ---------------------------
         triangle = Triangle3D([m1, m2, m3])
         # Scale sides and area to milimiters
         sides = triangle.calculate_sides(scale=1000)
@@ -77,14 +107,26 @@ def main():
         # sides = calculate_triangle_sides(m1,m2,m3)
         # area = calculate_area(m1,m2,m3)
         log.debug(f"Step {k} results")
+        log.debug(f"MID POINT RESULTS")
         log.debug(f"triangle sides {sides} mm")
         log.debug(f"triangle area {area:0.4f} mm^2")
+        log.debug(f"MARKER TO PITCH RESULTS")
+        log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
+        log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
+        log.debug(f"pitch axis1  from marker {pitch_ax1}")
+        log.debug(f"pitch axis2  from marker {pitch_ax2}")
         list_area.append(area)
-    list_area = np.array(list_area)
 
+    list_area = np.array(list_area)
+    pitch_orig = np.array(pitch_orig1 + pitch_orig2)
+    pitch_axis = np.array(pitch_axis1_M + pitch_axis2_M)
     # create_histogram(list_area)
     log.info(f"Mean area {list_area.mean():0.4f}")
     log.info(f"Std  area {list_area.std():0.4f}")
+    log.info(f"Mean pitch_orig {pitch_orig.mean(axis=0)}")
+    log.info(f"Std  pitch_orig {pitch_orig.std(axis=0)}")
+    log.info(f"Mean pitch_axis {pitch_axis.mean(axis=0)}")
+    log.info(f"Std  pitch_axis {pitch_axis.std(axis=0)}")
 
     f_path = Path(__file__).parent / "results" / root.name
     log.info(f_path)
@@ -112,5 +154,5 @@ parser.add_argument( "-l", "--log", type=str, default="DEBUG",
 args = parser.parse_args()
 
 if __name__ == "__main__":
-    # main()
+    main()
     plot_results()

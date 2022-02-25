@@ -5,13 +5,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from kincalib.Atracsys.ftk_utils import markerfile2triangles, identify_marker
 from kincalib.geometry import Line3D, Circle3D, Triangle3D
+from kincalib.utils.CmnUtils import calculate_mean_frame
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
+from collections import defaultdict
 
 # ------------------------------------------------------------
 # EXPERIMENT 02 UTILS
 # ------------------------------------------------------------
-def separate_markerandfiducial(filename, marker_file, df: pd.DataFrame = None):
+def separate_markerandfiducial(
+    filename, marker_file, df: pd.DataFrame = None
+) -> Tuple[List[PyKDL.Frame], np.ndarray]:
+    """Read atracsys data and separates the wrist fiducials from the fiducials on the shaft marker.
+
+    Args:
+        filename ([type]): [description]
+        marker_file ([type]): [description]
+        df (pd.DataFrame, optional): [description]. Defaults to None.
+
+    Returns:
+        Tuple[List[PyKDL.Frame], np.ndarray]: returns a list PyKDL.Frames corresponding to the all the available poses
+        of the marker in the shaft and a array of the wrist marker fiducial.
+    """
 
     # Read df and marker files
     if df is None:
@@ -48,12 +63,17 @@ def separate_markerandfiducial(filename, marker_file, df: pd.DataFrame = None):
     return pose_arr, wrist_fiducials
 
 
-def calculate_midpoints(roll_df: pd.DataFrame, pitch_df: pd.DataFrame) -> Tuple[np.ndarray]:
+def calculate_midpoints(
+    roll_df: pd.DataFrame, pitch_df: pd.DataFrame, other_vals_dict: dict = {}
+) -> Tuple[np.ndarray]:
     """Calculate pitch axis origin candidates from a roll movement and pitch movement.
 
     Args:
         roll_df (pd.DataFrame): [description]
         pitch_df (pd.DataFrame): [description]
+        other_vals_dict (dict): Save the mean marker frame for each pitch circle data, and the pitch1, pitch2 and
+        roll vectors. To get this values pass a empty dict and the function will populate it. If None, this information is not
+        calculated.
 
     Returns:
         Tuple[np.ndarray]: [description]
@@ -63,6 +83,7 @@ def calculate_midpoints(roll_df: pd.DataFrame, pitch_df: pd.DataFrame) -> Tuple[
     # Calculate roll axis (Shaft axis)
     roll = roll_df.q4.unique()
     marker_orig_arr = []
+
     for r in roll:
         df_temp = roll_df.loc[roll_df["q4"] == r]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
@@ -73,15 +94,29 @@ def calculate_midpoints(roll_df: pd.DataFrame, pitch_df: pd.DataFrame) -> Tuple[
     roll_axis = Line3D(ref_point=roll_circle.center, direction=roll_circle.normal)
 
     # calculate pitch axis
+    marker_frame_dict = []
     roll = pitch_df.q4.unique()
     fid_arr = []
-    for r in roll:
+    for idx, r in enumerate(roll):
         df_temp = pitch_df.loc[pitch_df["q4"] == r]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
+        mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)
+        marker_frame_dict.append([mean_pose, position_std, orientation_std])
         fid_arr.append(wrist_fiducials)
 
     pitch_circle1 = Circle3D.from_lstsq_fit(fid_arr[0].T)
     pitch_circle2 = Circle3D.from_lstsq_fit(fid_arr[1].T)
+
+    # Populate intermediate values
+    other_vals_dict["marker_frame_pitch1"] = marker_frame_dict[0][0]
+    other_vals_dict["marker_frame1_pos_std"] = marker_frame_dict[0][1]
+    other_vals_dict["marker_frame1_ori_std"] = marker_frame_dict[0][2]
+    other_vals_dict["marker_frame_pitch2"] = marker_frame_dict[1][0]
+    other_vals_dict["marker_frame2_pos_std"] = marker_frame_dict[1][1]
+    other_vals_dict["marker_frame2_ori_std"] = marker_frame_dict[1][2]
+    other_vals_dict["pitch_axis1"] = pitch_circle1.normal
+    other_vals_dict["pitch_axis2"] = pitch_circle2.normal
+    other_vals_dict["roll_axis2"] = roll_circle.normal
 
     # ------------------------------------------------------------
     # Calculate mid point between rotation axis
