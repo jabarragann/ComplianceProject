@@ -3,9 +3,10 @@ from typing import Union
 from typing import Type
 from numpy.linalg import norm, svd, det
 import numpy as np
+from kincalib.utils.Logger import Logger
 import logging
 
-log = logging.getLogger(__name__)
+log = Logger(__name__).log
 
 
 class Frame:
@@ -16,7 +17,30 @@ class Frame:
             p (np.ndarray): translation.
         """
         self.r = np.array(r)
+
+        if not self.is_rotation(r):
+            log.warning(
+                f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
+            )
+            log.warning(f"Renormalizing to a proper rotation matrix")
+            self.r = self.closest_to_rotation(r)
+
         self.p = np.array(p).reshape((3, 1))
+
+    @classmethod
+    def init_from_matrix(cls, m: np.ndarray) -> Frame:
+        """Create instance from homogenous transformation matrix
+
+        Args:
+            m (np.ndarray): _description_
+
+        Returns:
+            Frame: _description_
+        """
+        if not all(np.array(m.shape) == [4, 4]):
+            raise ("Not a 4x4 homogenous transformation matrix")
+
+        return cls(m[:3, :3], m[:3, 3])
 
     def __array__(self):
         out = np.eye(4, dtype=np.float32)
@@ -139,3 +163,28 @@ class Frame:
     @classmethod
     def identity(cls: Type[Frame]) -> Type[Frame]:
         return Frame(np.identity(3), np.zeros(3))
+
+    @staticmethod
+    def is_rotation(r):
+        return np.isclose(np.linalg.det(r), 1.0)
+
+    @staticmethod
+    def closest_to_rotation(matrix):
+        """Find closest rotation to the input matrix algorithm from
+        https://stackoverflow.com/questions/23080791/eigen-re-orthogonalization-of-rotation-matrix/23083722
+        Args:
+            matrix (np.ndarray): (3x3) rotation matrix
+        Returns:
+            np.ndarray: [description]
+        """
+
+        # Method 2
+        u, s, vh = np.linalg.svd(matrix, full_matrices=True)
+        new_matrix = u @ vh
+
+        ## Todo - What happens if the algorithm returns a reflection matrix?
+        assert np.isclose(
+            np.linalg.det(new_matrix), 1.0
+        ), "Normalization procedure failed...Implement what is missing"
+
+        return new_matrix

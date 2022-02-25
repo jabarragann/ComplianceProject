@@ -12,6 +12,7 @@ from rich.logging import RichHandler
 from rich.progress import track
 from collections import defaultdict
 import re
+import json
 
 # ROS and DVRK imports
 import dvrk
@@ -61,6 +62,34 @@ def calculate_registration(df: pd.DataFrame, root: Path):
 
     np.save(dst_f, trans)
     return trans
+
+
+def calculate_pitch_to_marker(registration_data, other_values_dict=None):
+    # calculate pitch orig
+    pitch_orig = registration_data[["mox", "moy", "moz"]].to_numpy()
+    pitch_orig_mean = pitch_orig.mean(axis=0)
+    pitch_orig_std = pitch_orig.std(axis=0)
+    # calculate pitch axis
+    pitch_axis = registration_data[["mpx", "mpy", "mpz"]].to_numpy()
+    pitch_axis_mean = pitch_axis.mean(axis=0)
+    pitch_axis_std = pitch_axis.std(axis=0)
+    # calculate roll axis
+    roll_axis = registration_data[["mrx", "mry", "mrz"]].to_numpy()
+    roll_axis_mean = roll_axis.mean(axis=0)
+    roll_axis_std = roll_axis.std(axis=0)
+
+    other_values_dict["pitchaxis"] = pitch_axis_mean
+    other_values_dict["rollaxis"] = roll_axis_mean
+    other_values_dict["pitchorigin"] = pitch_orig_mean
+
+    pitch_y_axis = np.cross(roll_axis_mean, pitch_axis_mean)
+    # calculate transformation
+    pitch2marker_T = np.identity(4)
+    pitch2marker_T[:3, 0] = pitch_axis_mean
+    pitch2marker_T[:3, 1] = pitch_y_axis
+    pitch2marker_T[:3, 2] = roll_axis_mean
+    pitch2marker_T[:3, 3] = pitch_orig_mean
+    return Frame.init_from_matrix(pitch2marker_T)
 
 
 def pitch_orig_in_robot(
@@ -165,12 +194,12 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
 def calculate_axes_in_marker(pitch_ori_T, intermediate_values: dict, prev_p_ax, prev_r_ax):
     # Marker2Tracker
     T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
-    pitch_ori1 = T_TM1.inv() @ pitch_ori_T
+    pitch_ori1 = (T_TM1.inv() @ pitch_ori_T).squeeze()
     pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
     roll_ax1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
 
     T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
-    pitch_ori2 = T_TM2.inv() @ pitch_ori_T
+    pitch_ori2 = (T_TM2.inv() @ pitch_ori_T).squeeze()
     pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
     roll_ax2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
 
@@ -248,10 +277,28 @@ def main():
 
     # Calculate registration
     robot2tracker_t = calculate_registration(registration_data, root)
+    # Calculate marker to pitch transformation
+    axis_dict = {}
+    pitch2marker_t = calculate_pitch_to_marker(registration_data, other_values_dict=axis_dict)
 
     # Save everything as a JSON file.
-    # robot2tracker_t
-    # marker2pitch_t
+    json_data = {}
+    json_data["robot2tracker_T"] = np.array(robot2tracker_t).tolist()
+    json_data["pitch2marker_T"] = np.array(pitch2marker_t).tolist()
+    json_data["pitchorigin_in_marker"] = axis_dict["pitchorigin"].tolist()
+    json_data["pitchaxis_in_marker"] = axis_dict["pitchaxis"].tolist()
+    json_data["rollaxis_in_marker"] = axis_dict["rollaxis"].tolist()
+
+    new_name = registration_data_path.parent / "registration_values.json"
+    with open(new_name, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=4)
+
+    # Load json
+    registration_dict = json.load(open(new_name, "r"))
+    T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+    log.info(f"Robot to Tracker\n{T_RT}")
+    log.info(f"Pitch to marker\n{T_MP}")
 
 
 parser = argparse.ArgumentParser()
@@ -263,5 +310,4 @@ parser.add_argument( "-l", "--log", type=str, default="DEBUG",
 args = parser.parse_args()
 
 if __name__ == "__main__":
-
     main()
