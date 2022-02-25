@@ -68,9 +68,12 @@ def main():
     list_area = []
     pitch_orig1 = []
     pitch_orig2 = []
-    roll_axis_M = []
+    roll_axis1_M = []
+    roll_axis2_M = []
     pitch_axis1_M = []
     pitch_axis2_M = []
+    prev_p_ax = None
+    prev_r_ax = None
     for k in keys:
         if len(list(dict_files[k].keys())) < 2:
             log.warning(f"files for step {k} are not available")
@@ -82,6 +85,9 @@ def main():
         )
         # ---------------------------
         # Marker to pitch frame error metrics
+        # - Calculate pitch origin in marker Frame
+        # - Calculate pitch axes in marker Frame
+        # - Calculate roll axes in marker Frame
         # ---------------------------
         pitch_ori_T = (m1 + m2 + m3) / 3
         # Marker2Tracker
@@ -90,12 +96,40 @@ def main():
         pitch_orig1.append(pitch_ori_M1.squeeze())
         pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
         pitch_axis1_M.append(pitch_ax1)
+        roll_axis1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
+        roll_axis1_M.append(roll_axis1)
 
         T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
         pitch_ori_M2 = T_TM2.inv() @ pitch_ori_T
         pitch_orig2.append(pitch_ori_M2.squeeze())
         pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
         pitch_axis2_M.append(pitch_ax2)
+        roll_axis2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
+        roll_axis2_M.append(roll_axis2)
+
+        # Check if pitch axis are looking in opposite directions
+        if np.dot(pitch_ax1, pitch_ax2) < 0:
+            pitch_ax1 *= -1
+        if prev_p_ax is None:
+            prev_p_ax = pitch_ax1
+        # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+        else:
+            if np.dot(prev_p_ax, pitch_ax1) < 0:
+                pitch_ax1 *= -1
+                pitch_ax2 *= -1
+            prev_p_ax = pitch_ax1
+
+        # Check if roll axis are looking in opposite directions
+        if np.dot(roll_axis1, roll_axis2) < 0:
+            roll_axis1 *= -1
+        if prev_r_ax is None:
+            prev_r_ax = roll_axis1
+        # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+        else:
+            if np.dot(prev_r_ax, roll_axis1) < 0:
+                roll_axis1 *= -1
+                roll_axis2 *= -1
+            prev_r_ax = roll_axis1
 
         # ---------------------------
         # Mid point error metrics
@@ -115,11 +149,16 @@ def main():
         log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
         log.debug(f"pitch axis1  from marker {pitch_ax1}")
         log.debug(f"pitch axis2  from marker {pitch_ax2}")
+        log.debug(f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1,pitch_ax2)>0}")
+        log.debug(f"roll axis1  from marker {roll_axis1}")
+        log.debug(f"roll axis2  from marker {roll_axis2}")
+        log.debug(f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1,roll_axis2)>0}")
         list_area.append(area)
 
     list_area = np.array(list_area)
     pitch_orig = np.array(pitch_orig1 + pitch_orig2)
     pitch_axis = np.array(pitch_axis1_M + pitch_axis2_M)
+    roll_axis = np.array(roll_axis1_M + roll_axis2_M)
     # create_histogram(list_area)
     log.info(f"Mean area {list_area.mean():0.4f}")
     log.info(f"Std  area {list_area.std():0.4f}")
@@ -127,6 +166,8 @@ def main():
     log.info(f"Std  pitch_orig {pitch_orig.std(axis=0)}")
     log.info(f"Mean pitch_axis {pitch_axis.mean(axis=0)}")
     log.info(f"Std  pitch_axis {pitch_axis.std(axis=0)}")
+    log.info(f"Mean roll_axis {roll_axis.mean(axis=0)}")
+    log.info(f"Std  roll_axis {roll_axis.std(axis=0)}")
 
     f_path = Path(__file__).parent / "results" / root.name
     log.info(f_path)

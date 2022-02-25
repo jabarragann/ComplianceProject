@@ -108,15 +108,17 @@ def calculate_midpoints(
     pitch_circle2 = Circle3D.from_lstsq_fit(fid_arr[1].T)
 
     # Populate intermediate values
+    # Marker frame from pitch1 circle
     other_vals_dict["marker_frame_pitch1"] = marker_frame_dict[0][0]
     other_vals_dict["marker_frame1_pos_std"] = marker_frame_dict[0][1]
     other_vals_dict["marker_frame1_ori_std"] = marker_frame_dict[0][2]
+    # Marker frame from pitch2 circle
     other_vals_dict["marker_frame_pitch2"] = marker_frame_dict[1][0]
     other_vals_dict["marker_frame2_pos_std"] = marker_frame_dict[1][1]
     other_vals_dict["marker_frame2_ori_std"] = marker_frame_dict[1][2]
     other_vals_dict["pitch_axis1"] = pitch_circle1.normal
     other_vals_dict["pitch_axis2"] = pitch_circle2.normal
-    other_vals_dict["roll_axis2"] = roll_circle.normal
+    other_vals_dict["roll_axis"] = roll_circle.normal
 
     # ------------------------------------------------------------
     # Calculate mid point between rotation axis

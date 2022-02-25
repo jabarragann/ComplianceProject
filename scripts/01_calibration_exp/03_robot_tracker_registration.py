@@ -27,6 +27,7 @@ from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial, calculate_midpoints
 from kincalib.geometry import Line3D, Circle3D, Triangle3D
+import kincalib.utils.CmnUtils as utils
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -90,7 +91,19 @@ def pitch_orig_in_robot(
     return df_results
 
 
-def pitch_orig_in_tracker(root: Path):
+def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Calculate the pitch origin in tracker coordinates and the pitch in frame in marker
+    coordinates. There exists a rigid transformation between the marker in the shaft and
+    the pitch frame.
+
+    Args:
+        root (Path): data path
+
+    Returns:
+        Tuple[pd.DataFrame,pd.DataFrame]: dataframe with pitch origin w.r.t tracker and dataframe
+        pitch frame w.r.t marker frame
+    """
+
     def load_files(root: Path):
         dict_files = defaultdict(dict)  # Use step as keys. Each entry has a pitch and roll file.
         for f in (root / "pitch_roll_mov").glob("*"):
@@ -103,23 +116,30 @@ def pitch_orig_in_tracker(root: Path):
         return dict_files
 
     # ------------------------------------------------------------
-    # Itereate over data and calculate pitch origin in tracker coordinates
+    # Iterate over data and calculate pitch origin in tracker coordinates
     # ------------------------------------------------------------
     # Final df
     cols = ["step", "area", "tpx", "tpy", "tpz"]
+    cols_pitch_M = ["step", "mox", "moy", "moz", "mpx", "mpy", "mpz", "mrx", "mry", "mrz"]
     df_results = pd.DataFrame(columns=cols)
+    df_pitch_axes = pd.DataFrame(columns=cols_pitch_M)
 
     dict_files = load_files(root)  # Use the step as the dictionary key
     keys = sorted(list(dict_files.keys()))
 
+    prev_p_ax = None
+    prev_r_ax = None
     for k in track(keys, "Computing pitch origin in tracker coordinates"):
         if len(list(dict_files[k].keys())) < 2:
             log.warning(f"files for step {k} are not available")
             continue
         step = k
-        m1, m2, m3 = calculate_midpoints(dict_files[k]["roll"], dict_files[k]["pitch"])
+        intermediate_values = {}
+        m1, m2, m3 = calculate_midpoints(
+            dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
+        )
         triangle = Triangle3D([m1, m2, m3])
-        # Scale sides and area to milimiters
+        # Scale area to milimiters
         area = triangle.calculate_area(scale=1000)
         center = triangle.calculate_centroid()
         # Add new entry to df
@@ -128,7 +148,57 @@ def pitch_orig_in_tracker(root: Path):
         new_df = pd.DataFrame(data, columns=cols)
         df_results = df_results.append(new_df)
 
-    return df_results
+        # Calculate pitch axis in Marker frame
+        pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
+            center, intermediate_values, prev_p_ax, prev_r_ax
+        )
+        prev_p_ax = pitch_ax_M
+        prev_r_ax = roll_ax_M
+        data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M)
+        data = np.array(data).reshape((1, -1))
+        new_pt = pd.DataFrame(data, columns=cols_pitch_M)
+        df_pitch_axes = df_pitch_axes.append(new_pt)
+
+    return df_results, df_pitch_axes
+
+
+def calculate_axes_in_marker(pitch_ori_T, intermediate_values: dict, prev_p_ax, prev_r_ax):
+    # Marker2Tracker
+    T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
+    pitch_ori1 = T_TM1.inv() @ pitch_ori_T
+    pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
+    roll_ax1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
+
+    T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
+    pitch_ori2 = T_TM2.inv() @ pitch_ori_T
+    pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
+    roll_ax2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
+
+    # Check if pitch axis are looking in opposite directions
+    if np.dot(pitch_ax1, pitch_ax2) < 0:
+        pitch_ax1 *= -1
+    if prev_p_ax is None:
+        prev_p_ax = pitch_ax1
+    # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+    else:
+        if np.dot(prev_p_ax, pitch_ax1) < 0:
+            pitch_ax1 *= -1
+            pitch_ax2 *= -1
+        prev_p_ax = pitch_ax1
+
+    # Check if roll axis are looking in opposite directions
+    if np.dot(roll_ax1, roll_ax2) < 0:
+        roll_ax1 *= -1
+    if prev_r_ax is None:
+        prev_r_ax = roll_ax1
+    # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+    else:
+        if np.dot(prev_r_ax, roll_ax1) < 0:
+            roll_ax1 *= -1
+            roll_ax2 *= -1
+        prev_r_ax = roll_ax1
+
+    return (pitch_ori1 + pitch_ori2) / 2, (pitch_ax1 + pitch_ax2) / 2, (roll_ax1 + roll_ax2) / 2
 
 
 def obtain_registration_data(root: Path):
@@ -138,10 +208,12 @@ def obtain_registration_data(root: Path):
     pitch_robot = pitch_orig_in_robot(robot_jp)  # df with columns = [step,px,py,pz]
 
     # Tracker points
-    pitch_tracker = pitch_orig_in_tracker(root)  # df with columns = [step area tx, ty,tz]
+    # df with columns = [step area tx, ty,tz]
+    pitch_tracker, pitch_marker = pitch_orig_in_tracker(root)
 
     # combine df using step as index
-    final_df = pd.merge(pitch_robot, pitch_tracker, on="step")
+    pitch_df = pd.merge(pitch_tracker, pitch_marker, on="step")
+    final_df = pd.merge(pitch_robot, pitch_df, on="step")
 
     # Save df
     dst_f = root / "registration_results"
@@ -176,6 +248,10 @@ def main():
 
     # Calculate registration
     robot2tracker_t = calculate_registration(registration_data, root)
+
+    # Save everything as a JSON file.
+    # robot2tracker_t
+    # marker2pitch_t
 
 
 parser = argparse.ArgumentParser()
