@@ -6,6 +6,8 @@ import numpy as np
 
 def save_without_overwritting(df: pd.DataFrame, filename: Path) -> None:
 
+    if not filename.parent.exists():
+        filename.parent.mkdir(parents=True)
     # check if filename exists.
     if not filename.exists():
         df.to_csv(filename, sep=",", index=False)

@@ -13,6 +13,7 @@ from rich.logging import RichHandler
 from rich.progress import track
 import re
 from collections import defaultdict
+import traceback
 
 # ROS and DVRK imports
 import dvrk
@@ -79,81 +80,89 @@ def main():
             log.warning(f"files for step {k} are not available")
             continue
 
-        intermediate_values = {}
-        m1, m2, m3 = calculate_midpoints(
-            dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
-        )
-        # ---------------------------
-        # Marker to pitch frame error metrics
-        # - Calculate pitch origin in marker Frame
-        # - Calculate pitch axes in marker Frame
-        # - Calculate roll axes in marker Frame
-        # ---------------------------
-        pitch_ori_T = (m1 + m2 + m3) / 3
-        # Marker2Tracker
-        T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
-        pitch_ori_M1 = T_TM1.inv() @ pitch_ori_T
-        pitch_orig1.append(pitch_ori_M1.squeeze())
-        pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
-        pitch_axis1_M.append(pitch_ax1)
-        roll_axis1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
-        roll_axis1_M.append(roll_axis1)
+        try:
 
-        T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
-        pitch_ori_M2 = T_TM2.inv() @ pitch_ori_T
-        pitch_orig2.append(pitch_ori_M2.squeeze())
-        pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
-        pitch_axis2_M.append(pitch_ax2)
-        roll_axis2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
-        roll_axis2_M.append(roll_axis2)
+            intermediate_values = {}
+            m1, m2, m3 = calculate_midpoints(
+                dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
+            )
+            # ---------------------------
+            # Marker to pitch frame error metrics
+            # - Calculate pitch origin in marker Frame
+            # - Calculate pitch axes in marker Frame
+            # - Calculate roll axes in marker Frame
+            # ---------------------------
+            pitch_ori_T = (m1 + m2 + m3) / 3
+            # Marker2Tracker
+            T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
+            pitch_ori_M1 = T_TM1.inv() @ pitch_ori_T
+            pitch_orig1.append(pitch_ori_M1.squeeze())
+            pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
+            pitch_axis1_M.append(pitch_ax1)
+            roll_axis1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
+            roll_axis1_M.append(roll_axis1)
 
-        # Check if pitch axis are looking in opposite directions
-        if np.dot(pitch_ax1, pitch_ax2) < 0:
-            pitch_ax1 *= -1
-        if prev_p_ax is None:
-            prev_p_ax = pitch_ax1
-        # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
-        else:
-            if np.dot(prev_p_ax, pitch_ax1) < 0:
+            T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
+            pitch_ori_M2 = T_TM2.inv() @ pitch_ori_T
+            pitch_orig2.append(pitch_ori_M2.squeeze())
+            pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
+            pitch_axis2_M.append(pitch_ax2)
+            roll_axis2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
+            roll_axis2_M.append(roll_axis2)
+
+            # Check if pitch axis are looking in opposite directions
+            if np.dot(pitch_ax1, pitch_ax2) < 0:
                 pitch_ax1 *= -1
-                pitch_ax2 *= -1
-            prev_p_ax = pitch_ax1
+            if prev_p_ax is None:
+                prev_p_ax = pitch_ax1
+            # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+            else:
+                if np.dot(prev_p_ax, pitch_ax1) < 0:
+                    pitch_ax1 *= -1
+                    pitch_ax2 *= -1
+                prev_p_ax = pitch_ax1
 
-        # Check if roll axis are looking in opposite directions
-        if np.dot(roll_axis1, roll_axis2) < 0:
-            roll_axis1 *= -1
-        if prev_r_ax is None:
-            prev_r_ax = roll_axis1
-        # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
-        else:
-            if np.dot(prev_r_ax, roll_axis1) < 0:
+            # Check if roll axis are looking in opposite directions
+            if np.dot(roll_axis1, roll_axis2) < 0:
                 roll_axis1 *= -1
-                roll_axis2 *= -1
-            prev_r_ax = roll_axis1
+            if prev_r_ax is None:
+                prev_r_ax = roll_axis1
+            # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+            else:
+                if np.dot(prev_r_ax, roll_axis1) < 0:
+                    roll_axis1 *= -1
+                    roll_axis2 *= -1
+                prev_r_ax = roll_axis1
 
-        # ---------------------------
-        # Mid point error metrics
-        # ---------------------------
-        triangle = Triangle3D([m1, m2, m3])
-        # Scale sides and area to milimiters
-        sides = triangle.calculate_sides(scale=1000)
-        area = triangle.calculate_area(scale=1000)
-        # sides = calculate_triangle_sides(m1,m2,m3)
-        # area = calculate_area(m1,m2,m3)
-        log.debug(f"Step {k} results")
-        log.debug(f"MID POINT RESULTS")
-        log.debug(f"triangle sides {sides} mm")
-        log.debug(f"triangle area {area:0.4f} mm^2")
-        log.debug(f"MARKER TO PITCH RESULTS")
-        log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
-        log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
-        log.debug(f"pitch axis1  from marker {pitch_ax1}")
-        log.debug(f"pitch axis2  from marker {pitch_ax2}")
-        log.debug(f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1,pitch_ax2)>0}")
-        log.debug(f"roll axis1  from marker {roll_axis1}")
-        log.debug(f"roll axis2  from marker {roll_axis2}")
-        log.debug(f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1,roll_axis2)>0}")
-        list_area.append(area)
+            # ---------------------------
+            # Mid point error metrics
+            # ---------------------------
+            triangle = Triangle3D([m1, m2, m3])
+            # Scale sides and area to milimiters
+            sides = triangle.calculate_sides(scale=1000)
+            area = triangle.calculate_area(scale=1000)
+            # sides = calculate_triangle_sides(m1,m2,m3)
+            # area = calculate_area(m1,m2,m3)
+            # fmt: off
+            log.debug(f"Step {k} results")
+            log.debug(f"MID POINT RESULTS")
+            log.debug(f"triangle sides {sides} mm")
+            log.debug(f"triangle area {area:0.4f} mm^2")
+            log.debug(f"MARKER TO PITCH RESULTS")
+            log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
+            log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
+            log.debug(f"pitch axis1  from marker {pitch_ax1}")
+            log.debug(f"pitch axis2  from marker {pitch_ax2}")
+            log.debug( f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1,pitch_ax2)>0}")
+            log.debug(f"roll axis1  from marker {roll_axis1}")
+            log.debug(f"roll axis2  from marker {roll_axis2}")
+            log.debug( f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1,roll_axis2)>0}")
+            # fmt: on
+            list_area.append(area)
+        except Exception as e:
+            log.error(f"Exception triggered in step {k}")
+            log.debug(e)
+            log.debug(traceback.print_exc())
 
     list_area = np.array(list_area)
     pitch_orig = np.array(pitch_orig1 + pitch_orig2)
@@ -188,7 +197,7 @@ def plot_results():
 # ------------------------------------------------------------
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-03", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-04", 
                         help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
