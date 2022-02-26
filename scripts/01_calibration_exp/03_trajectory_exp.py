@@ -19,7 +19,7 @@ import rospy
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.Motion.replay_rosbag import RosbagReplay, replay_device
+from kincalib.Motion.replay_rosbag import RosbagReplay
 from kincalib.Motion.ReplayDevice import ReplayDevice
 
 
@@ -31,11 +31,11 @@ def main():
 
     # fmt: off
     parser.add_argument("-b", "--rosbag",type=str,
-                        default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
+                        default="data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag",
                         help="rosbag trajectory to replay")
     parser.add_argument( "-f", "--file", type=str, default="test_trajectories/test_traj01", 
-                         help="filename to save the data from a test trajectory. execute_measure() func") 
-    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-02", 
+                         help="filename where a test trajectory data will be saved. execute_measure() func") 
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-04", 
                          help="root dir to save the data.")                     
     args = parser.parse_args()
     # fmt: on
@@ -86,13 +86,13 @@ def main():
     # ------------------------------------------------------------
     # Execute trajectory
     # ------------------------------------------------------------
-    filename = root / args.file
 
     # Collect a testing trajectory.
-    replay.execute_measure(arm, filename, marker_name, expected_spheres=expected_spheres)
+    # filename = root / args.file
+    # replay.execute_measure(arm, filename, marker_name, expected_spheres=expected_spheres)
 
     # Collect calibration data.
-    # replay.robot_registration(arm,root,marker_name,expected_spheres=expected_spheres,save=True)
+    replay.robot_registration(arm, root, marker_name, expected_spheres=expected_spheres, save=True)
 
 
 if __name__ == "__main__":

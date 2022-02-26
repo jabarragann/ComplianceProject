@@ -12,6 +12,8 @@ from pathlib import Path
 from itertools import product
 from rich.progress import track
 from kincalib.Motion.ReplayDevice import ReplayDevice
+from typing import List
+import rospy
 
 
 class DvrkMotions:
@@ -46,6 +48,13 @@ class DvrkMotions:
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
+    @staticmethod
+    def generate_yaw_motion(steps: int = 22) -> np.ndarray:
+        min_pitch = -1.38
+        max_pitch = 1.38
+        trajectory = np.linspace(min_pitch, max_pitch, num=steps)
+        return trajectory
+
     def create_df_with_robot_jp(robot_handler: ReplayDevice, idx) -> pd.DataFrame:
         jp = robot_handler.measured_jp()
         jaw_jp = robot_handler.jaw_jp()
@@ -67,7 +76,7 @@ class DvrkMotions:
             - pd.DataFrame with cp of the robot.
         """
 
-        robot_frame = ReplayDevice.measured_cp()
+        robot_frame = robot_handler.measured_cp()
         r_p = list(robot_frame.p)
         r_q = robot_frame.M.GetQuaternion()
         # fmt: off
@@ -152,6 +161,106 @@ class DvrkMotions:
         DvrkMotions.pitch_roll_together_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file)
         DvrkMotions.roll_motion(  init_jp, psm_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
         # fmt:on
+
+    @staticmethod
+    def pitch_yaw_roll_independent_motion(
+        init_jp, psm_handler, log, expected_markers=4, save: bool = False, filename: Path = None
+    ):
+        """Move each axis independently. Save the measurements from each movement in different df.
+        First the swing the pitch axis with two different roll values.
+        Then swing the roll axis. This will allow you to fit three different circles to the markers data.
+
+        Args:
+            init_jp ([type]): [description]
+            psm_handler ([type]): [description]
+            log ([type]): [description]
+            expected_markers (int, optional): [description]. Defaults to 4.
+            save (bool, optional): [description]. Defaults to False.
+            filename (Path, optional): [description]. Defaults to None.
+
+        """
+
+        pitch_trajectory = DvrkMotions.generate_pitch_motion()
+        yaw_trajectory = DvrkMotions.generate_yaw_motion()
+        pitch_yaw_traj = []
+        roll_v = [0.2, -0.3]
+        for r in roll_v:
+            pitch_yaw_traj += list(product([r], pitch_trajectory, [0.0])) + list(
+                product([r], [0.0], yaw_trajectory)
+            )
+        roll_traj = DvrkMotions.generate_roll_motion()
+        roll_traj = list(product(roll_traj, [0], [0]))
+        pitch_yaw_file = filename.parent / (filename.with_suffix("").name + "_pitch_yaw.txt")
+        roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
+        # fmt:off
+        # roll trajectory
+        DvrkMotions.wrist_joints_motion( init_jp, psm_handler, log, expected_markers, save,
+                                 filename=roll_file, trajectory=roll_traj)
+        # pitch trajectory
+        DvrkMotions.wrist_joints_motion( init_jp, psm_handler, log, expected_markers, save,
+                                                filename=pitch_yaw_file,trajectory=pitch_yaw_traj)
+        # fmt:on
+
+    @staticmethod
+    def wrist_joints_motion(
+        init_jp,
+        psm_handler,
+        log,
+        expected_markers=4,
+        save: bool = False,
+        filename: Path = None,
+        trajectory: List = None,
+    ):
+        """Identify pitch axis by moving outer roll (shaft movement) and wrist pitch joint.
+
+        Args:
+            init_jp ([type]): [description]
+            psm_handler ([type]): [description]
+            log ([type]): [description]
+            expected_markers (int, optional): [description]. Defaults to 4.
+            save (bool, optional): [description]. Defaults to True.
+            filename (Path, optional): [description]. Defaults to None.
+            trajectory (List): List of joints values that the robot will follow. Each point in the trajectory
+            needs to specify q4, q5 and q6.
+        """
+        if trajectory is None:
+            raise ("Trajectory not given")
+        if filename is None:
+            raise ("filename not give")
+
+        pitch_trajectory = DvrkMotions.generate_pitch_motion()
+        roll_trajectory = [0.2, -0.3]
+        total = len(roll_trajectory) * len(pitch_trajectory)
+
+        ftk_handler = ftk_500("custom_marker_112")
+        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+
+        # Move to initial position
+        psm_handler.move_jp(init_jp).wait()
+        time.sleep(1)
+        # Start trajectory
+        counter = 0
+        for q4, q5, q6 in track(trajectory, description="-- Trajectory Progress -- "):
+            counter += 1
+            # Move only wrist joints
+            log.info(f"q4 {q4:+.4f} q5 {q5:+.4f} q6 {q6:+.4f}")
+            init_jp[3] = q4
+            init_jp[4] = q5
+            init_jp[5] = q6
+            q7 = psm_handler.jaw_jp()
+            psm_handler.move_jp(init_jp).wait()
+            time.sleep(0.15)
+
+            if save:
+                new_pt = DvrkMotions.create_df_with_measurements(
+                    ftk_handler, expected_markers, counter, q4, q5, q6, q7, log
+                )
+                if df_vals is not None:
+                    df_vals = df_vals.append(new_pt)
+        # Save experiment
+        # log.debug(df_vals.head())
+        if save:
+            save_without_overwritting(df_vals, Path(filename))
 
     @staticmethod
     def pitch_roll_together_motion(
@@ -352,7 +461,9 @@ class DvrkMotions:
 
 if __name__ == "__main__":
     log = Logger("utils_log").log
-    psm_handler = dvrk.psm("PSM2", expected_interval=0.01)
+    rospy.init_node("dvrk_bag_replay", anonymous=True)
+    # psm_handler = dvrk.psm("PSM2", expected_interval=0.01)
+    psm_handler = ReplayDevice("PSM2", expected_interval=0.01)
     is_enabled = psm_handler.enable(10)
     if not is_enabled:
         sys.exit(0)
@@ -383,8 +494,12 @@ if __name__ == "__main__":
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     # )
 
-    DvrkMotions.pitch_roll_independent_motion(
-        init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
+    # DvrkMotions.pitch_roll_independent_motion(
+    #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
+    # )
+
+    DvrkMotions.pitch_yaw_roll_independent_motion(
+        init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=False, filename=filename
     )
 
     # DvrkMotions.pitch_motion(

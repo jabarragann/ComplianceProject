@@ -181,12 +181,21 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
             center, intermediate_values, prev_p_ax, prev_r_ax
         )
+        ## IMPORTANT NOTE
+        # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
+        # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
+        # are used to ensure consistency in the selected direction for different points in the trajectory.
+
         prev_p_ax = pitch_ax_M
         prev_r_ax = roll_ax_M
         data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M)
         data = np.array(data).reshape((1, -1))
         new_pt = pd.DataFrame(data, columns=cols_pitch_M)
         df_pitch_axes = df_pitch_axes.append(new_pt)
+
+        # Calculate yaw frame and location of wrist fiducial wrt to yaw frame. This is rigid transformation
+        # that does not depends on the joints values.
+        ## todo: Calculate wrist fiducial wrt yaw frame.
 
     return df_results, df_pitch_axes
 

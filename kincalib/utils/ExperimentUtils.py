@@ -93,21 +93,30 @@ def calculate_midpoints(
     roll_circle = Circle3D.from_lstsq_fit(marker_orig_arr)
     roll_axis = Line3D(ref_point=roll_circle.center, direction=roll_circle.normal)
 
-    # calculate pitch axis
+    # calculate pitch and yaw axis
     marker_frame_dict = []
     roll = pitch_df.q4.unique()
     fid_arr = []
     for idx, r in enumerate(roll):
+        # Get pitch data
         df_temp = pitch_df.loc[pitch_df["q4"] == r]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)
+        if len(pose_arr) > 0:
+            mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)
+        else:
+            mean_pose, position_std, orientation_std = None, None, None
         marker_frame_dict.append([mean_pose, position_std, orientation_std])
         fid_arr.append(wrist_fiducials)
+        # Get yaw data
 
     pitch_circle1 = Circle3D.from_lstsq_fit(fid_arr[0].T)
     pitch_circle2 = Circle3D.from_lstsq_fit(fid_arr[1].T)
+    yaw_circle1 = None
+    yaw_circle2 = None
 
+    # ------------------------------------------------------------
     # Populate intermediate values
+    # ------------------------------------------------------------
     # Marker frame from pitch1 circle
     other_vals_dict["marker_frame_pitch1"] = marker_frame_dict[0][0]
     other_vals_dict["marker_frame1_pos_std"] = marker_frame_dict[0][1]
@@ -119,6 +128,7 @@ def calculate_midpoints(
     other_vals_dict["pitch_axis1"] = pitch_circle1.normal
     other_vals_dict["pitch_axis2"] = pitch_circle2.normal
     other_vals_dict["roll_axis"] = roll_circle.normal
+    ## Todo add yaw axis to other_val_dict
 
     # ------------------------------------------------------------
     # Calculate mid point between rotation axis

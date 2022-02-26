@@ -201,7 +201,7 @@ class RosbagReplay:
                 replay_device.move_jp(numpy.array(self.setpoints[index].position)).wait()
 
                 marker_pose, fiducials_pose = ftk_handler.obtain_processed_measurement(
-                    expected_spheres, t=100, sample_time=15
+                    expected_spheres, t=200, sample_time=15
                 )
                 if marker_pose is not None:
                     #Measure
@@ -284,7 +284,6 @@ class RosbagReplay:
 
         # for index in track(range(total), "-- Trajectory Progress -- "):
         for index in range(total):
-            self.log.info(f"-- Trajectory Progress --> {100*index/total:0.02f} %")
             # record start time
             loop_start_time = time.time()
             # compute expected dt
@@ -293,11 +292,12 @@ class RosbagReplay:
             last_bag_time = new_bag_time
             # replay
             if index % 40 == 0:
+                self.log.info(f"-- Trajectory Progress --> {100*index/total:0.02f} %")
                 #Move
                 replay_device.move_jp(numpy.array(self.setpoints[index].position)).wait()
 
                 marker_pose, fiducials_pose = ftk_handler.obtain_processed_measurement(
-                    expected_spheres, t=100, sample_time=15
+                    expected_spheres, t=200, sample_time=15
                 )
                 if marker_pose is not None:
                     #Measure
@@ -315,7 +315,7 @@ class RosbagReplay:
                     #-------------------------------------
                     #Add robot cp and jp measurements
                     #-------------------------------------
-                    new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,q4,q5,q6)
+                    new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,q4,q5,q6,jaw_jp)
                     df_vals_cp = df_vals_cp.append(new_pt)
                     new_pt = DvrkMotions.create_df_with_robot_jp(replay_device,index)
                     df_vals_jp.append(new_pt)
@@ -328,7 +328,7 @@ class RosbagReplay:
                     # Wrist motions
                     # ------------------------------------------------------------
                     init_jp = replay_device.measured_jp()
-                    DvrkMotions.pitch_roll_independent_motion(
+                    DvrkMotions.pitch_yaw_roll_independent_motion(
                         init_jp,
                         psm_handler=replay_device,
                         expected_markers=4,
@@ -380,7 +380,7 @@ if __name__ == "__main__":
     # Get robot ready
     # ------------------------------------------------------------
 
-    arm = replay_device(device_namespace=arm_name, expected_interval=0.01)
+    arm = ReplayDevice(device_namespace=arm_name, expected_interval=0.01)
     arm.measured_cp()
     setpoints = replay.setpoints
 

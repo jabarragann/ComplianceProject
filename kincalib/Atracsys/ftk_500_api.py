@@ -137,7 +137,7 @@ class ftk_500:
 
         mean_frame, mean_value = None, None
         # self.log.debug(f"collected samples: {len(sensor_vals)}")
-        if len(sensor_vals) >= 10:
+        if len(sensor_vals) >= 2:
             # Sanity check - make sure the fiducials are reported in the same order
             sensor_vals = ftk_500.sort_measurements(sensor_vals)
             sensor_vals = np.array(sensor_vals)
@@ -146,7 +146,7 @@ class ftk_500:
             std_value = sensor_vals.squeeze().std(axis=0)
             # self.log.debug(f"mean value:\n{mean_value}")
             # self.log.debug(f"std value:\n{std_value}")
-        if len(marker_pose) >= 10:
+        if len(marker_pose) >= 2:
             # Get mean pose of the marker
             mean_frame, _, _ = ftk_500.average_marker_pose(marker_pose)
             # self.log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
@@ -155,7 +155,7 @@ class ftk_500:
 
     @staticmethod
     def sort_measurements(measurement_list: List[List[float]]) -> np.ndarray:
-        if len(measurement_list) < 10:
+        if len(measurement_list) < 2:
             print("Not enough records (10 minimum)")  # this is totally arbitrary
             return None
 
@@ -199,8 +199,8 @@ class ftk_500:
         Returns:
             Tuple[np.ndarray,np.ndarray,np.ndarray]: mean_frame, position_std, orientation_std
         """
-        if len(pose_arr) < 10:
-            print("Not enough records (10 minimum)")  # this is totally arbitrary
+        if len(pose_arr) < 2:
+            print("Not enough records (2 minimum)")  # this is totally arbitrary
             return None, None, None
         position = []
         orientation = []
