@@ -318,7 +318,7 @@ class RosbagReplay:
                     new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,q4,q5,q6,jaw_jp)
                     df_vals_cp = df_vals_cp.append(new_pt)
                     new_pt = DvrkMotions.create_df_with_robot_jp(replay_device,index)
-                    df_vals_jp.append(new_pt)
+                    df_vals_jp = df_vals_jp.append(new_pt)
 
                     #Save values
                     df_vals_cp.to_csv(robot_files / ("robot_cp_temp.txt"), index=None)

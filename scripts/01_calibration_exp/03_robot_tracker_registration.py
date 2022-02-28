@@ -162,37 +162,40 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         if len(list(dict_files[k].keys())) < 2:
             log.warning(f"files for step {k} are not available")
             continue
-        step = k
-        intermediate_values = {}
-        m1, m2, m3 = calculate_midpoints(
-            dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
-        )
-        triangle = Triangle3D([m1, m2, m3])
-        # Scale area to milimiters
-        area = triangle.calculate_area(scale=1000)
-        center = triangle.calculate_centroid()
-        # Add new entry to df
-        data = [step, area] + list(center)
-        data = np.array(data).reshape((1, -1))
-        new_df = pd.DataFrame(data, columns=cols)
-        df_results = df_results.append(new_df)
+        try:
+            step = k
+            intermediate_values = {}
+            m1, m2, m3 = calculate_midpoints(
+                dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
+            )
+            triangle = Triangle3D([m1, m2, m3])
+            # Scale area to milimiters
+            area = triangle.calculate_area(scale=1000)
+            center = triangle.calculate_centroid()
+            # Add new entry to df
+            data = [step, area] + list(center)
+            data = np.array(data).reshape((1, -1))
+            new_df = pd.DataFrame(data, columns=cols)
+            df_results = df_results.append(new_df)
 
-        # Calculate pitch axis in Marker frame
-        pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
-            center, intermediate_values, prev_p_ax, prev_r_ax
-        )
-        ## IMPORTANT NOTE
-        # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
-        # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
-        # are used to ensure consistency in the selected direction for different points in the trajectory.
+            # Calculate pitch axis in Marker frame
+            pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
+                center, intermediate_values, prev_p_ax, prev_r_ax
+            )
+            ## IMPORTANT NOTE
+            # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
+            # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
+            # are used to ensure consistency in the selected direction for different points in the trajectory.
 
-        prev_p_ax = pitch_ax_M
-        prev_r_ax = roll_ax_M
-        data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M)
-        data = np.array(data).reshape((1, -1))
-        new_pt = pd.DataFrame(data, columns=cols_pitch_M)
-        df_pitch_axes = df_pitch_axes.append(new_pt)
-
+            prev_p_ax = pitch_ax_M
+            prev_r_ax = roll_ax_M
+            data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M)
+            data = np.array(data).reshape((1, -1))
+            new_pt = pd.DataFrame(data, columns=cols_pitch_M)
+            df_pitch_axes = df_pitch_axes.append(new_pt)
+        except Exception as e:
+            log.error(f"Error in step {step}")
+            log.error(e)
         # Calculate yaw frame and location of wrist fiducial wrt to yaw frame. This is rigid transformation
         # that does not depends on the joints values.
         ## todo: Calculate wrist fiducial wrt yaw frame.
@@ -261,6 +264,9 @@ def obtain_registration_data(root: Path):
     dst_f = dst_f / "registration_data.txt"
     final_df.to_csv(dst_f, index=None)
 
+    if final_df.shape[0] == 0:
+        raise Exception("No data found for registration")
+
     return final_df
 
 
@@ -312,7 +318,7 @@ def main():
 
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-02", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-04", 
                 help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                 help="log level") #fmt:on

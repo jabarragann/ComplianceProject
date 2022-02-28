@@ -14,6 +14,7 @@ from rich.progress import track
 import re
 from collections import defaultdict
 import traceback
+import seaborn as sns
 
 # ROS and DVRK imports
 import dvrk
@@ -24,7 +25,7 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial, calculate_midpoints
-from kincalib.geometry import Line3D, Circle3D, Triangle3D
+from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
@@ -51,14 +52,12 @@ def create_histogram(data):
     axes.set_ylabel("Frequency")
     axes.set_title(f"Pitch axis measurements. (N={data.shape[0]:02d})")
     # axes.set_xticks([i * 5 for i in range(110 // 5)])
-    plt.show()
+    # plt.show()
 
 
 def main():
 
     # Important paths
-    log_level = args.log
-    log = Logger("pitch_exp_analize2", log_level=log_level).log
     root = Path(args.root)
     marker_file = Path("./share/custom_marker_id_112.json")
     regex = ""
@@ -162,13 +161,38 @@ def main():
         except Exception as e:
             log.error(f"Exception triggered in step {k}")
             log.debug(e)
-            log.debug(traceback.print_exc())
+            # log.debug(traceback.print_exc())
 
     list_area = np.array(list_area)
     pitch_orig = np.array(pitch_orig1 + pitch_orig2)
     pitch_axis = np.array(pitch_axis1_M + pitch_axis2_M)
     roll_axis = np.array(roll_axis1_M + roll_axis2_M)
-    # create_histogram(list_area)
+
+    f_path = root / "registration_results/error_metrics"
+    if not f_path.exists():
+        f_path.mkdir(parents=True)
+
+    log.info(f_path)
+    np.save(f_path / "error_metric_area", list_area)
+    np.save(f_path / "error_metric_pitch_orig", pitch_orig)
+    np.save(f_path / "error_metric_pitch_axis", pitch_axis)
+    np.save(f_path / "error_metric_roll_axis", roll_axis)
+
+
+def plot_results():
+    root = Path(args.root)
+    f_path = root / "registration_results/error_metrics"
+
+    # Plot area histograms
+    list_area = np.load(f_path / "error_metric_area.npy")
+    pitch_orig = np.load(f_path / "error_metric_pitch_orig.npy")
+    pitch_orig_df = pd.DataFrame(pitch_orig, columns=["px", "py", "pz"])
+    pitch_axis = np.load(f_path / "error_metric_pitch_axis.npy")
+    pitch_axis_df = pd.DataFrame(pitch_axis, columns=["px", "py", "pz"])
+    roll_axis = np.load(f_path / "error_metric_roll_axis.npy")
+    roll_axis_df = pd.DataFrame(roll_axis, columns=["px", "py", "pz"])
+
+    log.info(f"Error report for {root}")
     log.info(f"Mean area {list_area.mean():0.4f}")
     log.info(f"Std  area {list_area.std():0.4f}")
     log.info(f"Mean pitch_orig {pitch_orig.mean(axis=0)}")
@@ -177,19 +201,42 @@ def main():
     log.info(f"Std  pitch_axis {pitch_axis.std(axis=0)}")
     log.info(f"Mean roll_axis {roll_axis.mean(axis=0)}")
     log.info(f"Std  roll_axis {roll_axis.std(axis=0)}")
+    log.info(f"roll and pitch dot {np.dot(roll_axis.mean(axis=0),pitch_axis.mean(axis=0)):0.05f}")
 
-    f_path = Path(__file__).parent / "results" / root.name
-    log.info(f_path)
-    np.save(f_path, list_area)
+    # create_histogram(list_area)
+    # Plot axis
+    pitch_a_mean_center = pitch_axis_df - pitch_axis_df.mean()
+    pitch_axis_df = pitch_a_mean_center.melt(var_name="coordinate")
+    roll_a_mean_center = roll_axis_df - roll_axis_df.mean()
+    roll_axis_df = roll_a_mean_center.melt(var_name="coordinate")
+    pitch_o_mean_center = pitch_orig_df - pitch_orig_df.mean()
+    pitch_orig_df = pitch_o_mean_center.melt(var_name="coordinate")
 
+    # Box plots for transformation between marker and pitch
+    fig, axes = plt.subplots(3, 1)
+    plt.subplots_adjust(left=0.06, right=0.96, top=0.96, bottom=0.05, hspace=0.28)
+    axes[0].set_title("pitch_axis")
+    sns.boxplot(x="coordinate", y="value", data=pitch_axis_df, ax=axes[0])
+    axes[1].set_title("roll_axis")
+    sns.boxplot(x="coordinate", y="value", data=roll_axis_df, ax=axes[1])
+    axes[2].set_title("pitch_orig")
+    sns.boxplot(x="coordinate", y="value", data=pitch_orig_df, ax=axes[2])
+    [ax.set_xlabel("") for ax in axes]
 
-def plot_results():
-    root = Path(args.root)
-    f_path = Path(__file__).parent / "results" / root.name
-    f_path = f_path.with_suffix(".npy")
-    results = np.load(f_path)
+    # Histograms for triangle area
+    # create_histogram(liost_area)
 
-    create_histogram(results)
+    # fig, axes = plt.subplots(1, 3)
+    # axes[0].set_title(f"(mean={pitch_axis_df['px'].mean():+0.04f})")
+    # axes[1].set_title(f"pitch_axis (mean={pitch_axis_df['py'].mean():+0.04f})")
+    # axes[2].set_title(f"(mean={pitch_axis_df['pz'].mean():+0.04f})")
+    # sns.boxplot(y=pitch_axis_df["px"] - pitch_axis_df["px"].mean(), ax=axes[0])
+    # sns.boxplot(y=pitch_axis_df["py"] - pitch_axis_df["py"].mean(), ax=axes[1])
+    # sns.boxplot(y=pitch_axis_df["pz"] - pitch_axis_df["pz"].mean(), ax=axes[2])
+    # plotter = Plotter3D()
+    # plotter.scatter_3d(pitch_axis.T)
+    # plotter.scatter_3d(roll_axis.T)
+    plt.show()
 
 
 # ------------------------------------------------------------
@@ -202,6 +249,8 @@ parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_traject
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
 args = parser.parse_args()
+log_level = args.log
+log = Logger("pitch_exp_analize2", log_level=log_level).log
 
 if __name__ == "__main__":
     main()

@@ -99,7 +99,7 @@ def calculate_midpoints(
     fid_arr = []
     for idx, r in enumerate(roll):
         # Get pitch data
-        df_temp = pitch_df.loc[pitch_df["q4"] == r]
+        df_temp = pitch_df.loc[(pitch_df["q4"] == r) & (pitch_df["q6"] == 0.0)]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
         if len(pose_arr) > 0:
             mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)

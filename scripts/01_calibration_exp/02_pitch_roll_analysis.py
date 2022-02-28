@@ -42,8 +42,8 @@ def three_axis_analysis():
     # ------------------------------------------------------------
     parser = argparse.ArgumentParser()
     #fmt:off
-    parser.add_argument( "-f", "--file", type=str, default="pitch_exp01.txt", 
-                         help="file to analyze") 
+    # parser.add_argument( "-f", "--file", type=str, default="pitch_exp01.txt", 
+    #                      help="file to analyze") 
     parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                          help="log level") #fmt:on
     args = parser.parse_args()
@@ -69,11 +69,22 @@ def three_axis_analysis():
     for k in keys:
         log.info(f"key {k}: {files[k]['pitch']}")
 
-    exp_id = 3 
+    exp_id = 0 
+
     # ------------------------------------------------------------
     # Roll axis analysis 
     # ------------------------------------------------------------
-    filename = root/files[exp_id]['roll']
+    #original
+    # filename = root/files[exp_id]['roll']
+    #modification
+    rec = "04"
+    step = "200"
+    file_p = f"data/03_replay_trajectory/d04-rec-{rec}/pitch_roll_mov/step{step}_wrist_motion_pitch_yaw.txt" 
+    file_r = f"data/03_replay_trajectory/d04-rec-{rec}/pitch_roll_mov/step{step}_wrist_motion_roll.txt" 
+    files[0]['roll']=file_r
+    files[0]['pitch']=file_p
+    filename =files[exp_id]['roll']
+
     df = pd.read_csv(filename)
     log.info(f"Loading ...\n{filename}")
 
@@ -101,7 +112,8 @@ def three_axis_analysis():
     # ------------------------------------------------------------
     # Pitch axis analysis 
     # ------------------------------------------------------------
-    filename = root/files[exp_id]['pitch']
+    # filename = root/files[exp_id]['pitch']
+    filename = files[exp_id]['pitch']
     df = pd.read_csv(filename)
     log.info(f"Loading... \n{filename}")
 
@@ -110,7 +122,7 @@ def three_axis_analysis():
 
     fid_arr = []
     for r in roll:
-        df_temp = df.loc[df["q4"]==r]
+        df_temp = df.loc[(df["q4"]==r) & (df["q6"]==0.0)]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None,marker_file,df=df_temp)
         log.info(f"Wrist fiducials for q4={r:+0.2f}: {wrist_fiducials.shape}")
         fid_arr.append(wrist_fiducials)

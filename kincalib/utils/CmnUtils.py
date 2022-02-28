@@ -22,7 +22,9 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Frame import Frame
+from kincalib.utils.Logger import Logger
 
+log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
@@ -54,6 +56,11 @@ def calculate_mean_frame(
     position_std = np.array(position).std(axis=0)
     orientation_std = np.array(orientation).std(axis=0)
     orientation_mean = orientation_mean / np.linalg.norm(orientation_mean)
+
+    if any(position_std > 0.001) or any(orientation_std > 0.001):
+        log.warning(f"************TRACKER WARNING***************")
+        log.warning(f"Position std {position_std}")
+        log.warning(f"Orientation std {orientation_std}")
 
     mean_frame = PyKDL.Frame(
         PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
