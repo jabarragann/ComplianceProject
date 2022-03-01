@@ -280,7 +280,7 @@ class RosbagReplay:
 
         # Create data frames
         df_vals_cp = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
-        df_vals_jp = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+        df_vals_jp = pd.DataFrame(columns=DvrkMotions.df_cols_jp)
 
         # for index in track(range(total), "-- Trajectory Progress -- "):
         for index in range(total):
