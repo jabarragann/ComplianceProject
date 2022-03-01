@@ -1,4 +1,8 @@
 # Python imports
+"""
+Todo: Calculate dot product between pitch axis and shaft axis in tracker frame
+"""
+
 from pathlib import Path
 import time
 import argparse
@@ -24,23 +28,11 @@ import rospy
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.ExperimentUtils import separate_markerandfiducial, calculate_midpoints
+from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
 from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
-
-
-def load_files(root: Path):
-    dict_files = defaultdict(dict)  # Use step as keys. Each entry has a pitch and roll file.
-    for f in (root / "pitch_roll_mov").glob("*"):
-        step = int(re.findall("step[0-9]+", f.name)[0][4:])  # Not very reliable
-        if "pitch" in f.name:
-            dict_files[step]["pitch"] = pd.read_csv(f)
-        elif "roll" in f.name:
-            dict_files[step]["roll"] = pd.read_csv(f)
-
-    return dict_files
 
 
 def create_histogram(data):
@@ -62,7 +54,7 @@ def main():
     marker_file = Path("./share/custom_marker_id_112.json")
     regex = ""
 
-    dict_files = load_files(root)
+    dict_files = load_registration_data(root)
     keys = sorted(list(dict_files.keys()))
     x = 0
     list_area = []
@@ -140,14 +132,15 @@ def main():
             # Scale sides and area to milimiters
             sides = triangle.calculate_sides(scale=1000)
             area = triangle.calculate_area(scale=1000)
-            # sides = calculate_triangle_sides(m1,m2,m3)
-            # area = calculate_area(m1,m2,m3)
             # fmt: off
             log.debug(f"Step {k} results")
             log.debug(f"MID POINT RESULTS")
             log.debug(f"triangle sides {sides} mm")
             log.debug(f"triangle area {area:0.4f} mm^2")
-            log.debug(f"MARKER TO PITCH RESULTS")
+            log.debug(f"SHAFT RESULTS")
+            log.debug(f"pitch1 dot roll {np.dot(intermediate_values['roll_axis'],intermediate_values['pitch_axis1'])}")
+            log.debug(f"pitch2 dot roll {np.dot(intermediate_values['roll_axis'],intermediate_values['pitch_axis2'])}")
+            log.debug(f"MARKER TO PITCH FRAME RESULTS")
             log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
             log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
             log.debug(f"pitch axis1  from marker {pitch_ax1}")
@@ -244,7 +237,7 @@ def plot_results():
 # ------------------------------------------------------------
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-04", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-02", 
                         help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
@@ -253,5 +246,5 @@ log_level = args.log
 log = Logger("pitch_exp_analize2", log_level=log_level).log
 
 if __name__ == "__main__":
-    main()
+    # main()
     plot_results()

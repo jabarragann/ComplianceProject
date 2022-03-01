@@ -9,10 +9,23 @@ from kincalib.utils.CmnUtils import calculate_mean_frame
 from pathlib import Path
 from typing import Tuple, List
 from collections import defaultdict
+import re
 
 # ------------------------------------------------------------
 # EXPERIMENT 02 UTILS
 # ------------------------------------------------------------
+def load_registration_data(root: Path):
+    dict_files = defaultdict(dict)  # Use step as keys. Each entry has a pitch and roll file.
+    for f in (root / "pitch_roll_mov").glob("*"):
+        step = int(re.findall("step[0-9]+", f.name)[0][4:])  # Not very reliable
+        if "pitch" in f.name:
+            dict_files[step]["pitch"] = pd.read_csv(f)
+        elif "roll" in f.name:
+            dict_files[step]["roll"] = pd.read_csv(f)
+
+    return dict_files
+
+
 def separate_markerandfiducial(
     filename, marker_file, df: pd.DataFrame = None
 ) -> Tuple[List[PyKDL.Frame], np.ndarray]:

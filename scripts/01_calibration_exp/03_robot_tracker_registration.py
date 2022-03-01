@@ -26,7 +26,7 @@ from kincalib.utils.Frame import Frame
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.ExperimentUtils import separate_markerandfiducial, calculate_midpoints
+from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
 from kincalib.geometry import Line3D, Circle3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
 
@@ -133,17 +133,6 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         pitch frame w.r.t marker frame
     """
 
-    def load_files(root: Path):
-        dict_files = defaultdict(dict)  # Use step as keys. Each entry has a pitch and roll file.
-        for f in (root / "pitch_roll_mov").glob("*"):
-            step = int(re.findall("step[0-9]+", f.name)[0][4:])  # NOT very reliable
-            if "pitch" in f.name:
-                dict_files[step]["pitch"] = pd.read_csv(f)
-            elif "roll" in f.name:
-                dict_files[step]["roll"] = pd.read_csv(f)
-
-        return dict_files
-
     # ------------------------------------------------------------
     # Iterate over data and calculate pitch origin in tracker coordinates
     # ------------------------------------------------------------
@@ -153,7 +142,7 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df_results = pd.DataFrame(columns=cols)
     df_pitch_axes = pd.DataFrame(columns=cols_pitch_M)
 
-    dict_files = load_files(root)  # Use the step as the dictionary key
+    dict_files = load_registration_data(root)  # Use the step as the dictionary key
     keys = sorted(list(dict_files.keys()))
 
     prev_p_ax = None
