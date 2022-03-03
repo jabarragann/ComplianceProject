@@ -35,7 +35,7 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 def create_histogram(data):
     fig, axes = plt.subplots(1, 1, sharey=True, tight_layout=True)
-    axes.hist(data, bins=50, edgecolor="black", linewidth=1.2, density=False)
+    axes.hist(data, bins=50, range=(0, 2), edgecolor="black", linewidth=1.2, density=False)
     # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)
     axes.grid()
     axes.set_xlabel("Triangle area mm^2")
@@ -144,7 +144,7 @@ def main():
             log.debug(f"triangle sides {sides} mm")
             log.debug(f"triangle area {area:0.4f} mm^2")
             log.debug(f"SHAFT RESULTS")
-            log.debug(f"pitch1 dot roll {np.dot(roll_axis1, pitch_axis1)}")
+            log.debug(f"pitch1 dot roll {np.dot(roll_axis, pitch_axis1)}")
             log.debug(f"pitch2 dot roll {np.dot(roll_axis, pitch_axis2)}")
             log.debug(f"MARKER TO PITCH FRAME RESULTS")
             log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
@@ -252,5 +252,5 @@ log_level = args.log
 log = Logger("pitch_exp_analize2", log_level=log_level).log
 
 if __name__ == "__main__":
-    main()
+    # main()
     plot_results()
