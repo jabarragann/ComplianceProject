@@ -14,7 +14,18 @@ import re
 # ------------------------------------------------------------
 # EXPERIMENT 02 UTILS
 # ------------------------------------------------------------
-def load_registration_data(root: Path):
+def load_registration_data(root: Path) -> dict:
+    """Read all the calibration files found in `root` and store them in a dictonary.
+    First key of the dictonary is a index corresponding to the step in the trajectory.
+    The second key in the dictionary is either 'pitch' or 'roll' to obtain either the pitch or
+    roll movement.
+
+    Args:
+        root (Path): _description_
+
+    Returns:
+        dict: _description_
+    """
     dict_files = defaultdict(dict)  # Use step as keys. Each entry has a pitch and roll file.
     for f in (root / "pitch_roll_mov").glob("*"):
         step = int(re.findall("step[0-9]+", f.name)[0][4:])  # Not very reliable

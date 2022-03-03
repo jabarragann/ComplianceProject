@@ -57,8 +57,9 @@ def calculate_mean_frame(
     orientation_std = np.array(orientation).std(axis=0)
     orientation_mean = orientation_mean / np.linalg.norm(orientation_mean)
 
-    if any(position_std > 0.001) or any(orientation_std > 0.001):
+    if any(position_std > 0.001) or any(orientation_std > 0.002):
         log.warning(f"************TRACKER WARNING***************")
+        log.warning(f"With std when averaging the tracker provided frames")
         log.warning(f"Position std {position_std}")
         log.warning(f"Orientation std {orientation_std}")
 

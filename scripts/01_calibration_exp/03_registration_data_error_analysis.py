@@ -1,7 +1,4 @@
 # Python imports
-"""
-Todo: Calculate dot product between pitch axis and shaft axis in tracker frame
-"""
 
 from pathlib import Path
 import time
@@ -217,7 +214,7 @@ def plot_results():
     [ax.set_xlabel("") for ax in axes]
 
     # Histograms for triangle area
-    # create_histogram(liost_area)
+    create_histogram(list_area)
 
     # fig, axes = plt.subplots(1, 3)
     # axes[0].set_title(f"(mean={pitch_axis_df['px'].mean():+0.04f})")
@@ -237,7 +234,7 @@ def plot_results():
 # ------------------------------------------------------------
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-02", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
                         help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
@@ -246,5 +243,5 @@ log_level = args.log
 log = Logger("pitch_exp_analize2", log_level=log_level).log
 
 if __name__ == "__main__":
-    # main()
+    main()
     plot_results()

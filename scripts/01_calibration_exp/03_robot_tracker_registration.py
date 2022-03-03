@@ -307,7 +307,7 @@ def main():
 
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-04", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
                 help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                 help="log level") #fmt:on

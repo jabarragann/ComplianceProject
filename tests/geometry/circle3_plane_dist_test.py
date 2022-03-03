@@ -74,19 +74,21 @@ def create_yaw_pitch_circles(py_df) -> List[Circle3D]:
 
     pitch_arr = []
     yaw_arr = []
-    pitch_yaw_circles_dict = defaultdict(dict)
-    for idx, r in enumerate(roll):
+    for r in roll:
         df_temp = df.loc[(df["q4"] == r) & (df["q6"] == 0.0)]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        pitch_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-        pitch_yaw_circles_dict[idx]["pitch"] = pitch_cir
+        pitch_arr = wrist_fiducials
 
         df_temp = df.loc[(df["q4"] == r) & (df["q5"] == 0.0)]
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        yaw_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-        pitch_yaw_circles_dict[idx]["yaw"] = yaw_cir
+        yaw_arr = wrist_fiducials
 
-    return dict(pitch_yaw_circles_dict)
+        break
+
+    pitch_cir = Circle3D.from_lstsq_fit(pitch_arr.T)
+    yaw_cir = Circle3D.from_lstsq_fit(yaw_arr.T)
+
+    return yaw_cir, pitch_cir
 
 
 def main():
@@ -97,66 +99,27 @@ def main():
     # Load files
     dict_files = load_registration_data(root)
     keys = sorted(list(dict_files.keys()))
-    k = 1200
+    k = 440
     if len(list(dict_files[k].keys())) < 2:
         log.warning(f"files for step {k} are not available")
         exit(0)
 
     log.info(f"Loading files from {root}")
-    log.info(f"Loading files from step {k}")
 
     # Get roll circles
     roll_cir1, roll_cir2 = create_roll_circles(dict_files[k]["roll"])
     # Get pitch and yaw circles
-    pitch_yaw_circles = create_yaw_pitch_circles(dict_files[k]["pitch"])
+    yaw_cir, pitch_cir = create_yaw_pitch_circles(dict_files[k]["pitch"])
 
-    # Estimate pitch origin with roll and pitch
-    intermediate_values = {}
-    m1, m2, m3 = calculate_midpoints(
-        dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
-    )
-    pitch_orig_est1 = (m1 + m2 + m3) / 3
-
-    for kk in range(2):
-        log.info(f"Estimation for roll value {kk}")
-        pitch_cir, yaw_cir = pitch_yaw_circles[kk]["pitch"], pitch_yaw_circles[kk]["yaw"]
-
-        # Estimate pitch and yaw origin with yaw and pitch
-        l1 = Line3D(ref_point=pitch_cir.center, direction=pitch_cir.normal)
-        l2 = Line3D(ref_point=yaw_cir.center, direction=yaw_cir.normal)
-        inter_params = []
-        l3 = Line3D.perpendicular_to_skew(l1, l2, intersect_params=inter_params)
-        pitch_orig_est2 = l1(inter_params[0][0])
-        yaw_orig_est = l2(inter_params[0][1])
-        pitch2yaw1 = np.linalg.norm(pitch_orig_est1 - yaw_orig_est)
-        pitch2yaw2 = np.linalg.norm(pitch_orig_est2 - yaw_orig_est)
-
-        # Estimate wrist fiducial in yaw origin
-
-        # Get location of wrist fiducial
-        solutions_pts, solutions = dist_circle3_plane(pitch_cir, roll_cir2.get_plane())
-
-        # Summary of analysis
-        log.info(f"Pitch orig est with roll pitch:     {pitch_orig_est1}")
-        log.info(f"Pitch orig est with pitch yaw:      {pitch_orig_est2}")
-        log.info(f"error:                              {pitch_orig_est1-pitch_orig_est2}")
-        log.debug(f"test                               {l3(0.0)}")
-        log.info(f"yaw orig est:                       {yaw_orig_est}")
-        log.debug(f"test                               {l3(inter_params[0][2])}")
-        log.info(f"pitch2yaw:                          {pitch2yaw1:0.05f}")
-        log.info(f"pitch2yaw:                          {pitch2yaw2:0.05f}")
-        log.info(f"wrist fiducial in yaw frame.\n {solutions_pts}")
-
-    # Plot
     circles = [roll_cir2, pitch_cir, yaw_cir]
+
+    solutions_pts, solutions = dist_circle3_plane(pitch_cir, roll_cir2.get_plane())
+    solutions_pts2, solutions2 = dist_circle3_plane(roll_cir2, pitch_cir.get_plane())
     plotter = plot_circles(circles, ["black", "orange", "orange"])
-    plotter.scatter_3d(np.array(solutions_pts).T, marker="*", marker_size=100, color="green")
-    plotter.scatter_3d(
-        np.array([pitch_orig_est1, pitch_orig_est2, yaw_orig_est]).T,
-        marker="o",
-        marker_size=100,
-        color="green",
-    )
+    plotter.scatter_3d(np.array(solutions_pts).T, marker="*", marker_size=200, color="green")
+    plotter.scatter_3d(np.array(solutions_pts2).T, marker="*", marker_size=200, color="red")
+    log.info(f"estimated wrist fiducial in tracker frame .\n {solutions_pts}")
+    log.info(f"Error of wrist fiducial position. \n{solutions_pts - solutions_pts2}")
 
     plt.show()
 
@@ -169,7 +132,7 @@ parser = argparse.ArgumentParser()
 # fmt:off
 parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
                         help="root dir") 
-parser.add_argument( "-l", "--log", type=str, default="INFO", 
+parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
 args = parser.parse_args()
 log_level = args.log

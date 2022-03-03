@@ -12,6 +12,45 @@ from numpy import linalg, cross, dot
 np.set_printoptions(precision=3, suppress=True)
 
 
+def dist_circle3_plane(circle: Circle3D, plane: Plane3D) -> np.ndarray:
+    """Simple derivation to find closest distance from circle to plane.
+    WARNING: A simplification was done to obtain an easier formula this might not work for the general case.
+    THIS FUNCTION REQUIRES MORE TESTING
+
+    Args:
+        circle (Circle3D): _description_
+        plane (Plane3D): _description_
+
+    Returns:
+        np.ndarray: _description_
+    """
+    gamma_n = np.dot(plane.normal, circle.a) ** 2
+    gamma_d = np.dot(plane.normal, circle.a) ** 2 + np.dot(plane.normal, circle.b) ** 2
+    if not np.isclose(gamma_d, 0.0):
+        gamma_sqr = gamma_n / gamma_d
+
+        solutions = []
+        solutions_pts = []
+        solutions.append(np.arccos(+np.sqrt(gamma_sqr)))
+        solutions.append(np.arccos(-np.sqrt(gamma_sqr)))
+        solutions_pts.append(circle(solutions[0]))
+        solutions_pts.append(circle(solutions[1]))
+
+        func = lambda t: np.dot(plane.normal, np.cos(t) * circle.b - np.sin(t) * circle.a)
+        distance = [abs(func(solutions[0])), abs(func(solutions[1]))]
+        # log.info(circle(solutions[0]))
+        # log.info(circle(solutions[1]))
+        # log.info(func(solutions[0]))
+        # log.info(func(solutions[1]))
+
+        idx = np.argmin(distance)
+        if not np.isclose(func(solutions[idx]), 0.0):
+            log.warning("pitch circle min distance to roll circle plane should be zero")
+            log.warning(f"distance: {func(solutions[idx]):0.04}")
+
+        return solutions_pts[idx], solutions[idx]
+
+
 class Plotter3D:
     def __init__(self) -> None:
         self.fig = plt.figure()
@@ -28,6 +67,10 @@ class Plotter3D:
             marker (str, optional): [description]. Defaults to "^".
             color ([type], optional): [description]. Defaults to None.
         """
+        # Reshape for single points vectors
+        if len(points.shape) == 1:
+            points = points.reshape(-1, 1)
+
         self.ax.scatter(
             points[0, :], points[1, :], points[2, :], marker=marker, c=color, s=marker_size
         )
@@ -120,10 +163,20 @@ class Triangle3D:
 
 
 class Circle3D:
-    def __init__(self, center, normal, radius):
+    def __init__(self, center, normal, radius, samples=None):
+        """_summary_
+
+        Args:
+            center (_type_): _description_
+            normal (_type_): _description_
+            radius (_type_): _description_
+            samples (_type_, optional): Data used to solve the lstsq problem. Defaults to None.
+        """
         self.center = center
         self.radius = radius
         self.normal = normal / norm(normal)
+        self.samples = samples.T
+
         # Orthogonal vectors to n
         s = 0.5
         t = 0.5
@@ -135,6 +188,13 @@ class Circle3D:
 
         # a is orthogonal to n
         # l = self.normal.dot(self.a)
+
+    def __call__(self, theta):
+        pts = self.center.T + self.radius * (cos(theta) * self.a + sin(theta) * self.b)
+        return pts
+
+    def get_plane(self) -> Plane3D:
+        return Plane3D(self.normal, self(0))
 
     def generate_pts(self, N):
         """Generate `N` sample point from the parametric representation of the 3D circle
@@ -185,7 +245,7 @@ class Circle3D:
         C = rodrigues_rot(np.array([xc, yc, 0]), [0, 0, 1], plane.normal) + P_mean
         C = C.flatten()
 
-        return Circle3D(C, plane.normal, radius)
+        return Circle3D(C, plane.normal, radius, samples=samples)
 
     @staticmethod
     def fit_circle_2d(x, y, w=[]):
@@ -350,8 +410,10 @@ class Line3D:
             l2 (Line3D): [description]
             intersect_params (List): This should be a empty list that will get populated with the system of equations'
             solutions. List of 3 values showing the solutions of the system Ax=b. The first value is the parameter
-            at which l1 intersects l3 [l1(lambda1)=l3(0)]. The second value is the parameter at which l2 intersects l3 [l2(lambda2)=l2(lambda3)].
-            The third value is the parameter at which l3 intersects l2.
+            at which l1 intersects l3 [l1(lambda1)=l3(0)]. The second value is the parameter at which l2 intersects l3 [l2(lambda2)=l3(lambda3)].
+            The third value is the parameter at which l3 intersects l2. The shape of this list is [1,3].
+
+            TODO: Modify shape of intersect_params to [3,]
 
         Returns:
             Line3D: [description]
@@ -370,7 +432,12 @@ class Line3D:
         x = np.linalg.solve(A, b)
         intersect_params.append(x)
 
-        return Line3D(ref_point=l1(x[0]), direction=l3_dir)
+        l3 = Line3D(ref_point=l1(x[0]), direction=l3_dir)
+
+        assert all(np.isclose(l1(x[0]) - l3(0.0), 0)), "assumption 1 not met"
+        assert all(np.isclose(l2(x[1]) - l3(x[2]), 0)), "assumption 1 not met"
+
+        return l3
 
     @classmethod
     def dist_between_skew(cls, l1: Line3D, l2: Line3D) -> float:
