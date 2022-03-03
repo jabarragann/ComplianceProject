@@ -28,6 +28,7 @@ from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
 from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -69,11 +70,15 @@ def main():
             continue
 
         try:
-
-            intermediate_values = {}
-            m1, m2, m3 = calculate_midpoints(
-                dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
+            # Get roll circles
+            roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[k]["roll"])
+            # Get pitch and yaw circles
+            pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[k]["pitch"])
+            # Estimate pitch origin with roll and pitch
+            m1, m2, m3 = calib.calculate_pitch_origin(
+                roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
             )
+
             # ---------------------------
             # Marker to pitch frame error metrics
             # - Calculate pitch origin in marker Frame
@@ -82,20 +87,20 @@ def main():
             # ---------------------------
             pitch_ori_T = (m1 + m2 + m3) / 3
             # Marker2Tracker
-            T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
+            T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
             pitch_ori_M1 = T_TM1.inv() @ pitch_ori_T
             pitch_orig1.append(pitch_ori_M1.squeeze())
-            pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
+            pitch_ax1 = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
             pitch_axis1_M.append(pitch_ax1)
-            roll_axis1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
+            roll_axis1 = T_TM1.inv().r @ roll_cir1.normal
             roll_axis1_M.append(roll_axis1)
 
-            T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
+            T_TM2 = utils.pykdl2frame(pitch_yaw_circles[1]["marker_pose"])
             pitch_ori_M2 = T_TM2.inv() @ pitch_ori_T
             pitch_orig2.append(pitch_ori_M2.squeeze())
-            pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
+            pitch_ax2 = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
             pitch_axis2_M.append(pitch_ax2)
-            roll_axis2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
+            roll_axis2 = T_TM2.inv().r @ roll_cir1.normal
             roll_axis2_M.append(roll_axis2)
 
             # Check if pitch axis are looking in opposite directions
@@ -125,6 +130,10 @@ def main():
             # ---------------------------
             # Mid point error metrics
             # ---------------------------
+            roll_axis = roll_cir1.normal
+            pitch_axis1 = pitch_yaw_circles[0]["pitch"].normal
+            pitch_axis2 = pitch_yaw_circles[1]["pitch"].normal
+
             triangle = Triangle3D([m1, m2, m3])
             # Scale sides and area to milimiters
             sides = triangle.calculate_sides(scale=1000)
@@ -135,8 +144,8 @@ def main():
             log.debug(f"triangle sides {sides} mm")
             log.debug(f"triangle area {area:0.4f} mm^2")
             log.debug(f"SHAFT RESULTS")
-            log.debug(f"pitch1 dot roll {np.dot(intermediate_values['roll_axis'],intermediate_values['pitch_axis1'])}")
-            log.debug(f"pitch2 dot roll {np.dot(intermediate_values['roll_axis'],intermediate_values['pitch_axis2'])}")
+            log.debug(f"pitch1 dot roll {np.dot(roll_axis1, pitch_axis1)}")
+            log.debug(f"pitch2 dot roll {np.dot(roll_axis, pitch_axis2)}")
             log.debug(f"MARKER TO PITCH FRAME RESULTS")
             log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
             log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
@@ -151,7 +160,7 @@ def main():
         except Exception as e:
             log.error(f"Exception triggered in step {k}")
             log.debug(e)
-            # log.debug(traceback.print_exc())
+            log.debug(traceback.print_exc())
 
     list_area = np.array(list_area)
     pitch_orig = np.array(pitch_orig1 + pitch_orig2)
