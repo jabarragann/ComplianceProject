@@ -32,6 +32,7 @@ from kincalib.utils.ExperimentUtils import (
 )
 from kincalib.geometry import Line3D, Circle3D, Plane3D, Plotter3D, Triangle3D, dist_circle3_plane
 import kincalib.utils.CmnUtils as utils
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -45,48 +46,6 @@ def plot_circles(circles_list, colors=None):
         plotter.scatter_3d(ci.generate_pts(40), marker="o", color=color)
         plotter.scatter_3d(ci.samples, marker="*", color="blue")
     return plotter
-
-
-def create_roll_circles(roll_df) -> List[Circle3D]:
-    df = roll_df
-    roll = df.q4.unique()
-    marker_orig_arr = []  # shaft marker
-    fid_arr = []  # Wrist fiducial
-    for r in roll:
-        df_temp = df.loc[df["q4"] == r]
-        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        if len(pose_arr) > 0 and len(wrist_fiducials) > 0:
-            marker_orig_arr.append(list(pose_arr[0].p))
-            fid_arr.append(wrist_fiducials)
-
-    marker_orig_arr = np.array(marker_orig_arr)
-    fid_arr = np.array(fid_arr)
-    roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
-    roll_cir2 = Circle3D.from_lstsq_fit(fid_arr)
-
-    return roll_cir1, roll_cir2
-
-
-def create_yaw_pitch_circles(py_df) -> List[Circle3D]:
-    df = py_df
-    # roll values
-    roll = df.q4.unique()
-
-    pitch_arr = []
-    yaw_arr = []
-    pitch_yaw_circles_dict = defaultdict(dict)
-    for idx, r in enumerate(roll):
-        df_temp = df.loc[(df["q4"] == r) & (df["q6"] == 0.0)]
-        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        pitch_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-        pitch_yaw_circles_dict[idx]["pitch"] = pitch_cir
-
-        df_temp = df.loc[(df["q4"] == r) & (df["q5"] == 0.0)]
-        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        yaw_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-        pitch_yaw_circles_dict[idx]["yaw"] = yaw_cir
-
-    return dict(pitch_yaw_circles_dict)
 
 
 def main():
@@ -106,14 +65,12 @@ def main():
     log.info(f"Loading files from step {k}")
 
     # Get roll circles
-    roll_cir1, roll_cir2 = create_roll_circles(dict_files[k]["roll"])
+    roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[k]["roll"])
     # Get pitch and yaw circles
-    pitch_yaw_circles = create_yaw_pitch_circles(dict_files[k]["pitch"])
-
+    pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[k]["pitch"])
     # Estimate pitch origin with roll and pitch
-    intermediate_values = {}
-    m1, m2, m3 = calculate_midpoints(
-        dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
+    m1, m2, m3 = calib.calculate_pitch_origin(
+        roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
     )
     pitch_orig_est1 = (m1 + m2 + m3) / 3
 
