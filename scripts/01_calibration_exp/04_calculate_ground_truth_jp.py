@@ -72,10 +72,15 @@ def plot_joints(joints_df):
     for i in range(3):
         axes[i].set_title(f"joint {i+1}")
         axes[i].plot(joints_df[f"rq{i+1}"], color="blue")
-        axes[i].plot(joints_df[f"rq{i+1}"], marker="*", linestyle="None", color="blue")
+        axes[i].plot(
+            joints_df[f"rq{i+1}"], marker="*", linestyle="None", color="blue", label="robot"
+        )
 
         axes[i].plot(joints_df[f"tq{i+1}"], color="orange")
-        axes[i].plot(joints_df[f"tq{i+1}"], marker="*", linestyle="None", color="orange")
+        axes[i].plot(
+            joints_df[f"tq{i+1}"], marker="*", linestyle="None", color="orange", label="tracker"
+        )
+    axes[0].legend()
     plt.show()
 
 

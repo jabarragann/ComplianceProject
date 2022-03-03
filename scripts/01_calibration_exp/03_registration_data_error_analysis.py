@@ -19,6 +19,7 @@ import seaborn as sns
 
 # ROS and DVRK imports
 import dvrk
+from kincalib.utils.Frame import Frame
 import rospy
 
 # kincalib module imports
@@ -26,21 +27,20 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
-from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D
+from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D, dist_circle3_plane
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
-def create_histogram(data):
-    fig, axes = plt.subplots(1, 1, sharey=True, tight_layout=True)
-    axes.hist(data, bins=50, range=(0, 2), edgecolor="black", linewidth=1.2, density=False)
+def create_histogram(data, axes, title=None, xlabel=None):
+    axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
     # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)
     axes.grid()
-    axes.set_xlabel("Triangle area mm^2")
+    axes.set_xlabel(xlabel)
     axes.set_ylabel("Frequency")
-    axes.set_title(f"Pitch axis measurements. (N={data.shape[0]:02d})")
+    axes.set_title(f"{title} (N={data.shape[0]:02d})")
     # axes.set_xticks([i * 5 for i in range(110 // 5)])
     # plt.show()
 
@@ -54,14 +54,15 @@ def main():
 
     dict_files = load_registration_data(root)
     keys = sorted(list(dict_files.keys()))
-    x = 0
+
     list_area = []
-    pitch_orig1 = []
-    pitch_orig2 = []
-    roll_axis1_M = []
-    roll_axis2_M = []
-    pitch_axis1_M = []
-    pitch_axis2_M = []
+    list_pitch_orig_M = []
+    list_roll_axis_M = []
+    list_pitch_axis_M = []
+    list_pitch2yaw = []
+    list_fiducial_Y = []
+
+    prev_y_ax = None
     prev_p_ax = None
     prev_r_ax = None
     for k in keys:
@@ -78,7 +79,6 @@ def main():
             m1, m2, m3 = calib.calculate_pitch_origin(
                 roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
             )
-
             # ---------------------------
             # Marker to pitch frame error metrics
             # - Calculate pitch origin in marker Frame
@@ -88,44 +88,62 @@ def main():
             pitch_ori_T = (m1 + m2 + m3) / 3
             # Marker2Tracker
             T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
-            pitch_ori_M1 = T_TM1.inv() @ pitch_ori_T
-            pitch_orig1.append(pitch_ori_M1.squeeze())
-            pitch_ax1 = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
-            pitch_axis1_M.append(pitch_ax1)
-            roll_axis1 = T_TM1.inv().r @ roll_cir1.normal
-            roll_axis1_M.append(roll_axis1)
+            pitch_ori1_M = T_TM1.inv() @ pitch_ori_T
+            pitch_ax1_M = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
+            roll_axis1_M = T_TM1.inv().r @ roll_cir1.normal
 
             T_TM2 = utils.pykdl2frame(pitch_yaw_circles[1]["marker_pose"])
-            pitch_ori_M2 = T_TM2.inv() @ pitch_ori_T
-            pitch_orig2.append(pitch_ori_M2.squeeze())
-            pitch_ax2 = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
-            pitch_axis2_M.append(pitch_ax2)
-            roll_axis2 = T_TM2.inv().r @ roll_cir1.normal
-            roll_axis2_M.append(roll_axis2)
+            pitch_ori2_M = T_TM2.inv() @ pitch_ori_T
+            pitch_ax2_M = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
+            roll_axis2_M = T_TM2.inv().r @ roll_cir1.normal
 
+            # Estimate wrist fiducial in yaw origin
+            # TODO find a consistent way of assigning the axis
+            for kk in range(2):
+                pitch_cir, yaw_cir = pitch_yaw_circles[kk]["pitch"], pitch_yaw_circles[kk]["yaw"]
+
+                # Construct jaw2tracker transformation
+                l1 = Line3D(ref_point=pitch_cir.center, direction=pitch_cir.normal)
+                l2 = Line3D(ref_point=yaw_cir.center, direction=yaw_cir.normal)
+                inter_params = []
+                l3 = Line3D.perpendicular_to_skew(l1, l2, intersect_params=inter_params)
+                yaw_orig_M = l2(inter_params[0][1])
+                pitch2yaw1 = np.linalg.norm(pitch_ori_T - yaw_orig_M)
+
+                T_TJ = np.identity(4)
+                T_TJ[:3, 0] = pitch_cir.normal
+                T_TJ[:3, 1] = np.cross(yaw_cir.normal, pitch_cir.normal)
+                T_TJ[:3, 2] = yaw_cir.normal
+                T_TJ[:3, 3] = yaw_orig_M
+                T_TJ = Frame.init_from_matrix(T_TJ)
+                # Get fiducial in jaw coordinates
+                fiducial_T, solutions = dist_circle3_plane(pitch_cir, roll_cir2.get_plane())
+                fiducial_Y = T_TJ.inv() @ fiducial_T
+
+            # Maker sure that all axis look in the same direction
             # Check if pitch axis are looking in opposite directions
-            if np.dot(pitch_ax1, pitch_ax2) < 0:
-                pitch_ax1 *= -1
+            if np.dot(pitch_ax1_M, pitch_ax2_M) < 0:
+                pitch_ax1_M *= -1
             if prev_p_ax is None:
-                prev_p_ax = pitch_ax1
+                prev_p_ax = pitch_ax1_M
             # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
             else:
-                if np.dot(prev_p_ax, pitch_ax1) < 0:
-                    pitch_ax1 *= -1
-                    pitch_ax2 *= -1
-                prev_p_ax = pitch_ax1
+                if np.dot(prev_p_ax, pitch_ax1_M) < 0:
+                    pitch_ax1_M *= -1
+                    pitch_ax2_M *= -1
+                prev_p_ax = pitch_ax1_M
 
             # Check if roll axis are looking in opposite directions
-            if np.dot(roll_axis1, roll_axis2) < 0:
-                roll_axis1 *= -1
+            if np.dot(roll_axis1_M, roll_axis2_M) < 0:
+                roll_axis1_M *= -1
             if prev_r_ax is None:
-                prev_r_ax = roll_axis1
+                prev_r_ax = roll_axis1_M
             # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
             else:
-                if np.dot(prev_r_ax, roll_axis1) < 0:
-                    roll_axis1 *= -1
-                    roll_axis2 *= -1
-                prev_r_ax = roll_axis1
+                if np.dot(prev_r_ax, roll_axis1_M) < 0:
+                    roll_axis1_M *= -1
+                    roll_axis2_M *= -1
+                prev_r_ax = roll_axis1_M
 
             # ---------------------------
             # Mid point error metrics
@@ -144,34 +162,55 @@ def main():
             log.debug(f"triangle sides {sides} mm")
             log.debug(f"triangle area {area:0.4f} mm^2")
             log.debug(f"SHAFT RESULTS")
-            log.debug(f"pitch1 dot roll {np.dot(roll_axis, pitch_axis1)}")
-            log.debug(f"pitch2 dot roll {np.dot(roll_axis, pitch_axis2)}")
+            log.debug(f"pitch1 dot roll in tracker {np.dot(roll_axis, pitch_axis1)}")
+            log.debug(f"pitch2 dot roll in tracker {np.dot(roll_axis, pitch_axis2)}")
             log.debug(f"MARKER TO PITCH FRAME RESULTS")
-            log.debug(f"pitch origin1 from marker {pitch_ori_M1.squeeze()}")
-            log.debug(f"pitch origin2 from marker {pitch_ori_M2.squeeze()}")
-            log.debug(f"pitch axis1  from marker {pitch_ax1}")
-            log.debug(f"pitch axis2  from marker {pitch_ax2}")
-            log.debug( f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1,pitch_ax2)>0}")
-            log.debug(f"roll axis1  from marker {roll_axis1}")
-            log.debug(f"roll axis2  from marker {roll_axis2}")
-            log.debug( f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1,roll_axis2)>0}")
+            log.debug(f"pitch origin1 from marker {pitch_ori1_M.squeeze()}")
+            log.debug(f"pitch origin2 from marker {pitch_ori2_M.squeeze()}")
+            log.debug(f"pitch axis1  from marker {pitch_ax1_M}")
+            log.debug(f"pitch axis2  from marker {pitch_ax2_M}")
+            log.debug( f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1_M,pitch_ax2_M)>0}")
+            log.debug(f"roll axis1  from marker {roll_axis1_M}")
+            log.debug(f"roll axis2  from marker {roll_axis2_M}")
+            log.debug( f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1_M,roll_axis2_M)>0}")
+            log.debug(f"Fiducial in Jaw {fiducial_Y.squeeze()}")
             # fmt: on
-            list_area.append(area)
+
+            # Add data to list
+            if area < 3:
+                list_area.append(area)
+
+                list_pitch2yaw.append(pitch2yaw1)
+                list_fiducial_Y.append(fiducial_Y.squeeze())
+                # Data from roll 1 position
+                list_pitch_orig_M.append(pitch_ori1_M.squeeze())
+                list_pitch_axis_M.append(pitch_ax1_M)
+                list_roll_axis_M.append(roll_axis2_M)
+                # Data from roll 2 position
+                list_pitch_orig_M.append(pitch_ori1_M.squeeze())
+                list_pitch_axis_M.append(pitch_ax2_M)
+                list_roll_axis_M.append(roll_axis2_M)
+            else:
+                log.warning(f"Data in step {k} was not added to list")
+
         except Exception as e:
             log.error(f"Exception triggered in step {k}")
             log.debug(e)
             log.debug(traceback.print_exc())
 
     list_area = np.array(list_area)
-    pitch_orig = np.array(pitch_orig1 + pitch_orig2)
-    pitch_axis = np.array(pitch_axis1_M + pitch_axis2_M)
-    roll_axis = np.array(roll_axis1_M + roll_axis2_M)
+    pitch_orig = np.array(list_pitch_orig_M)
+    pitch_axis = np.array(list_pitch_axis_M)
+    roll_axis = np.array(list_roll_axis_M)
+    list_fiducial_Y = np.array(list_fiducial_Y)
+    list_pitch2yaw = np.array(list_pitch2yaw)
 
     f_path = root / "registration_results/error_metrics"
     if not f_path.exists():
         f_path.mkdir(parents=True)
 
-    log.info(f_path)
+    np.save(f_path / "error_metric_pitch2yaw", list_pitch2yaw)
+    np.save(f_path / "error_metric_fid_in_yaw", list_fiducial_Y)
     np.save(f_path / "error_metric_area", list_area)
     np.save(f_path / "error_metric_pitch_orig", pitch_orig)
     np.save(f_path / "error_metric_pitch_axis", pitch_axis)
@@ -183,6 +222,9 @@ def plot_results():
     f_path = root / "registration_results/error_metrics"
 
     # Plot area histograms
+
+    list_pitch2yaw = np.load(f_path / "error_metric_pitch2yaw.npy")
+    list_fiducial_Y = np.load(f_path / "error_metric_fid_in_yaw.npy")
     list_area = np.load(f_path / "error_metric_area.npy")
     pitch_orig = np.load(f_path / "error_metric_pitch_orig.npy")
     pitch_orig_df = pd.DataFrame(pitch_orig, columns=["px", "py", "pz"])
@@ -223,7 +265,11 @@ def plot_results():
     [ax.set_xlabel("") for ax in axes]
 
     # Histograms for triangle area
-    create_histogram(list_area)
+    fig, axes = plt.subplots(2, 1, sharey=True, tight_layout=True)
+    create_histogram(
+        list_area, axes[0], xlabel="Triangle area mm^2", title="Pitch origin measurements"
+    )
+    create_histogram(list_pitch2yaw, axes[1], xlabel="m", title="pitch2yaw measurements")
 
     # fig, axes = plt.subplots(1, 3)
     # axes[0].set_title(f"(mean={pitch_axis_df['px'].mean():+0.04f})")
@@ -232,9 +278,9 @@ def plot_results():
     # sns.boxplot(y=pitch_axis_df["px"] - pitch_axis_df["px"].mean(), ax=axes[0])
     # sns.boxplot(y=pitch_axis_df["py"] - pitch_axis_df["py"].mean(), ax=axes[1])
     # sns.boxplot(y=pitch_axis_df["pz"] - pitch_axis_df["pz"].mean(), ax=axes[2])
-    # plotter = Plotter3D()
-    # plotter.scatter_3d(pitch_axis.T)
-    # plotter.scatter_3d(roll_axis.T)
+
+    plotter = Plotter3D()
+    plotter.scatter_3d(list_fiducial_Y.T)
     plt.show()
 
 

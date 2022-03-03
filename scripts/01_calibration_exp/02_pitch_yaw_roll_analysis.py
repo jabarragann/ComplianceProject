@@ -33,6 +33,7 @@ from kincalib.utils.ExperimentUtils import (
 from kincalib.geometry import Line3D, Circle3D, Plane3D, Plotter3D, Triangle3D, dist_circle3_plane
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
+from kincalib.utils.Frame import Frame
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -89,9 +90,17 @@ def main():
         pitch2yaw2 = np.linalg.norm(pitch_orig_est2 - yaw_orig_est)
 
         # Estimate wrist fiducial in yaw origin
+        # Construct jaw2tracker transformation
+        T_TJ = np.identity(4)
+        T_TJ[:3, 0] = pitch_cir.normal
+        T_TJ[:3, 1] = np.cross(yaw_cir.normal, pitch_cir.normal)
+        T_TJ[:3, 2] = yaw_cir.normal
+        T_TJ[:3, 3] = yaw_orig_est
+        T_TJ = Frame.init_from_matrix(T_TJ)
 
-        # Get location of wrist fiducial
-        solutions_pts, solutions = dist_circle3_plane(pitch_cir, roll_cir2.get_plane())
+        # Get fiducial in jaw coordinates
+        fiducial_T, solutions = dist_circle3_plane(pitch_cir, roll_cir2.get_plane())
+        fiducial_J = T_TJ.inv() @ fiducial_T
 
         # Summary of analysis
         log.info(f"Pitch orig est with roll pitch:     {pitch_orig_est1}")
@@ -102,12 +111,13 @@ def main():
         log.debug(f"test                               {l3(inter_params[0][2])}")
         log.info(f"pitch2yaw:                          {pitch2yaw1:0.05f}")
         log.info(f"pitch2yaw:                          {pitch2yaw2:0.05f}")
-        log.info(f"wrist fiducial in yaw frame.\n {solutions_pts}")
+        log.info(f"wrist fiducial in tracker.          {fiducial_T}")
+        log.info(f"wrist fiducial in yaw frame.        {fiducial_J.squeeze()}")
 
     # Plot
-    circles = [roll_cir2, pitch_cir, yaw_cir]
-    plotter = plot_circles(circles, ["black", "orange", "orange"])
-    plotter.scatter_3d(np.array(solutions_pts).T, marker="*", marker_size=100, color="green")
+    circles = [roll_cir1, roll_cir2, pitch_cir, yaw_cir]
+    plotter = plot_circles(circles, ["black", "black", "orange", "orange"])
+    plotter.scatter_3d(np.array(fiducial_T).T, marker="*", marker_size=100, color="green")
     plotter.scatter_3d(
         np.array([pitch_orig_est1, pitch_orig_est2, yaw_orig_est]).T,
         marker="o",
