@@ -10,7 +10,7 @@ log = Logger(__name__).log
 
 
 class Frame:
-    def __init__(self, r: np.ndarray, p: np.ndarray) -> None:
+    def __init__(self, r: np.ndarray, p: np.ndarray, normalization_warning=False) -> None:
         """Create a frame with rotation `r` and translation `p`.
         Args:
             r (np.ndarray): Rotation.
@@ -19,10 +19,11 @@ class Frame:
         self.r = np.array(r)
 
         if not self.is_rotation(r):
-            log.warning(
-                f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
-            )
-            log.warning(f"Renormalizing to a proper rotation matrix")
+            if normalization_warning:
+                log.warning(
+                    f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
+                )
+                log.warning(f"Renormalizing to a proper rotation matrix")
             self.r = self.closest_to_rotation(r)
 
         self.p = np.array(p).reshape((3, 1))

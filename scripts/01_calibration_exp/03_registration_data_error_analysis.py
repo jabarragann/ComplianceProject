@@ -129,6 +129,7 @@ def main():
             # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
             else:
                 if np.dot(prev_p_ax, pitch_ax1_M) < 0:
+                    log.warning("INCONSISTENT NORMAL ASSIGNMENT")
                     pitch_ax1_M *= -1
                     pitch_ax2_M *= -1
                 prev_p_ax = pitch_ax1_M
@@ -298,5 +299,5 @@ log_level = args.log
 log = Logger("pitch_exp_analize2", log_level=log_level).log
 
 if __name__ == "__main__":
-    # main()
+    main()
     plot_results()

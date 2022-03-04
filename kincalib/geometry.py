@@ -245,6 +245,12 @@ class Circle3D:
         C = rodrigues_rot(np.array([xc, yc, 0]), [0, 0, 1], plane.normal) + P_mean
         C = C.flatten()
 
+        # Select a consistent normal direction. (This will only work if the points are ordered)
+        correct_normal = np.cross(samples[0] - C, samples[-1] - C)
+        correct_normal = correct_normal / np.linalg.norm(correct_normal)
+        if np.dot(correct_normal, plane.normal) < 0:
+            plane.normal = -plane.normal
+
         return Circle3D(C, plane.normal, radius, samples=samples)
 
     @staticmethod
