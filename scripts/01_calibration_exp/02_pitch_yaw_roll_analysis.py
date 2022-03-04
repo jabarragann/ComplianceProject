@@ -57,7 +57,7 @@ def main():
     # Load files
     dict_files = load_registration_data(root)
     keys = sorted(list(dict_files.keys()))
-    k = 1200
+    k = 440  # 1680,440,240
     if len(list(dict_files[k].keys())) < 2:
         log.warning(f"files for step {k} are not available")
         exit(0)

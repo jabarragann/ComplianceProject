@@ -225,8 +225,8 @@ def plot_results():
     # Plot area histograms
 
     list_pitch2yaw = np.load(f_path / "error_metric_pitch2yaw.npy")
-    list_fiducial_Y = np.load(f_path / "error_metric_fid_in_yaw.npy")
     list_area = np.load(f_path / "error_metric_area.npy")
+    fiducial_Y = np.load(f_path / "error_metric_fid_in_yaw.npy")
     pitch_orig = np.load(f_path / "error_metric_pitch_orig.npy")
     pitch_orig_df = pd.DataFrame(pitch_orig, columns=["px", "py", "pz"])
     pitch_axis = np.load(f_path / "error_metric_pitch_axis.npy")
@@ -234,16 +234,32 @@ def plot_results():
     roll_axis = np.load(f_path / "error_metric_roll_axis.npy")
     roll_axis_df = pd.DataFrame(roll_axis, columns=["px", "py", "pz"])
 
-    log.info(f"Error report for {root}")
-    log.info(f"Mean area {list_area.mean():0.4f}")
-    log.info(f"Std  area {list_area.std():0.4f}")
-    log.info(f"Mean pitch_orig {pitch_orig.mean(axis=0)}")
-    log.info(f"Std  pitch_orig {pitch_orig.std(axis=0)}")
-    log.info(f"Mean pitch_axis {pitch_axis.mean(axis=0)}")
-    log.info(f"Std  pitch_axis {pitch_axis.std(axis=0)}")
-    log.info(f"Mean roll_axis {roll_axis.mean(axis=0)}")
-    log.info(f"Std  roll_axis {roll_axis.std(axis=0)}")
-    log.info(f"roll and pitch dot {np.dot(roll_axis.mean(axis=0),pitch_axis.mean(axis=0)):0.05f}")
+    def mean_std_str_vect(mean_vect, std_vect):
+        str = "["
+        plus_minus_sign = "\u00B1"
+        for m, s in zip(mean_vect.squeeze(), std_vect.squeeze()):
+            str += f"{m:+0.04f}{plus_minus_sign}{s:0.04f},"
+        return str[:-1] + "]"
+
+    def mean_std_str(mean, std):
+        str = ""
+        plus_minus_sign = "\u00B1"
+        str += f"{mean:+0.04f}{plus_minus_sign}{std:0.04f},"
+        return str[:-1]
+
+    plus_minus_sign = "\u00B1"
+    log.info(f"Error report for {root}. (N={list_area.shape[0]})")
+    log.info(f"Mean area (mm^2): {mean_std_str(list_area.mean(),list_area.std())}")
+    log.info(f"pitch2yaw (m):    {mean_std_str(list_pitch2yaw.mean(),list_pitch2yaw.std())}")
+    log.info(f"Rotation axis from Marker frame")
+    log.info(f"Pitch_orig_M {mean_std_str_vect(pitch_orig.mean(axis=0),pitch_orig.std(axis=0))}")
+    log.info(f"Pitch_axis_M {mean_std_str_vect(pitch_axis.mean(axis=0),pitch_axis.std(axis=0))}")
+    log.info(f"Roll_axis_M  {mean_std_str_vect(roll_axis.mean(axis=0),roll_axis.std(axis=0))}")
+    log.info(f"Fiducial from Yaw frame")
+    log.info(f"fiducial_M   {mean_std_str_vect(fiducial_Y.mean(axis=0),fiducial_Y.std(axis=0))}")
+
+    roll_pitch_dot = np.dot(roll_axis.mean(axis=0), pitch_axis.mean(axis=0))
+    log.info(f"mean roll and mean pitch dot {roll_pitch_dot:0.05f}")
 
     # create_histogram(list_area)
     # Plot axis
@@ -257,11 +273,11 @@ def plot_results():
     # Box plots for transformation between marker and pitch
     fig, axes = plt.subplots(3, 1)
     plt.subplots_adjust(left=0.06, right=0.96, top=0.96, bottom=0.05, hspace=0.28)
-    axes[0].set_title("pitch_axis")
+    axes[0].set_title("std pitch_axis from M")
     sns.boxplot(x="coordinate", y="value", data=pitch_axis_df, ax=axes[0])
-    axes[1].set_title("roll_axis")
+    axes[1].set_title("std roll_axis from M")
     sns.boxplot(x="coordinate", y="value", data=roll_axis_df, ax=axes[1])
-    axes[2].set_title("pitch_orig")
+    axes[2].set_title("std pitch_orig from M")
     sns.boxplot(x="coordinate", y="value", data=pitch_orig_df, ax=axes[2])
     [ax.set_xlabel("") for ax in axes]
 
@@ -281,7 +297,7 @@ def plot_results():
     # sns.boxplot(y=pitch_axis_df["pz"] - pitch_axis_df["pz"].mean(), ax=axes[2])
 
     plotter = Plotter3D()
-    plotter.scatter_3d(list_fiducial_Y.T)
+    plotter.scatter_3d(fiducial_Y.T)
     plt.show()
 
 
@@ -299,5 +315,5 @@ log_level = args.log
 log = Logger("pitch_exp_analize2", log_level=log_level).log
 
 if __name__ == "__main__":
-    main()
+    # main()
     plot_results()
