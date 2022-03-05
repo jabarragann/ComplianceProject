@@ -98,31 +98,14 @@ def main():
             roll_axis2_M = T_TM2.inv().r @ roll_cir1.normal
 
             # Estimate wrist fiducial in yaw origin
-            # TODO find a consistent way of assigning the axis
-            for kk in range(2):
-                pitch_cir, yaw_cir = pitch_yaw_circles[kk]["pitch"], pitch_yaw_circles[kk]["yaw"]
-
-                # Construct jaw2tracker transformation
-                l1 = Line3D(ref_point=pitch_cir.center, direction=pitch_cir.normal)
-                l2 = Line3D(ref_point=yaw_cir.center, direction=yaw_cir.normal)
-                inter_params = []
-                l3 = Line3D.perpendicular_to_skew(l1, l2, intersect_params=inter_params)
-                yaw_orig_M = l2(inter_params[0][1])
-                pitch2yaw1 = np.linalg.norm(pitch_ori_T - yaw_orig_M)
-
-                T_TJ = np.identity(4)
-                T_TJ[:3, 0] = pitch_cir.normal
-                T_TJ[:3, 1] = np.cross(yaw_cir.normal, pitch_cir.normal)
-                T_TJ[:3, 2] = yaw_cir.normal
-                T_TJ[:3, 3] = yaw_orig_M
-                T_TJ = Frame.init_from_matrix(T_TJ)
-                # Get fiducial in jaw coordinates
-                fiducial_T, solutions = dist_circle3_plane(pitch_cir, roll_cir2.get_plane())
-                fiducial_Y = T_TJ.inv() @ fiducial_T
+            fiducial_Y, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
+                pitch_ori_T, pitch_yaw_circles, roll_cir2
+            )
 
             # Maker sure that all axis look in the same direction
             # Check if pitch axis are looking in opposite directions
             if np.dot(pitch_ax1_M, pitch_ax2_M) < 0:
+                log.warning("INCONSISTENT NORMAL ASSIGNMENT")
                 pitch_ax1_M *= -1
             if prev_p_ax is None:
                 prev_p_ax = pitch_ax1_M
@@ -136,12 +119,14 @@ def main():
 
             # Check if roll axis are looking in opposite directions
             if np.dot(roll_axis1_M, roll_axis2_M) < 0:
+                log.warning("INCONSISTENT NORMAL ASSIGNMENT")
                 roll_axis1_M *= -1
             if prev_r_ax is None:
                 prev_r_ax = roll_axis1_M
             # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
             else:
                 if np.dot(prev_r_ax, roll_axis1_M) < 0:
+                    log.warning("INCONSISTENT NORMAL ASSIGNMENT")
                     roll_axis1_M *= -1
                     roll_axis2_M *= -1
                 prev_r_ax = roll_axis1_M
@@ -174,7 +159,8 @@ def main():
             log.debug(f"roll axis1  from marker {roll_axis1_M}")
             log.debug(f"roll axis2  from marker {roll_axis2_M}")
             log.debug( f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1_M,roll_axis2_M)>0}")
-            log.debug(f"Fiducial in Jaw {fiducial_Y.squeeze()}")
+            log.debug(f"Fiducial in Jaw 1 {fiducial_Y[0].squeeze()}")
+            log.debug(f"Fiducial in Jaw 2 {fiducial_Y[1].squeeze()}")
             # fmt: on
 
             # Add data to list
@@ -182,7 +168,8 @@ def main():
                 list_area.append(area)
 
                 list_pitch2yaw.append(pitch2yaw1)
-                list_fiducial_Y.append(fiducial_Y.squeeze())
+                list_fiducial_Y.append(fiducial_Y[0].squeeze())
+                list_fiducial_Y.append(fiducial_Y[1].squeeze())
                 # Data from roll 1 position
                 list_pitch_orig_M.append(pitch_ori1_M.squeeze())
                 list_pitch_axis_M.append(pitch_ax1_M)
@@ -297,7 +284,9 @@ def plot_results():
     # sns.boxplot(y=pitch_axis_df["pz"] - pitch_axis_df["pz"].mean(), ax=axes[2])
 
     plotter = Plotter3D()
-    plotter.scatter_3d(fiducial_Y.T)
+    # plotter.scatter_3d(fiducial_Y.T)
+    plotter.scatter_3d(pitch_axis.T)
+    plotter.scatter_3d(roll_axis.T)
     plt.show()
 
 

@@ -29,6 +29,7 @@ from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
 from kincalib.geometry import Line3D, Circle3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -65,22 +66,32 @@ def calculate_registration(df: pd.DataFrame, root: Path):
 
 
 def calculate_pitch_to_marker(registration_data, other_values_dict=None):
-    # calculate pitch orig
+    # calculate pitch orig in marker
     pitch_orig = registration_data[["mox", "moy", "moz"]].to_numpy()
     pitch_orig_mean = pitch_orig.mean(axis=0)
     pitch_orig_std = pitch_orig.std(axis=0)
-    # calculate pitch axis
+    # calculate pitch axis in marker
     pitch_axis = registration_data[["mpx", "mpy", "mpz"]].to_numpy()
     pitch_axis_mean = pitch_axis.mean(axis=0)
     pitch_axis_std = pitch_axis.std(axis=0)
-    # calculate roll axis
+    # calculate roll axis in marker
     roll_axis = registration_data[["mrx", "mry", "mrz"]].to_numpy()
     roll_axis_mean = roll_axis.mean(axis=0)
     roll_axis_std = roll_axis.std(axis=0)
+    # calculate fiducial in yaw
+    fiducial_yaw = registration_data[["yfx", "yfy", "yfz"]].to_numpy()
+    fiducial_yaw_mean = fiducial_yaw.mean(axis=0)
+    fiducial_yaw_std = fiducial_yaw.std(axis=0)
+    # Calculate pitch2yaw
+    pitch2yaw = registration_data["pitch2yaw"].to_numpy()
+    pitch2yaw_mean = pitch2yaw.mean()
+    pitch2yaw_std = pitch2yaw.std()
 
     other_values_dict["pitchaxis"] = pitch_axis_mean
     other_values_dict["rollaxis"] = roll_axis_mean
     other_values_dict["pitchorigin"] = pitch_orig_mean
+    other_values_dict["fiducial_yaw"] = fiducial_yaw_mean
+    other_values_dict["pitch2yaw"] = pitch2yaw_mean
 
     pitch_y_axis = np.cross(roll_axis_mean, pitch_axis_mean)
     # calculate transformation
@@ -137,8 +148,15 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Iterate over data and calculate pitch origin in tracker coordinates
     # ------------------------------------------------------------
     # Final df
-    cols = ["step", "area", "tpx", "tpy", "tpz"]
-    cols_pitch_M = ["step", "mox", "moy", "moz", "mpx", "mpy", "mpz", "mrx", "mry", "mrz"]
+    cols = ["step", "area", "tpx", "tpy", "tpz"]  # pitch orig in tracker
+    # mo -> pitch origin in marker
+    # mp -> pitch axis in marker
+    # mr -> roll axis in marker
+    # yf -> wrist fiducial in yaw
+    # fmt: off
+    cols_pitch_M = [ "step", "mox", "moy", "moz", "mpx", "mpy", "mpz",
+                        "mrx", "mry", "mrz", "yfx", "yfy", "yfz", "pitch2yaw" ]
+    # fmt: on
     df_results = pd.DataFrame(columns=cols)
     df_pitch_axes = pd.DataFrame(columns=cols_pitch_M)
 
@@ -147,62 +165,79 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     prev_p_ax = None
     prev_r_ax = None
-    for k in track(keys, "Computing pitch origin in tracker coordinates"):
-        if len(list(dict_files[k].keys())) < 2:
-            log.warning(f"files for step {k} are not available")
+    for step in track(keys, "Computing pitch origin in tracker coordinates"):
+        if len(list(dict_files[step].keys())) < 2:
+            log.warning(f"files for step {step} are not available")
             continue
         try:
-            step = k
-            intermediate_values = {}
-            m1, m2, m3 = calculate_midpoints(
-                dict_files[k]["roll"], dict_files[k]["pitch"], other_vals_dict=intermediate_values
-            )
-            triangle = Triangle3D([m1, m2, m3])
-            # Scale area to milimiters
-            area = triangle.calculate_area(scale=1000)
-            center = triangle.calculate_centroid()
-            # Add new entry to df
-            data = [step, area] + list(center)
-            data = np.array(data).reshape((1, -1))
-            new_df = pd.DataFrame(data, columns=cols)
-            df_results = df_results.append(new_df)
-
-            # Calculate pitch axis in Marker frame
-            pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
-                center, intermediate_values, prev_p_ax, prev_r_ax
-            )
-            ## IMPORTANT NOTE
-            # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
-            # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
-            # are used to ensure consistency in the selected direction for different points in the trajectory.
-
-            prev_p_ax = pitch_ax_M
-            prev_r_ax = roll_ax_M
-            data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M)
-            data = np.array(data).reshape((1, -1))
-            new_pt = pd.DataFrame(data, columns=cols_pitch_M)
-            df_pitch_axes = df_pitch_axes.append(new_pt)
+            # Get roll circles
+            roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[step]["roll"])
+            # Get pitch and yaw circles
+            pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[step]["pitch"])
         except Exception as e:
-            log.error(f"Error in step {step}")
+            log.error(f"Error in circles creation on step {step}")
             log.error(e)
-        # Calculate yaw frame and location of wrist fiducial wrt to yaw frame. This is rigid transformation
-        # that does not depends on the joints values.
-        ## todo: Calculate wrist fiducial wrt yaw frame.
+            continue
+
+        # Calculate registration data
+        m1, m2, m3 = calib.calculate_pitch_origin(
+            roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
+        )
+        pitch_ori_T = (m1 + m2 + m3) / 3
+
+        triangle = Triangle3D([m1, m2, m3])
+        # Scale area to milimiters
+        area = triangle.calculate_area(scale=1000)
+        pitch_ori_T = triangle.calculate_centroid()
+        # Add new entry to df
+        data = [step, area] + list(pitch_ori_T)
+        data = np.array(data).reshape((1, -1))
+        new_df = pd.DataFrame(data, columns=cols)
+        df_results = df_results.append(new_df)
+
+        # Calculate pitch axis in Marker frame
+        pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
+            pitch_ori_T, pitch_yaw_circles, roll_cir1, prev_p_ax, prev_r_ax
+        )
+        ## IMPORTANT NOTE
+        # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
+        # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
+        # are used to ensure consistency in the selected direction for different points in the trajectory.
+        prev_p_ax = pitch_ax_M
+        prev_r_ax = roll_ax_M
+
+        # Estimate wrist fiducial in yaw origin
+        # todo fiducial_y and pitch2yaw1 have two values each. You are only using 1.
+        fiducial_Y, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
+            pitch_ori_T, pitch_yaw_circles, roll_cir2
+        )
+
+        # Add to dataframe
+        # fmt: off
+        data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M) + \
+                list(fiducial_Y[1].squeeze()) +  [pitch2yaw1[1]]
+        # fmt: on
+
+        data = np.array(data).reshape((1, -1))
+        new_pt = pd.DataFrame(data, columns=cols_pitch_M)
+        df_pitch_axes = df_pitch_axes.append(new_pt)
 
     return df_results, df_pitch_axes
 
 
-def calculate_axes_in_marker(pitch_ori_T, intermediate_values: dict, prev_p_ax, prev_r_ax):
+def calculate_axes_in_marker(
+    pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax
+):
     # Marker2Tracker
-    T_TM1 = utils.pykdl2frame(intermediate_values["marker_frame_pitch1"])
+    T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
     pitch_ori1 = (T_TM1.inv() @ pitch_ori_T).squeeze()
-    pitch_ax1 = T_TM1.inv().r @ intermediate_values["pitch_axis1"]
-    roll_ax1 = T_TM1.inv().r @ intermediate_values["roll_axis"]
+    pitch_ax1 = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
+    roll_ax1 = T_TM1.inv().r @ roll_circle.normal
 
-    T_TM2 = utils.pykdl2frame(intermediate_values["marker_frame_pitch2"])
+    T_TM2 = utils.pykdl2frame(pitch_yaw_circles[1]["marker_pose"])
     pitch_ori2 = (T_TM2.inv() @ pitch_ori_T).squeeze()
-    pitch_ax2 = T_TM2.inv().r @ intermediate_values["pitch_axis2"]
-    roll_ax2 = T_TM2.inv().r @ intermediate_values["roll_axis"]
+    pitch_ax2 = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
+    roll_ax2 = T_TM2.inv().r @ roll_circle.normal
 
     # Check if pitch axis are looking in opposite directions
     if np.dot(pitch_ax1, pitch_ax2) < 0:
@@ -271,6 +306,7 @@ def main():
     marker_file = Path("./share/custom_marker_id_112.json")
     regex = ""
 
+    # Obtain registration data
     registration_data_path = root / "registration_results/registration_data.txt"
     if registration_data_path.exists():
         log.info("Loading registration data ...")
@@ -292,6 +328,8 @@ def main():
     json_data["pitchorigin_in_marker"] = axis_dict["pitchorigin"].tolist()
     json_data["pitchaxis_in_marker"] = axis_dict["pitchaxis"].tolist()
     json_data["rollaxis_in_marker"] = axis_dict["rollaxis"].tolist()
+    json_data["fiducial_in_jaw"] = axis_dict["fiducial_yaw"].tolist()
+    json_data["pitch2yaw"] = axis_dict["pitch2yaw"].tolist()
 
     new_name = registration_data_path.parent / "registration_values.json"
     with open(new_name, "w", encoding="utf-8") as f:

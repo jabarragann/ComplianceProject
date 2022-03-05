@@ -115,8 +115,11 @@ def main():
         log.info(f"wrist fiducial in yaw frame.        {fiducial_J.squeeze()}")
 
     # Plot
-    circles = [roll_cir1, roll_cir2, pitch_cir, yaw_cir]
-    plotter = plot_circles(circles, ["black", "black", "orange", "orange"])
+    # circles = [roll_cir1, roll_cir2, pitch_cir, yaw_cir]
+    # plotter = plot_circles(circles, ["black", "black", "orange", "orange"])
+    circles = [pitch_cir]
+    plotter = plot_circles(circles, ["orange"])
+
     plotter.scatter_3d(np.array(fiducial_T).T, marker="*", marker_size=100, color="green")
     plotter.scatter_3d(
         np.array([pitch_orig_est1, pitch_orig_est2, yaw_orig_est]).T,

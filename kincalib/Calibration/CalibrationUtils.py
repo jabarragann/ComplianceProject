@@ -4,13 +4,14 @@ from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
-from kincalib.geometry import Circle3D, Line3D
+from kincalib.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
     load_registration_data,
     calculate_midpoints,
     separate_markerandfiducial,
 )
+from kincalib.utils.Frame import Frame
 
 marker_file = Path("./share/custom_marker_id_112.json")
 
@@ -94,3 +95,29 @@ class CalibrationUtils:
         midpoint3 = roll_axis2(inter_params[0][2] / 2)
 
         return midpoint1, midpoint2, midpoint3
+
+    def calculate_fiducial_from_yaw(pitch_orig_T, pitch_yaw_circles, roll_circle2):
+        fiducial_Y = []
+        pitch2yaw1 = []
+        for kk in range(2):
+            pitch_cir, yaw_cir = pitch_yaw_circles[kk]["pitch"], pitch_yaw_circles[kk]["yaw"]
+
+            # Construct jaw2tracker transformation
+            l1 = Line3D(ref_point=pitch_cir.center, direction=pitch_cir.normal)
+            l2 = Line3D(ref_point=yaw_cir.center, direction=yaw_cir.normal)
+            inter_params = []
+            l3 = Line3D.perpendicular_to_skew(l1, l2, intersect_params=inter_params)
+            yaw_orig_M = l2(inter_params[0][1])
+            pitch2yaw1.append(np.linalg.norm(pitch_orig_T - yaw_orig_M))
+
+            T_TJ = np.identity(4)
+            T_TJ[:3, 0] = pitch_cir.normal
+            T_TJ[:3, 1] = np.cross(yaw_cir.normal, pitch_cir.normal)
+            T_TJ[:3, 2] = yaw_cir.normal
+            T_TJ[:3, 3] = yaw_orig_M
+            T_TJ = Frame.init_from_matrix(T_TJ)
+            # Get fiducial in jaw coordinates
+            fiducial_T, solutions = dist_circle3_plane(pitch_cir, roll_circle2.get_plane())
+            fiducial_Y.append(T_TJ.inv() @ fiducial_T)
+
+        return fiducial_Y, pitch2yaw1
