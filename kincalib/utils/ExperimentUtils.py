@@ -64,17 +64,19 @@ def separate_markerandfiducial(
     # split fiducials and markers
     df_f = df.loc[df["m_t"] == "f"]
     # get number of steps
-    n_step = df["step"].to_numpy().max()
+    n_step = df["step"].unique()
     # Get wrist's fiducials
+    log.info(f" ")
     wrist_fiducials = []
-    for n in range(n_step + 1):
+    for n in n_step:
         step_n_d = df_f.loc[df_f["step"] == n]
         s_time = time.time()
         dd, closest_t = identify_marker(
             step_n_d.loc[:, ["px", "py", "pz"]].to_numpy(), triangles_list[0]
         )
         e_time = time.time()
-        log.info(f"indentify_marker time {e_time-s_time:0.04f}")
+        log.info(f"identify_marker time {e_time-s_time:0.04f}")
+        log.info(f"{n} - step_n_d shape {step_n_d.shape}")
         if len(dd["other"]) > 0:
             wrist_fiducials.append(step_n_d.iloc[dd["other"]][["px", "py", "pz"]].to_numpy())
         # log.debug(step_n_d)
