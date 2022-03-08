@@ -98,6 +98,7 @@ class CalibrationUtils:
 
     def calculate_fiducial_from_yaw(pitch_orig_T, pitch_yaw_circles, roll_circle2):
         fiducial_Y = []
+        fiducial_T = []
         pitch2yaw1 = []
         for kk in range(2):
             pitch_cir, yaw_cir = pitch_yaw_circles[kk]["pitch"], pitch_yaw_circles[kk]["yaw"]
@@ -117,7 +118,8 @@ class CalibrationUtils:
             T_TJ[:3, 3] = yaw_orig_M
             T_TJ = Frame.init_from_matrix(T_TJ)
             # Get fiducial in jaw coordinates
-            fiducial_T, solutions = dist_circle3_plane(pitch_cir, roll_circle2.get_plane())
-            fiducial_Y.append(T_TJ.inv() @ fiducial_T)
+            fid_T, solutions = dist_circle3_plane(pitch_cir, roll_circle2.get_plane())
+            fiducial_Y.append(T_TJ.inv() @ fid_T)
+            fiducial_T.append(fid_T)
 
-        return fiducial_Y, pitch2yaw1
+        return fiducial_Y, fiducial_T, pitch2yaw1

@@ -155,7 +155,7 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # yf -> wrist fiducial in yaw
     # fmt: off
     cols_pitch_M = [ "step", "mox", "moy", "moz", "mpx", "mpy", "mpz",
-                        "mrx", "mry", "mrz", "yfx", "yfy", "yfz", "pitch2yaw" ]
+                        "mrx", "mry", "mrz", "yfx", "yfy", "yfz","tfx","tfy","tfz", "pitch2yaw" ]
     # fmt: on
     df_results = pd.DataFrame(columns=cols)
     df_pitch_axes = pd.DataFrame(columns=cols_pitch_M)
@@ -207,15 +207,16 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         prev_r_ax = roll_ax_M
 
         # Estimate wrist fiducial in yaw origin
+        # todo get the fiducial measurement from robot_cp_temp.
         # todo fiducial_y and pitch2yaw1 have two values each. You are only using 1.
-        fiducial_Y, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
+        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
             pitch_ori_T, pitch_yaw_circles, roll_cir2
         )
 
         # Add to dataframe
         # fmt: off
         data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M) + \
-                list(fiducial_Y[1].squeeze()) +  [pitch2yaw1[1]]
+                list(fiducial_Y[1].squeeze())+ list(fiducial_T[1].squeeze()) +  [pitch2yaw1[1]]
         # fmt: on
 
         data = np.array(data).reshape((1, -1))

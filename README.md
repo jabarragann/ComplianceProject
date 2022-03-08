@@ -18,7 +18,7 @@ http://wiki.ros.org/action/show/rosmsg?action=show&redirect=rossrv
 # To do 
 
 * Multiple marker problem solutions. 
-
+* ftk_uilts::identify_marker functions might be creating outlier data.
 
 # Failure cases that I need to revise
 
@@ -41,5 +41,11 @@ Problem: Outlier in pitch data creates a wrong circle
 
 Ransac might be a good solution.
 https://scikit-image.org/docs/dev/auto_examples/transform/plot_ransac.html
+https://www.cse.psu.edu/~rtc12/CSE486/lecture15.pdf
+
+Outlier detection
+https://nirpyresearch.com/detecting-outliers-using-mahalanobis-distance-pca-python/
+https://www.statology.org/how-to-find-iqr-of-box-plot/
+
 ## Failure in rotation axis from Marker
 ## Todo: Inspect data for data points that seem very odd.
