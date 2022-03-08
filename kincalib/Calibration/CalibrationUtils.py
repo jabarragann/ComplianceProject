@@ -2,7 +2,9 @@ from typing import List, Tuple
 import numpy as np
 from collections import defaultdict
 from pathlib import Path
-
+from roboticstoolbox import ETS as ET
+import roboticstoolbox as rtb
+from spatialmath import SE3
 import pandas as pd
 from kincalib.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.utils.CmnUtils import calculate_mean_frame
@@ -12,8 +14,66 @@ from kincalib.utils.ExperimentUtils import (
     separate_markerandfiducial,
 )
 from kincalib.utils.Frame import Frame
+from dataclasses import dataclass
 
 marker_file = Path("./share/custom_marker_id_112.json")
+
+
+@dataclass
+class JointEstimator:
+    """Joint estimator class
+
+    Args:
+    T_RT (Frame): Transformation from tracker to robot
+    T_MP (Frame): Transformation from Marker to Pitch frame.
+    fid_pos_Y (np.ndarray): Location of wrist fiducial in Yaw frame
+    """
+
+    T_RT: Frame
+    T_MP: Frame
+    wrist_fid_Y: np.ndarray
+
+    def __post_init__(self):
+        if len(self.wrist_fid_Y.shape) > 1:
+            self.wrist_fid_Y = self.wrist_fid_Y.squeeze()
+
+        # Robot model
+        pitch2yaw = 0.0092
+        end_effector = SE3(*self.wrist_fid_Y)
+        E = ET.rz() * ET.tx(pitch2yaw) * ET.rx(90, "deg") * ET.rz()
+        self.robot_model = rtb.ERobot(E, name="wrist_model", tool=end_effector)
+
+    def estimate_q123(self, T_TM: Frame) -> Tuple[float]:
+        """Estimate j1,j2,j3 from the marker measurement
+
+        Args:
+            T_TM (Frame): Trasformation from marker to tracker
+
+        Returns:
+            Tuple[float]: joints q1,q2 and q3 calculated from tracker transformation
+        """
+        # Pitch to tracker frame
+        T_TP = T_TM @ self.T_MP
+        # Tracker to robot frame
+        T_RT = self.T_RT @ T_TP
+        return self.joints123_ikins_calculation(*T_RT.p)
+
+    def estimate_q56(self, wrist_fid_T):
+        pass
+        # s = robot.ikine_LM(robot_sol)
+        # print(s)
+        # q = s.q*180/np.pi
+        # print(q)
+
+    @staticmethod
+    def joints123_ikins_calculation(px, py, pz):
+        L1 = -0.4318
+        Ltool = 0.4162
+
+        tq1 = np.arctan2(px, -pz)
+        tq2 = np.arctan2(-py, np.sqrt(px ** 2 + pz ** 2))
+        tq3 = np.sqrt(px ** 2 + py ** 2 + pz ** 2) + L1 + Ltool
+        return tq1, tq2, tq3
 
 
 class CalibrationUtils:

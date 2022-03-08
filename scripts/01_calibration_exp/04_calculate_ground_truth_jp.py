@@ -1,4 +1,5 @@
 # Python imports
+import json
 from pathlib import Path
 from re import I
 import time
@@ -15,13 +16,14 @@ from rich.progress import track
 # ROS and DVRK imports
 import dvrk
 import rospy
+import tf_conversions.posemath as pm
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Frame import Frame
-from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
@@ -75,8 +77,61 @@ def obtain_true_joints(
         marker_file = Path("./share/custom_marker_id_112.json")
         pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
         e_time = time.time()
+        if wrist_fiducials.shape[0] == 3:
+            log.info(f"Step {step} exec q5,q6 time {e_time-s_time:0.04f}")
+            tq4, tq5, tq6 = joints456_calculation(*pitch_orig_R.squeeze())
+        else:
+            tq4, tq5, tq6 = None, None, None
+
+        # Save data
+        d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
+        new_pt = pd.DataFrame(d, columns=cols_robot)
+        df_robot = df_robot.append(new_pt)
+
+        d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
+        new_pt = pd.DataFrame(d, columns=cols_tracker)
+        df_tracker = df_tracker.append(new_pt)
+
+    return df_robot, df_tracker
+
+
+def obtain_true_joints_v2(
+    estimator: JointEstimator, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame
+) -> pd.DataFrame:
+
+    cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+    cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+    df_robot = pd.DataFrame(columns=cols_robot)
+    df_tracker = pd.DataFrame(columns=cols_tracker)
+
+    # for idx in range(robot_jp.shape[0]):
+    for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
+        # Read robot joints
+        rq1, rq2, rq3, rq4, rq5, rq6 = (
+            robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
+        )
+        step = robot_jp.iloc[idx].loc["step"]
+
+        # Read tracker data
+        df_temp = robot_cp[robot_cp["step"] == step]
+        marker_file = Path("./share/custom_marker_id_112.json")
+        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
+        if len(pose_arr) == 0:
+            log.warning(f"Marker pose in {step} not found")
+            continue
+        assert len(pose_arr) == 1, "There should only be one marker pose at each step."
+        T_MT = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
+        # Calculate q1, q2 and q3
+        tq1, tq2, tq3 = estimator.estimate_q123(T_MT)
+
+        # Calculate joints 4,5,6
+        s_time = time.time()
+        df_temp = robot_cp[robot_cp["step"] == step]
+        marker_file = Path("./share/custom_marker_id_112.json")
+        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
+        e_time = time.time()
         log.info(f"Step {step} exec q5,q6 time {e_time-s_time:0.04f}")
-        tq4, tq5, tq6 = joints456_calculation(*pitch_orig_R.squeeze())
+        tq4, tq5, tq6 = joints456_calculation(*wrist_fiducials)
 
         # Save data
         d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
@@ -121,17 +176,28 @@ def main():
     robot_cp = pd.read_csv(robot_cp)
     registration_data_path = root / "registration_results"
 
+    registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
+    T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+    T_RT = T_TR.inv()
+    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+    T_PM = T_MP.inv()
+    wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
+
     if not (registration_data_path / "registration_data.txt").exists():
         log.error("Missing registration data file")
     if not (registration_data_path / "robot2tracker_t.npy").exists():
         log.error("Missing robot tracker transformation")
 
     reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
-    T_TR = np.load(registration_data_path / "robot2tracker_t.npy")
-    T_TR = Frame(T_TR[:3, :3], T_TR[:3, 3])
+    # T_TR = np.load(registration_data_path / "robot2tracker_t.npy")
+    # T_TR = Frame(T_TR[:3, :3], T_TR[:3, 3])
 
     # Calculate ground truth joints
-    robot_df, tracker_df = obtain_true_joints(reg_data, robot_jp, robot_cp, T_TR)
+    # V1
+    # robot_df, tracker_df = obtain_true_joints(reg_data, robot_jp, robot_cp, T_TR)
+    # V2
+    j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
+    robot_df, tracker_df = obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
 
     # plot
     plot_joints(robot_df, tracker_df)
