@@ -22,7 +22,7 @@ from scipy.optimize import dual_annealing
 marker_file = Path("./share/custom_marker_id_112.json")
 
 
-def fkins(q5, q6, unit: str = "rad"):
+def fkins_v1(q5, q6, unit: str = "rad"):
     pitch2yaw = 0.0092
     if unit == "deg":
         q5 = q5 * np.pi / 180
@@ -38,6 +38,19 @@ def fkins(q5, q6, unit: str = "rad"):
     ]
     # fmt:on
     return np.array(transf)
+
+
+def fkins_v2(q5, q6):
+    """Angles especified in rad"""
+    pitch2yaw = 0.0092
+    E = (
+        ET.rx(-90, "deg")
+        * ET.rz((-90) * np.pi / 180 + q5)
+        * ET.tx(pitch2yaw)
+        * ET.rx(-90, "deg")
+        * ET.rz((-90) * np.pi / 180 + q6)
+    )
+    return E.eval().data[0]
 
 
 @dataclass
@@ -98,7 +111,7 @@ class JointEstimator:
     def kin_objective(self, q, fid_in_P):
         q5, q6 = q
 
-        error = fid_in_P - fkins(q5, q6) @ self.wrist_fid_Y_h
+        error = fid_in_P - fkins_v2(q5, q6) @ self.wrist_fid_Y_h
         return np.linalg.norm(error)
 
     def estimate_q56(self, T_MT: Frame, wrist_fid_T: np.ndarray):
