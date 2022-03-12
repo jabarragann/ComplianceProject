@@ -43,9 +43,7 @@ def joints456_calculation(px, py, pz):
     return px, py, pz
 
 
-def obtain_true_joints(
-    reg_data: pd.DataFrame, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame, T_TR: Frame
-) -> pd.DataFrame:
+def obtain_true_joints(reg_data: pd.DataFrame, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame, T_TR: Frame) -> pd.DataFrame:
 
     T_RT = T_TR.inv()
     cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
@@ -55,9 +53,7 @@ def obtain_true_joints(
 
     # for idx in range(robot_jp.shape[0]):
     for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
-        rq1, rq2, rq3, rq4, rq5, rq6 = (
-            robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
-        )
+        rq1, rq2, rq3, rq4, rq5, rq6 = robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
         step = robot_jp.iloc[idx].loc["step"]
         # Get pitch origin in tracker
         pitch_orig_T = reg_data.loc[reg_data["step"] == step][["tpx", "tpy", "tpz"]].to_numpy()
@@ -95,21 +91,17 @@ def obtain_true_joints(
     return df_robot, df_tracker
 
 
-def obtain_true_joints_v2(
-    estimator: JointEstimator, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame
-) -> pd.DataFrame:
+def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame) -> pd.DataFrame:
 
     cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
     cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
     df_robot = pd.DataFrame(columns=cols_robot)
     df_tracker = pd.DataFrame(columns=cols_tracker)
-
+    opt_error = []
     # for idx in range(robot_jp.shape[0]):
     for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
         # Read robot joints
-        rq1, rq2, rq3, rq4, rq5, rq6 = (
-            robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
-        )
+        rq1, rq2, rq3, rq4, rq5, rq6 = robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
         step = robot_jp.iloc[idx].loc["step"]
 
         # Read tracker data
@@ -120,18 +112,16 @@ def obtain_true_joints_v2(
             log.warning(f"Marker pose in {step} not found")
             continue
         assert len(pose_arr) == 1, "There should only be one marker pose at each step."
-        T_MT = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
+        T_TM = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
+
         # Calculate q1, q2 and q3
-        tq1, tq2, tq3 = estimator.estimate_q123(T_MT)
+        tq1, tq2, tq3 = estimator.estimate_q123(T_TM)
 
         # Calculate joints 4,5,6
-        s_time = time.time()
-        df_temp = robot_cp[robot_cp["step"] == step]
-        marker_file = Path("./share/custom_marker_id_112.json")
-        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        e_time = time.time()
-        log.info(f"Step {step} exec q5,q6 time {e_time-s_time:0.04f}")
-        tq4, tq5, tq6 = joints456_calculation(*wrist_fiducials)
+        # tq4, tq5, tq6 = 0, 0, 0
+        tq5, tq6, evaluation = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
+        opt_error.append(evaluation)
+        tq4 = 0
 
         # Save data
         d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
@@ -142,7 +132,7 @@ def obtain_true_joints_v2(
         new_pt = pd.DataFrame(d, columns=cols_tracker)
         df_tracker = df_tracker.append(new_pt)
 
-    return df_robot, df_tracker
+    return df_robot, df_tracker, opt_error
 
 
 def plot_joints(robot_df, tracker_df):
@@ -158,7 +148,17 @@ def plot_joints(robot_df, tracker_df):
         axes[i].plot(tracker_df[f"tq{i+1}"], marker="*", linestyle="None", color="orange", label="tracker")
         # fmt:on
     axes[0].legend()
-    plt.show()
+
+
+def create_histogram(data, axes, title=None, xlabel=None):
+    axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
+    # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)
+    axes.grid()
+    axes.set_xlabel(xlabel)
+    axes.set_ylabel("Frequency")
+    axes.set_title(f"{title} (N={data.shape[0]:02d})")
+    # axes.set_xticks([i * 5 for i in range(110 // 5)])
+    # plt.show()
 
 
 def main():
@@ -193,15 +193,18 @@ def main():
     # T_TR = Frame(T_TR[:3, :3], T_TR[:3, 3])
 
     # Calculate ground truth joints
-    # V1
+    # Version1
     # robot_df, tracker_df = obtain_true_joints(reg_data, robot_jp, robot_cp, T_TR)
-    # V2
+
+    # Version2
     j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-    robot_df, tracker_df = obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
+    robot_df, tracker_df, opt_error = obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
 
     # plot
     plot_joints(robot_df, tracker_df)
-
+    fig, ax = plt.subplots(1, 1)
+    create_histogram(np.array(opt_error), axes=ax, title=f"Optimization error", xlabel="objective function at optimal solution")
+    plt.show()
     pass
 
 

@@ -20,9 +20,7 @@ class Frame:
 
         if not self.is_rotation(r):
             if normalization_warning:
-                log.warning(
-                    f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
-                )
+                log.warning(f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}")
                 log.warning(f"Renormalizing to a proper rotation matrix")
             self.r = self.closest_to_rotation(r)
 
@@ -170,6 +168,9 @@ class Frame:
 
     @staticmethod
     def is_rotation(r):
+        if np.linalg.det(r) < 0.0:
+            raise Exception("Frame has a negative determinant.")
+
         return np.isclose(np.linalg.det(r), 1.0)
 
     @staticmethod
@@ -187,8 +188,6 @@ class Frame:
         new_matrix = u @ vh
 
         ## Todo - What happens if the algorithm returns a reflection matrix?
-        assert np.isclose(
-            np.linalg.det(new_matrix), 1.0
-        ), "Normalization procedure failed...Implement what is missing"
+        assert np.isclose(np.linalg.det(new_matrix), 1.0), "Normalization procedure failed...Implement what is missing"
 
         return new_matrix

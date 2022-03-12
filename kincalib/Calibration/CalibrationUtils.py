@@ -1,3 +1,4 @@
+from re import I
 from typing import List, Tuple
 import numpy as np
 from collections import defaultdict
@@ -15,8 +16,28 @@ from kincalib.utils.ExperimentUtils import (
 )
 from kincalib.utils.Frame import Frame
 from dataclasses import dataclass
+from numpy import sin, cos
+from scipy.optimize import dual_annealing
 
 marker_file = Path("./share/custom_marker_id_112.json")
+
+
+def fkins(q5, q6, unit: str = "rad"):
+    pitch2yaw = 0.0092
+    if unit == "deg":
+        q5 = q5 * np.pi / 180
+        q6 = q6 * np.pi / 180
+
+    alpha = 90 * np.pi / 180
+    # fmt:off
+    transf = [ \
+    [-sin(q5)*sin(q6)*cos(alpha)+cos(q5)*cos(q6), -sin(q5)*cos(alpha)*cos(q6)-sin(q6)*cos(q5),sin(alpha)*sin(q5),pitch2yaw*cos(q5)],\
+    [ sin(q5)*cos(q6)+sin(q6)*cos(alpha)*cos(q5),-sin(q5)*sin(q6)+cos(alpha)*cos(q5)*cos(q6),-sin(alpha)*cos(q5),pitch2yaw*sin(q5)],\
+    [ sin(alpha)*sin(q6), sin(alpha)*cos(q6), 0 , cos(alpha)],\
+    [0,0,0,1]
+    ]
+    # fmt:on
+    return np.array(transf)
 
 
 @dataclass
@@ -37,6 +58,12 @@ class JointEstimator:
         if len(self.wrist_fid_Y.shape) > 1:
             self.wrist_fid_Y = self.wrist_fid_Y.squeeze()
 
+        self.T_PM = self.T_MP.inv()
+
+        t = np.ones((4, 1))
+        t[:3, :] = self.wrist_fid_Y.reshape(3, 1)
+        self.wrist_fid_Y_h = t
+
         # Robot model
         pitch2yaw = 0.0092
         end_effector = SE3(*self.wrist_fid_Y)
@@ -56,14 +83,54 @@ class JointEstimator:
         T_TP = T_TM @ self.T_MP
         # Tracker to robot frame
         T_RT = self.T_RT @ T_TP
-        return self.joints123_ikins_calculation(*T_RT.p)
+        return self.joints123_ikins_calculation(*T_RT.p.squeeze().tolist())
 
-    def estimate_q56(self, wrist_fid_T):
-        pass
-        # s = robot.ikine_LM(robot_sol)
-        # print(s)
-        # q = s.q*180/np.pi
-        # print(q)
+    @staticmethod
+    def solve_transcendental1(a, b, c):
+        assert a ** 2 + b ** 2 - c ** 2 > 0, "no solution"
+
+        t = np.arctan2(np.sqrt(a ** 2 + b ** 2 - c ** 2), c)
+        s1 = np.arctan2(b, a) + t
+        s2 = np.arctan2(b, a) - t
+        return s1, s2
+
+    # objective function
+    def kin_objective(self, q, fid_in_P):
+        q5, q6 = q
+
+        error = fid_in_P - fkins(q5, q6) @ self.wrist_fid_Y_h
+        return np.linalg.norm(error)
+
+    def estimate_q56(self, T_MT: Frame, wrist_fid_T: np.ndarray):
+        wrist_fid_P = self.T_PM @ T_MT @ wrist_fid_T
+        wrist_fid_P = wrist_fid_P.squeeze()
+        t = np.ones((4, 1))
+        t[:3, :] = wrist_fid_P.reshape(3, 1)
+        wrist_fid_P = t
+
+        # Analytical solution
+        # a = self.wrist_fid_Y[1]
+        # b = self.wrist_fid_Y[0]
+        # c = wrist_fid_P[2]
+        # s1, s2 = self.solve_transcendental1(a, b, c)
+
+        # Optimized solution
+        # Bounds
+        r_min, r_max = -np.pi, np.pi
+        bounds = [[r_min, r_max], [r_min, r_max]]
+        # perform the simulated annealing search
+        result = dual_annealing(self.kin_objective, bounds, args=(wrist_fid_P,))
+        # summarize the result
+        print("Status : %s" % result["message"])
+        print("Total Evaluations: %d" % result["nfev"])
+        # evaluate solution
+        solution = result["x"]
+        evaluation = self.kin_objective(solution, fid_in_P=wrist_fid_P)
+        print("Solution: f(%s) = %.5f" % (solution, evaluation))
+
+        print("Solution in degrees")
+        print(solution[0] * 180 / np.pi, solution[1] * 180 / np.pi)
+        return solution[0], solution[1], evaluation
 
     @staticmethod
     def joints123_ikins_calculation(px, py, pz):

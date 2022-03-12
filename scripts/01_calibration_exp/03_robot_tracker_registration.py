@@ -100,25 +100,25 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     # pitch_axis aligned with y
     # roll_axis aligned with z
     # ------------------------------------------------------------
-    pitch_x_axis = np.cross(pitch_axis_mean, roll_axis_mean)
+    # pitch_x_axis = np.cross(pitch_axis_mean, roll_axis_mean)
 
-    pitch2marker_T = np.identity(4)
-    pitch2marker_T[:3, 0] = pitch_x_axis
-    pitch2marker_T[:3, 1] = pitch_axis_mean
-    pitch2marker_T[:3, 2] = roll_axis_mean
-    pitch2marker_T[:3, 3] = pitch_orig_mean
+    # pitch2marker_T = np.identity(4)
+    # pitch2marker_T[:3, 0] = pitch_x_axis
+    # pitch2marker_T[:3, 1] = pitch_axis_mean
+    # pitch2marker_T[:3, 2] = roll_axis_mean
+    # pitch2marker_T[:3, 3] = pitch_orig_mean
     # ------------------------------------------------------------
     # Version2
     # pitch_axis aligned with z
     # roll_axis aligned with x
     # ------------------------------------------------------------
-    # pitch_y_axis = np.cross(pitch_axis_mean, roll_axis_mean)
+    pitch_y_axis = np.cross(pitch_axis_mean, roll_axis_mean)
 
-    # pitch2marker_T = np.identity(4)
-    # pitch2marker_T[:3, 0] = roll_axis_mean
-    # pitch2marker_T[:3, 1] = pitch_y_axis
-    # pitch2marker_T[:3, 2] = pitch_axis_mean
-    # pitch2marker_T[:3, 3] = pitch_orig_mean
+    pitch2marker_T = np.identity(4)
+    pitch2marker_T[:3, 0] = roll_axis_mean
+    pitch2marker_T[:3, 1] = pitch_y_axis
+    pitch2marker_T[:3, 2] = pitch_axis_mean
+    pitch2marker_T[:3, 3] = pitch_orig_mean
 
     return Frame.init_from_matrix(pitch2marker_T)
 
