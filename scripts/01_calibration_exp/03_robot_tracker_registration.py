@@ -93,19 +93,37 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     other_values_dict["fiducial_yaw"] = fiducial_yaw_mean
     other_values_dict["pitch2yaw"] = pitch2yaw_mean
 
-    pitch_y_axis = np.cross(roll_axis_mean, pitch_axis_mean)
+    # CRITICAL STEP OF THE IKIN CALCULATIONS
     # calculate transformation
+    # ------------------------------------------------------------
+    # Version1
+    # pitch_axis aligned with y
+    # roll_axis aligned with z
+    # ------------------------------------------------------------
+    pitch_x_axis = np.cross(pitch_axis_mean, roll_axis_mean)
+
     pitch2marker_T = np.identity(4)
-    pitch2marker_T[:3, 0] = pitch_axis_mean
-    pitch2marker_T[:3, 1] = pitch_y_axis
+    pitch2marker_T[:3, 0] = pitch_x_axis
+    pitch2marker_T[:3, 1] = pitch_axis_mean
     pitch2marker_T[:3, 2] = roll_axis_mean
     pitch2marker_T[:3, 3] = pitch_orig_mean
+    # ------------------------------------------------------------
+    # Version2
+    # pitch_axis aligned with z
+    # roll_axis aligned with x
+    # ------------------------------------------------------------
+    # pitch_y_axis = np.cross(pitch_axis_mean, roll_axis_mean)
+
+    # pitch2marker_T = np.identity(4)
+    # pitch2marker_T[:3, 0] = roll_axis_mean
+    # pitch2marker_T[:3, 1] = pitch_y_axis
+    # pitch2marker_T[:3, 2] = pitch_axis_mean
+    # pitch2marker_T[:3, 3] = pitch_orig_mean
+
     return Frame.init_from_matrix(pitch2marker_T)
 
 
-def pitch_orig_in_robot(
-    robot_df: pd.DataFrame, service_name: str = "/PSM1/local/query_cp"
-) -> pd.DataFrame:
+def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM1/local/query_cp") -> pd.DataFrame:
     # ------------------------------------------------------------
     # Connect to DVRK fk service
     # ------------------------------------------------------------
@@ -180,9 +198,7 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
             continue
 
         # Calculate registration data
-        m1, m2, m3 = calib.calculate_pitch_origin(
-            roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
-        )
+        m1, m2, m3 = calib.calculate_pitch_origin(roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"])
         pitch_ori_T = (m1 + m2 + m3) / 3
 
         triangle = Triangle3D([m1, m2, m3])
@@ -209,9 +225,7 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Estimate wrist fiducial in yaw origin
         # todo get the fiducial measurement from robot_cp_temp.
         # todo fiducial_y and pitch2yaw1 have two values each. You are only using 1.
-        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
-            pitch_ori_T, pitch_yaw_circles, roll_cir2
-        )
+        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(pitch_ori_T, pitch_yaw_circles, roll_cir2)
 
         # Add to dataframe
         # fmt: off
@@ -226,9 +240,7 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     return df_results, df_pitch_axes
 
 
-def calculate_axes_in_marker(
-    pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax
-):
+def calculate_axes_in_marker(pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax):
     # Marker2Tracker
     T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
     pitch_ori1 = (T_TM1.inv() @ pitch_ori_T).squeeze()
