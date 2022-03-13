@@ -34,9 +34,9 @@ class DvrkMotions:
     # fmt: off
     # cq->command joint position
     df_cols_cp = ["step","q1" ,"q2" ,"q3" , "q4", "q5", "q6", "q7", "m_t", "m_id",
-                    "px", "py", "pz", "qx", "qy", "qz", "q"] 
+                    "px", "py", "pz", "qx", "qy", "qz", "qw"] 
     # df_cols_cp = [ "step", "q4", "q5", "q6", "q7", "m_t", "m_id",
-    #                 "px", "py", "pz", "qx", "qy", "qz", "q"] 
+    #                 "px", "py", "pz", "qx", "qy", "qz", "qw"] 
     df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7"]
     # fmt: on
 

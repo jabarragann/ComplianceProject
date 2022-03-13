@@ -181,6 +181,9 @@ class CalibrationUtils:
         # roll values
         roll = df.q4.unique()
 
+        if len(roll) < 2:
+            raise Exception("Not enough roll values for the 2 pitch circle calculations")
+
         pitch_arr = []
         yaw_arr = []
         pitch_yaw_circles_dict = defaultdict(dict)
@@ -191,6 +194,8 @@ class CalibrationUtils:
             if len(pose_arr) > 0:
                 mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)
                 pitch_yaw_circles_dict[idx]["marker_pose"] = mean_pose
+            else:
+                raise Exception("No marker pose found")
             # Calculate pitch circle
             df_temp = df.loc[(df["q4"] == r) & (df["q6"] == 0.0)]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)

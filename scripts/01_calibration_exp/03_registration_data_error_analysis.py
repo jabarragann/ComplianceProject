@@ -75,116 +75,117 @@ def main():
             roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[k]["roll"])
             # Get pitch and yaw circles
             pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[k]["pitch"])
-            # Estimate pitch origin with roll and pitch
-            m1, m2, m3 = calib.calculate_pitch_origin(
-                roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
-            )
-            # ---------------------------
-            # Marker to pitch frame error metrics
-            # - Calculate pitch origin in marker Frame
-            # - Calculate pitch axes in marker Frame
-            # - Calculate roll axes in marker Frame
-            # ---------------------------
-            pitch_ori_T = (m1 + m2 + m3) / 3
-            # Marker2Tracker
-            T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
-            pitch_ori1_M = T_TM1.inv() @ pitch_ori_T
-            pitch_ax1_M = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
-            roll_axis1_M = T_TM1.inv().r @ roll_cir1.normal
-
-            T_TM2 = utils.pykdl2frame(pitch_yaw_circles[1]["marker_pose"])
-            pitch_ori2_M = T_TM2.inv() @ pitch_ori_T
-            pitch_ax2_M = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
-            roll_axis2_M = T_TM2.inv().r @ roll_cir1.normal
-
-            # Estimate wrist fiducial in yaw origin
-            fiducial_Y, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
-                pitch_ori_T, pitch_yaw_circles, roll_cir2
-            )
-
-            # Maker sure that all axis look in the same direction
-            # Check if pitch axis are looking in opposite directions
-            if np.dot(pitch_ax1_M, pitch_ax2_M) < 0:
-                log.warning("INCONSISTENT NORMAL ASSIGNMENT")
-                pitch_ax1_M *= -1
-            if prev_p_ax is None:
-                prev_p_ax = pitch_ax1_M
-            # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
-            else:
-                if np.dot(prev_p_ax, pitch_ax1_M) < 0:
-                    log.warning("INCONSISTENT NORMAL ASSIGNMENT")
-                    pitch_ax1_M *= -1
-                    pitch_ax2_M *= -1
-                prev_p_ax = pitch_ax1_M
-
-            # Check if roll axis are looking in opposite directions
-            if np.dot(roll_axis1_M, roll_axis2_M) < 0:
-                log.warning("INCONSISTENT NORMAL ASSIGNMENT")
-                roll_axis1_M *= -1
-            if prev_r_ax is None:
-                prev_r_ax = roll_axis1_M
-            # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
-            else:
-                if np.dot(prev_r_ax, roll_axis1_M) < 0:
-                    log.warning("INCONSISTENT NORMAL ASSIGNMENT")
-                    roll_axis1_M *= -1
-                    roll_axis2_M *= -1
-                prev_r_ax = roll_axis1_M
-
-            # ---------------------------
-            # Mid point error metrics
-            # ---------------------------
-            roll_axis = roll_cir1.normal
-            pitch_axis1 = pitch_yaw_circles[0]["pitch"].normal
-            pitch_axis2 = pitch_yaw_circles[1]["pitch"].normal
-
-            triangle = Triangle3D([m1, m2, m3])
-            # Scale sides and area to milimiters
-            sides = triangle.calculate_sides(scale=1000)
-            area = triangle.calculate_area(scale=1000)
-            # fmt: off
-            log.debug(f"Step {k} results")
-            log.debug(f"MID POINT RESULTS")
-            log.debug(f"triangle sides {sides} mm")
-            log.debug(f"triangle area {area:0.4f} mm^2")
-            log.debug(f"SHAFT RESULTS")
-            log.debug(f"pitch1 dot roll in tracker {np.dot(roll_axis, pitch_axis1)}")
-            log.debug(f"pitch2 dot roll in tracker {np.dot(roll_axis, pitch_axis2)}")
-            log.debug(f"MARKER TO PITCH FRAME RESULTS")
-            log.debug(f"pitch origin1 from marker {pitch_ori1_M.squeeze()}")
-            log.debug(f"pitch origin2 from marker {pitch_ori2_M.squeeze()}")
-            log.debug(f"pitch axis1  from marker {pitch_ax1_M}")
-            log.debug(f"pitch axis2  from marker {pitch_ax2_M}")
-            log.debug( f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1_M,pitch_ax2_M)>0}")
-            log.debug(f"roll axis1  from marker {roll_axis1_M}")
-            log.debug(f"roll axis2  from marker {roll_axis2_M}")
-            log.debug( f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1_M,roll_axis2_M)>0}")
-            log.debug(f"Fiducial in Jaw 1 {fiducial_Y[0].squeeze()}")
-            log.debug(f"Fiducial in Jaw 2 {fiducial_Y[1].squeeze()}")
-            # fmt: on
-
-            # Add data to list
-            if area < 3:
-                list_area.append(area)
-
-                list_pitch2yaw.append(pitch2yaw1)
-                list_fiducial_Y.append(fiducial_Y[0].squeeze())
-                list_fiducial_Y.append(fiducial_Y[1].squeeze())
-                # Data from roll 1 position
-                list_pitch_orig_M.append(pitch_ori1_M.squeeze())
-                list_pitch_axis_M.append(pitch_ax1_M)
-                list_roll_axis_M.append(roll_axis2_M)
-                # Data from roll 2 position
-                list_pitch_orig_M.append(pitch_ori1_M.squeeze())
-                list_pitch_axis_M.append(pitch_ax2_M)
-                list_roll_axis_M.append(roll_axis2_M)
-            else:
-                log.warning(f"Data in step {k} was not added to list")
-
         except Exception as e:
             log.error(f"Exception triggered in step {k}")
-            log.debug(e)
+            log.error(e)
             log.debug(traceback.print_exc())
+            continue
+
+        # Estimate pitch origin with roll and pitch
+        m1, m2, m3 = calib.calculate_pitch_origin(
+            roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
+        )
+        # ---------------------------
+        # Marker to pitch frame error metrics
+        # - Calculate pitch origin in marker Frame
+        # - Calculate pitch axes in marker Frame
+        # - Calculate roll axes in marker Frame
+        # ---------------------------
+        pitch_ori_T = (m1 + m2 + m3) / 3
+        # Marker2Tracker
+        T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
+        pitch_ori1_M = T_TM1.inv() @ pitch_ori_T
+        pitch_ax1_M = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
+        roll_axis1_M = T_TM1.inv().r @ roll_cir1.normal
+
+        T_TM2 = utils.pykdl2frame(pitch_yaw_circles[1]["marker_pose"])
+        pitch_ori2_M = T_TM2.inv() @ pitch_ori_T
+        pitch_ax2_M = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
+        roll_axis2_M = T_TM2.inv().r @ roll_cir1.normal
+
+        # Estimate wrist fiducial in yaw origin
+        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
+            pitch_ori_T, pitch_yaw_circles, roll_cir2
+        )
+
+        # Maker sure that all axis look in the same direction
+        # Check if pitch axis are looking in opposite directions
+        if np.dot(pitch_ax1_M, pitch_ax2_M) < 0:
+            log.warning("INCONSISTENT NORMAL ASSIGNMENT")
+            pitch_ax1_M *= -1
+        if prev_p_ax is None:
+            prev_p_ax = pitch_ax1_M
+        # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+        else:
+            if np.dot(prev_p_ax, pitch_ax1_M) < 0:
+                log.warning("INCONSISTENT NORMAL ASSIGNMENT")
+                pitch_ax1_M *= -1
+                pitch_ax2_M *= -1
+            prev_p_ax = pitch_ax1_M
+
+        # Check if roll axis are looking in opposite directions
+        if np.dot(roll_axis1_M, roll_axis2_M) < 0:
+            log.warning("INCONSISTENT NORMAL ASSIGNMENT")
+            roll_axis1_M *= -1
+        if prev_r_ax is None:
+            prev_r_ax = roll_axis1_M
+        # Then make sure that all the vectors from all the steps in the trajectory point in the same direction
+        else:
+            if np.dot(prev_r_ax, roll_axis1_M) < 0:
+                log.warning("INCONSISTENT NORMAL ASSIGNMENT")
+                roll_axis1_M *= -1
+                roll_axis2_M *= -1
+            prev_r_ax = roll_axis1_M
+
+        # ---------------------------
+        # Mid point error metrics
+        # ---------------------------
+        roll_axis = roll_cir1.normal
+        pitch_axis1 = pitch_yaw_circles[0]["pitch"].normal
+        pitch_axis2 = pitch_yaw_circles[1]["pitch"].normal
+
+        triangle = Triangle3D([m1, m2, m3])
+        # Scale sides and area to milimiters
+        sides = triangle.calculate_sides(scale=1000)
+        area = triangle.calculate_area(scale=1000)
+        # fmt: off
+        log.debug(f"Step {k} results")
+        log.debug(f"MID POINT RESULTS")
+        log.debug(f"triangle sides {sides} mm")
+        log.debug(f"triangle area {area:0.4f} mm^2")
+        log.debug(f"SHAFT RESULTS")
+        log.debug(f"pitch1 dot roll in tracker {np.dot(roll_axis, pitch_axis1)}")
+        log.debug(f"pitch2 dot roll in tracker {np.dot(roll_axis, pitch_axis2)}")
+        log.debug(f"MARKER TO PITCH FRAME RESULTS")
+        log.debug(f"pitch origin1 from marker {pitch_ori1_M.squeeze()}")
+        log.debug(f"pitch origin2 from marker {pitch_ori2_M.squeeze()}")
+        log.debug(f"pitch axis1  from marker {pitch_ax1_M}")
+        log.debug(f"pitch axis2  from marker {pitch_ax2_M}")
+        log.debug( f"Is dot product betweeen pitch axis positive? {np.dot(pitch_ax1_M,pitch_ax2_M)>0}")
+        log.debug(f"roll axis1  from marker {roll_axis1_M}")
+        log.debug(f"roll axis2  from marker {roll_axis2_M}")
+        log.debug( f"Is dot product betweeen roll axis positive? {np.dot(roll_axis1_M,roll_axis2_M)>0}")
+        log.debug(f"Fiducial in Jaw 1 {fiducial_Y[0].squeeze()}")
+        log.debug(f"Fiducial in Jaw 2 {fiducial_Y[1].squeeze()}")
+        # fmt: on
+
+        # Add data to list
+        if area < 3:
+            list_area.append(area)
+
+            list_pitch2yaw.append(pitch2yaw1)
+            list_fiducial_Y.append(fiducial_Y[0].squeeze())
+            list_fiducial_Y.append(fiducial_Y[1].squeeze())
+            # Data from roll 1 position
+            list_pitch_orig_M.append(pitch_ori1_M.squeeze())
+            list_pitch_axis_M.append(pitch_ax1_M)
+            list_roll_axis_M.append(roll_axis2_M)
+            # Data from roll 2 position
+            list_pitch_orig_M.append(pitch_ori1_M.squeeze())
+            list_pitch_axis_M.append(pitch_ax2_M)
+            list_roll_axis_M.append(roll_axis2_M)
+        else:
+            log.warning(f"Data in step {k} was not added to list")
 
     list_area = np.array(list_area)
     pitch_orig = np.array(list_pitch_orig_M)
@@ -270,9 +271,7 @@ def plot_results():
 
     # Histograms for triangle area
     fig, axes = plt.subplots(2, 1, sharey=True, tight_layout=True)
-    create_histogram(
-        list_area, axes[0], xlabel="Triangle area mm^2", title="Pitch origin measurements"
-    )
+    create_histogram(list_area, axes[0], xlabel="Triangle area mm^2", title="Pitch origin measurements")
     create_histogram(list_pitch2yaw, axes[1], xlabel="m", title="pitch2yaw measurements")
 
     # fig, axes = plt.subplots(1, 3)
@@ -286,7 +285,7 @@ def plot_results():
     plotter = Plotter3D()
     # plotter.scatter_3d(fiducial_Y.T)
     plotter.scatter_3d(pitch_axis.T)
-    plotter.scatter_3d(roll_axis.T)
+    # plotter.scatter_3d(roll_axis.T)
     plt.show()
 
 
@@ -295,13 +294,13 @@ def plot_results():
 # ------------------------------------------------------------
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-07-traj01", 
                         help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
 args = parser.parse_args()
 log_level = args.log
-log = Logger("pitch_exp_analize2", log_level=log_level).log
+log = Logger("pitch error analysis", log_level=log_level).log
 
 if __name__ == "__main__":
     # main()

@@ -183,6 +183,9 @@ class RosbagReplay:
         total = len(self.setpoints)
         start_time = time.time()
 
+        if not filename.exists:
+            filename.mkdir(parents=True)
+
         # Create ftk handler
         ftk_handler = ftk_500(marker_name=marker_name)
         # Create data frames
