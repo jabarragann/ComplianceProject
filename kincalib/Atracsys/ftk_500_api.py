@@ -21,6 +21,7 @@ from kincalib.utils.Logger import Logger
 import sys
 
 np.set_printoptions(precision=4, suppress=True)
+log = Logger(__name__).log
 
 
 class ftk_500:
@@ -140,10 +141,10 @@ class ftk_500:
             # Get the average position of each detected fiducial
             mean_value = sensor_vals.squeeze().mean(axis=0)
             std_value = sensor_vals.squeeze().std(axis=0)
-            # self.log.debug(f"mean value:\n{mean_value}")
-            # self.log.debug(f"std value:\n{std_value}")
+            # log.debug(f"mean value:\n{mean_value}")
+            # log.debug(f"std value:\n{std_value}")
         else:
-            log.warning(f"set of {expected_markers} not found")
+            log.warning(f"set of {m} fiducials not found")
         if len(marker_pose) >= 2:
             # Get mean pose of the marker
             mean_frame, _, _ = ftk_500.average_marker_pose(marker_pose)

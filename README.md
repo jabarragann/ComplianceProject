@@ -14,7 +14,16 @@ http://wiki.ros.org/rosservice
 http://wiki.ros.org/action/show/rosmsg?action=show&redirect=rossrv
 
 
+# Commands 
+Collecting calibration data
+```
+python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "calib" -b data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag -r data/03_replay_trajectory/d04-rec-08-traj02 
+```
 
+Collecting test trajectories
+```
+python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "test" -b data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag -r data/03_replay_trajectory/d04-rec-07-traj01 -f test_traj02
+```
 # To do 
 
 * Multiple marker problem solutions. 
