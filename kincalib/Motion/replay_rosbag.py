@@ -362,7 +362,7 @@ if __name__ == "__main__":
     # Create replay class
     # ------------------------------------------------------------
     root = Path("data/psm2_trajectories/")
-    file_p = root / "pitch_exp_traj_01_test_cropped.bag"
+    file_p = root / "pitch_exp_traj_03_test_cropped.bag"
     replay = RosbagReplay(file_p)
     replay.rosbag_utils.print_topics_info()
 

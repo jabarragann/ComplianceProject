@@ -15,6 +15,17 @@ http://wiki.ros.org/action/show/rosmsg?action=show&redirect=rossrv
 
 
 # Commands 
+## Creating ros bags
+Recording a rosbag with a PSM trajectory
+```
+rosbag record -O test -e "/PSM2/(measured|setpoint).*"
+```
+Cropping rosbag to remove section of no movement at beginning and end
+```
+
+```
+
+## Collection of calibration data
 Collecting calibration data
 ```
 python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "calib" -b data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag -r data/03_replay_trajectory/d04-rec-08-traj02 

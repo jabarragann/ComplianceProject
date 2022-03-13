@@ -43,7 +43,7 @@ def plot_cv(linear_vel):
 def main():
     parser = argparse.ArgumentParser()
     #fmt:off
-    parser.add_argument( "-f", "--file", type=str, default="./data/psm2_trajectories/pitch_exp_traj_02_test.bag",
+    parser.add_argument( "-f", "--file", type=str, default="./data/psm2_trajectories/pitch_exp_traj_03_test.bag",
                          help="path where the rosbag is located.") #fmt:on
     args = parser.parse_args()
 
