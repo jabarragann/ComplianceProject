@@ -1,4 +1,7 @@
 import crtk
+from kincalib.utils.Logger import Logger
+
+log = Logger(__name__).log
 
 
 class ReplayDevice:
@@ -10,9 +13,7 @@ class ReplayDevice:
         """Simplified jaw class to control the jaws, will not be used without the -j option"""
 
         def __init__(self, jaw_namespace, expected_interval, operating_state_instance):
-            self.__crtk_utils = crtk.utils(
-                self, jaw_namespace, expected_interval, operating_state_instance
-            )
+            self.__crtk_utils = crtk.utils(self, jaw_namespace, expected_interval, operating_state_instance)
             self.__crtk_utils.add_move_jp()
             self.__crtk_utils.add_servo_jp()
             self.__crtk_utils.add_measured_js()
@@ -29,9 +30,11 @@ class ReplayDevice:
         self.crtk_utils.add_measured_cp()
         self.crtk_utils.add_setpoint_js()
         self.crtk_utils.add_setpoint_cp()
-        self.jaw = self.__jaw_device(
-            device_namespace + "/jaw", expected_interval, operating_state_instance=self
-        )
+        self.jaw = self.__jaw_device(device_namespace + "/jaw", expected_interval, operating_state_instance=self)
 
     def jaw_jp(self):
-        return self.jaw.measured_jp()[0]
+        try:
+            jaw_pose = self.jaw.measured_jp()[0]
+        except RuntimeWarning as e:
+            log.error("Run time warning raised when reading jaw jp")
+            return -505

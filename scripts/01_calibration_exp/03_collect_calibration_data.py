@@ -33,7 +33,7 @@ def main():
     parser.add_argument("-b", "--rosbag",type=str,
                         default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
                         help="rosbag trajectory to replay")
-    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-06-traj01", 
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-07-traj01", 
                          help="root dir to save the data.")                     
     parser.add_argument( "-f", "--file", type=str, default="test_trajectories/test_traj01", 
                          help="filename where a test trajectory data will be saved. execute_measure() func") 
@@ -92,7 +92,7 @@ def main():
     # replay.execute_measure(arm, filename, marker_name, expected_spheres=expected_spheres)
 
     # Collect calibration data.
-    replay.robot_registration(arm, root, marker_name, expected_spheres=expected_spheres, save=True)
+    replay.collect_calibration_data(arm, root, marker_name, expected_spheres=expected_spheres)
 
 
 if __name__ == "__main__":

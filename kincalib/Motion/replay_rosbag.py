@@ -239,13 +239,12 @@ class RosbagReplay:
 
         self.log.info("Time to replay trajectory: %f seconds" % (time.time() - start_time))
 
-    def robot_registration(
+    def collect_calibration_data(
         self,
         replay_device: RosbagReplay,
         root_dir: Path,
         marker_name: str,
         expected_spheres: int,
-        save=False,
     ):
         """Stop every `n` number of setpoints to take a measurement while replaying the trajectory.
         Measurements will be saved in two different dataframes: a pose (cp) df (markers,fiducials, and robot
@@ -259,19 +258,21 @@ class RosbagReplay:
             expected_spheres (int, optional): Expected number of fiducials. Defaults to 3.
             save (bool, optional): [description]. Defaults to False.
         """
+        outer_js_files = root_dir / "outer_mov"
         wrist_files = root_dir / "pitch_roll_mov"
         robot_files = root_dir / "robot_mov"
         cp_filename = robot_files / ("robot_cp.txt")
         jp_filename = robot_files / ("robot_jp.txt")
         if not root_dir.exists():
             root_dir.mkdir(parents=True)
+        if not outer_js_files.exists():
+            outer_js_files.mkdir(parents=True)
         if not wrist_files.exists():
             wrist_files.mkdir(parents=True)
         if not robot_files.exists():
             robot_files.mkdir(parents=True)
 
         last_bag_time = self.setpoints[0].header.stamp.to_sec()
-        counter = 0
         total = len(self.setpoints)
         start_time = time.time()
 
@@ -281,7 +282,21 @@ class RosbagReplay:
         # Create data frames
         df_vals_cp = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
         df_vals_jp = pd.DataFrame(columns=DvrkMotions.df_cols_jp)
+        
+        # ------------------------------------------------------------
+        # Collect outer joints calibration data 
+        # ------------------------------------------------------------
+        DvrkMotions.outer_pitch_yaw_motion(
+            replay_device.measured_jp(),
+            psm_handler=replay_device,
+            expected_markers=4,
+            save=True,
+            root = outer_js_files
+        )
 
+        # ------------------------------------------------------------
+        # Collect wrist calibration data 
+        # ------------------------------------------------------------
         # for index in track(range(total), "-- Trajectory Progress -- "):
         for index in range(total):
             # record start time
@@ -302,20 +317,16 @@ class RosbagReplay:
                 if marker_pose is not None:
                     #Measure
                     jp = replay_device.measured_jp()
-                    q4, q5, q6 = jp[3], jp[4], jp[5]
                     jaw_jp = replay_device.jaw.measured_jp()[0]
                     # -------------------------------------
                     # Add sensor cp measurements
                     # -------------------------------------
-                    # fmt: off
-                    new_pt = DvrkMotions.create_df_with_measurements(
-                        ftk_handler, expected_spheres, index,
-                        q4, q5, q6, jaw_jp, self.log) #fmt: on
+                    new_pt = DvrkMotions.create_df_with_measurements( ftk_handler, expected_spheres, index, jp, jaw_jp) 
                     df_vals_cp = df_vals_cp.append(new_pt)
                     #-------------------------------------
                     #Add robot cp and jp measurements
                     #-------------------------------------
-                    new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,q4,q5,q6,jaw_jp)
+                    new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,jp,jaw_jp)
                     df_vals_cp = df_vals_cp.append(new_pt)
                     new_pt = DvrkMotions.create_df_with_robot_jp(replay_device,index)
                     df_vals_jp = df_vals_jp.append(new_pt)
@@ -332,7 +343,6 @@ class RosbagReplay:
                         init_jp,
                         psm_handler=replay_device,
                         expected_markers=4,
-                        log=self.log,
                         save=True,
                         filename=wrist_files / f"step{index:03d}_wrist_motion.txt",
                     )
