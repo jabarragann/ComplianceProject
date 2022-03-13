@@ -22,27 +22,13 @@ from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.Motion.replay_rosbag import RosbagReplay
 from kincalib.Motion.ReplayDevice import ReplayDevice
 
+log = Logger("collection").log
+
 
 def main():
     # ------------------------------------------------------------
     # Script configuration
     # ------------------------------------------------------------
-    parser = argparse.ArgumentParser()
-
-    # fmt: off
-    parser.add_argument("-m","--mode", choices=["calib","test"], default="calib",
-    help="Select 'calib' mode for calibration collection. Select 'test' to collect a test trajectory")
-
-    parser.add_argument("-b", "--rosbag",type=str,
-                        default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
-                        help="rosbag trajectory to replay")
-    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-07-traj01", 
-                         help="root dir to save the data.")                     
-    parser.add_argument( "-f", "--file", type=str, default="test_traj01", 
-                         help="filename where a test trajectory data will be saved. execute_measure() func") 
-    args = parser.parse_args()
-    # fmt: on
-
     root = Path(args.root)
     if not root.exists():
         root.mkdir(parents=True)
@@ -84,19 +70,42 @@ def main():
 
     input('---> Make sure arm is ready to move. Press "Enter" to move to start position')
     arm.move_jp(np.array(setpoints[0].position)).wait()
-    input('-> Press "Enter" to start data collection trajectory')
 
     # ------------------------------------------------------------
     # Execute trajectory
     # ------------------------------------------------------------
+    log.info("Collection information")
+    log.info(f"Data root dir:   {args.root}")
+    log.info(f"Trajectory name: {args.rosbag}")
+    log.info(f"Mode: {args.mode} ")
+    input('-> Press "Enter" to start data collection trajectory')
+
     if args.mode == "test":
         # Collect a testing trajectory.
+        log.info("Collecting test trajectory")
+        log.info(f"Saving data to  {args.file}")
         filename = (root / "test_trajectories") / args.file
         replay.execute_measure(arm, filename, marker_name, expected_spheres=expected_spheres)
     elif args.mode == "calib":
         # Collect calibration data.
+        log.info("Collecting calibration data")
         replay.collect_calibration_data(arm, root, marker_name, expected_spheres=expected_spheres)
 
 
+parser = argparse.ArgumentParser()
+# fmt: off
+parser.add_argument("-m","--mode", choices=["calib","test"], default="calib",
+help="Select 'calib' mode for calibration collection. Select 'test' to collect a test trajectory")
+
+parser.add_argument("-b", "--rosbag",type=str,
+                    default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
+                    help="rosbag trajectory to replay")
+parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-07-traj01", 
+                        help="root dir to save the data.")                     
+parser.add_argument( "-f", "--file", type=str, default="test_traj01", 
+                        help="filename where a test trajectory data will be saved. execute_measure() func") 
+args = parser.parse_args()
+
+# fmt: on
 if __name__ == "__main__":
     main()

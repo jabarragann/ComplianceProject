@@ -43,7 +43,9 @@ def joints456_calculation(px, py, pz):
     return px, py, pz
 
 
-def obtain_true_joints(reg_data: pd.DataFrame, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame, T_TR: Frame) -> pd.DataFrame:
+def obtain_true_joints(
+    reg_data: pd.DataFrame, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame, T_TR: Frame
+) -> pd.DataFrame:
 
     T_RT = T_TR.inv()
     cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
@@ -203,7 +205,9 @@ def main():
     # plot
     plot_joints(robot_df, tracker_df)
     fig, ax = plt.subplots(1, 1)
-    create_histogram(np.array(opt_error), axes=ax, title=f"Optimization error", xlabel="objective function at optimal solution")
+    create_histogram(
+        np.array(opt_error), axes=ax, title=f"Optimization error", xlabel="objective function at optimal solution"
+    )
     plt.show()
     pass
 
@@ -211,7 +215,7 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt:off
-    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-07-traj01", 
                     help="root dir") 
     parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                     help="log level") #fmt:on

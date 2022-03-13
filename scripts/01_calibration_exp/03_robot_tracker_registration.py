@@ -57,7 +57,7 @@ def calculate_registration(df: pd.DataFrame, root: Path):
     error = Frame.evaluation(robot_p, tracker_p, trans)
 
     log.info(f"transformation between robot and tracker\n{trans}")
-    log.info(f"mean square error: {1000*error:0.05f}")
+    log.info(f"mean square error (mm): {1000*error:0.05f}")
 
     dst_f = root / "registration_results/robot2tracker_t.npy"
 
@@ -123,7 +123,7 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     return Frame.init_from_matrix(pitch2marker_T)
 
 
-def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM1/local/query_cp") -> pd.DataFrame:
+def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM2/local/query_cp") -> pd.DataFrame:
     # ------------------------------------------------------------
     # Connect to DVRK fk service
     # ------------------------------------------------------------
@@ -198,7 +198,9 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
             continue
 
         # Calculate registration data
-        m1, m2, m3 = calib.calculate_pitch_origin(roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"])
+        m1, m2, m3 = calib.calculate_pitch_origin(
+            roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
+        )
         pitch_ori_T = (m1 + m2 + m3) / 3
 
         triangle = Triangle3D([m1, m2, m3])
@@ -225,7 +227,9 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Estimate wrist fiducial in yaw origin
         # todo get the fiducial measurement from robot_cp_temp.
         # todo fiducial_y and pitch2yaw1 have two values each. You are only using 1.
-        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(pitch_ori_T, pitch_yaw_circles, roll_cir2)
+        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
+            pitch_ori_T, pitch_yaw_circles, roll_cir2
+        )
 
         # Add to dataframe
         # fmt: off
@@ -358,7 +362,7 @@ def main():
 
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-07-traj01", 
                 help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                 help="log level") #fmt:on

@@ -66,9 +66,7 @@ class ftk_500:
             )
         self.poses_arr = record
 
-    def collect_measurements_raw(
-        self, m: int, t: float = 1000, sample_time: float = 50
-    ) -> List[List[float]]:
+    def collect_measurements_raw(self, m: int, t: float = 1000, sample_time: float = 50) -> List[List[float]]:
         """Collectect measurements from `m` fiducials for a specific amount of time.
         Marker pose will also be collected if it is provided when initializing the class.
 
@@ -116,9 +114,7 @@ class ftk_500:
             "markers_dropped": markers_dropped,
         }
 
-    def obtain_processed_measurement(
-        self, m: int, t: float = 1000, sample_time: float = 50
-    ) -> dict:
+    def obtain_processed_measurement(self, m: int, t: float = 1000, sample_time: float = 50) -> dict:
         """[summary]
 
         Args:
@@ -146,10 +142,14 @@ class ftk_500:
             std_value = sensor_vals.squeeze().std(axis=0)
             # self.log.debug(f"mean value:\n{mean_value}")
             # self.log.debug(f"std value:\n{std_value}")
+        else:
+            log.warning(f"set of {expected_markers} not found")
         if len(marker_pose) >= 2:
             # Get mean pose of the marker
             mean_frame, _, _ = ftk_500.average_marker_pose(marker_pose)
             # self.log.debug(f"mean frame: \n {pm.toMatrix(mean_frame)}")
+        else:
+            log.warning(f"Marker not found")
 
         return mean_frame, mean_value
 
@@ -214,9 +214,7 @@ class ftk_500:
         orientation_std = np.array(orientation).std(axis=0)
         orientation_mean = orientation_mean / np.linalg.norm(orientation_mean)
 
-        mean_frame = PyKDL.Frame(
-            PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
-        )
+        mean_frame = PyKDL.Frame(PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean))
         return mean_frame, position_std, orientation_std
 
 
@@ -305,7 +303,5 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Obtain processed measurements
     # ------------------------------------------------------------
-    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(
-        expected_markers, t=500, sample_time=15
-    )
+    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(expected_markers, t=500, sample_time=15)
     log.debug(f"Mean value shape {mean_value.shape}")

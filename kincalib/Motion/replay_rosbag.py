@@ -95,9 +95,7 @@ class RosbagReplay:
         self.log.info("Trajectory report:")
         # report out of order setpoints
         if self.out_of_order_counter > 0:
-            self.log.info(
-                "-- Found and removed %i out of order setpoints" % (self.out_of_order_counter)
-            )
+            self.log.info("-- Found and removed %i out of order setpoints" % (self.out_of_order_counter))
 
         # convert to mm
         bbmin = self.bbmin * 1000.0
@@ -108,17 +106,35 @@ class RosbagReplay:
         )
 
         # compute duration
-        duration = (
-            self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
-        )
+        duration = self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
         self.log.info("-- Duration of trajectory: %f seconds" % (duration))
 
         # Number of poses
-        self.log.info(
-            "-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t)
-        )
+        self.log.info("-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t))
         if len(self.setpoints) == 0:
             self.log.error("-- No trajectory found!")
+
+    def add_measurement(self, df_vals_cp, df_vals_jp, replay_device, ftk_handler, expected_spheres, index):
+        # Measure
+        jp = replay_device.measured_jp()
+        jaw_jp = replay_device.jaw.measured_jp()[0]
+        # -------------------------------------
+        # Add sensor cp measurements
+        # -------------------------------------
+        new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_spheres, index, jp, jaw_jp)
+        df_vals_cp = df_vals_cp.append(new_pt)
+        # -------------------------------------
+        # Add robot cp measurements
+        # -------------------------------------
+        new_pt = DvrkMotions.create_df_with_robot_cp(replay_device, index, jp, jaw_jp)
+        df_vals_cp = df_vals_cp.append(new_pt)
+        # -------------------------------------
+        # Add robot cp and jp measurements
+        # -------------------------------------
+        new_pt = DvrkMotions.create_df_with_robot_jp(replay_device, index)
+        df_vals_jp = df_vals_jp.append(new_pt)
+
+        return df_vals_cp, df_vals_jp
 
     def execute_trajectory(self, replay_device: RosbagReplay):
         """Normal trajectory execution based on Anton example.
@@ -200,32 +216,36 @@ class RosbagReplay:
             delta_bag_time = new_bag_time - last_bag_time
             last_bag_time = new_bag_time
             if index % 20 == 0:
-                #Move
+                # Move
                 replay_device.move_jp(numpy.array(self.setpoints[index].position)).wait()
 
                 marker_pose, fiducials_pose = ftk_handler.obtain_processed_measurement(
                     expected_spheres, t=200, sample_time=15
                 )
                 if marker_pose is not None:
-                    #Measure
-                    jp = replay_device.measured_jp()
-                    q4, q5, q6 = jp[3], jp[4], jp[5]
-                    jaw_jp = replay_device.jaw.measured_jp()[0]
-                    # -------------------------------------
-                    # Add sensor cp measurements
-                    # -------------------------------------
-                    # fmt: off
-                    new_pt = DvrkMotions.create_df_with_measurements(
-                        ftk_handler, expected_spheres, index,
-                        q4, q5, q6, jaw_jp, self.log) #fmt: on
-                    df_vals_cp = df_vals_cp.append(new_pt)
-                    #-------------------------------------
-                    #Add robot cp and jp measurements
-                    #-------------------------------------
-                    new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,q4,q5,q6,jaw_jp)
-                    df_vals_cp = df_vals_cp.append(new_pt)
-                    new_pt = DvrkMotions.create_df_with_robot_jp(replay_device,index)
-                    df_vals_jp.append(new_pt)
+                    df_vals_cp, df_vals_jp = self.add_measurement(
+                        df_vals_cp, df_vals_jp, replay_device, ftk_handler, expected_spheres, index
+                    )
+                    # # Measure
+                    # jp = replay_device.measured_jp()
+                    # jaw_jp = replay_device.jaw.measured_jp()[0]
+                    # # -------------------------------------
+                    # # Add sensor cp measurements
+                    # # -------------------------------------
+                    # new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_spheres, index, jp, jaw_jp)
+                    # df_vals_cp = df_vals_cp.append(new_pt)
+                    # # -------------------------------------
+                    # # Add robot cp measurements
+                    # # -------------------------------------
+                    # new_pt = DvrkMotions.create_df_with_robot_cp(replay_device, index, jp, jaw_jp)
+                    # df_vals_cp = df_vals_cp.append(new_pt)
+                    # # -------------------------------------
+                    # # Add robot cp and jp measurements
+                    # # -------------------------------------
+                    # new_pt = DvrkMotions.create_df_with_robot_jp(replay_device, index)
+                    # df_vals_jp = df_vals_jp.append(new_pt)
+                else:
+                    self.log.warning(f"No marker detected at step {index}")
 
             # try to keep motion synchronized
             loop_end_time = time.time()
@@ -285,20 +305,16 @@ class RosbagReplay:
         # Create data frames
         df_vals_cp = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
         df_vals_jp = pd.DataFrame(columns=DvrkMotions.df_cols_jp)
-        
+
         # ------------------------------------------------------------
-        # Collect outer joints calibration data 
+        # Collect outer joints calibration data
         # ------------------------------------------------------------
         DvrkMotions.outer_pitch_yaw_motion(
-            replay_device.measured_jp(),
-            psm_handler=replay_device,
-            expected_markers=4,
-            save=True,
-            root = outer_js_files
+            replay_device.measured_jp(), psm_handler=replay_device, expected_markers=4, save=True, root=outer_js_files
         )
 
         # ------------------------------------------------------------
-        # Collect wrist calibration data 
+        # Collect wrist calibration data
         # ------------------------------------------------------------
         # for index in track(range(total), "-- Trajectory Progress -- "):
         for index in range(total):
@@ -311,30 +327,33 @@ class RosbagReplay:
             # replay
             if index % 40 == 0:
                 self.log.info(f"-- Trajectory Progress --> {100*index/total:0.02f} %")
-                #Move
+                # Move
                 replay_device.move_jp(numpy.array(self.setpoints[index].position)).wait()
 
                 marker_pose, fiducials_pose = ftk_handler.obtain_processed_measurement(
                     expected_spheres, t=200, sample_time=15
                 )
                 if marker_pose is not None:
-                    #Measure
-                    jp = replay_device.measured_jp()
-                    jaw_jp = replay_device.jaw.measured_jp()[0]
-                    # -------------------------------------
-                    # Add sensor cp measurements
-                    # -------------------------------------
-                    new_pt = DvrkMotions.create_df_with_measurements( ftk_handler, expected_spheres, index, jp, jaw_jp) 
-                    df_vals_cp = df_vals_cp.append(new_pt)
-                    #-------------------------------------
-                    #Add robot cp and jp measurements
-                    #-------------------------------------
-                    new_pt = DvrkMotions.create_df_with_robot_cp(replay_device,index,jp,jaw_jp)
-                    df_vals_cp = df_vals_cp.append(new_pt)
-                    new_pt = DvrkMotions.create_df_with_robot_jp(replay_device,index)
-                    df_vals_jp = df_vals_jp.append(new_pt)
+                    df_vals_cp, df_vals_jp = self.add_measurement(
+                        df_vals_cp, df_vals_jp, replay_device, ftk_handler, expected_spheres, index
+                    )
+                    # # Measure
+                    # jp = replay_device.measured_jp()
+                    # jaw_jp = replay_device.jaw.measured_jp()[0]
+                    # # -------------------------------------
+                    # # Add sensor cp measurements
+                    # # -------------------------------------
+                    # new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_spheres, index, jp, jaw_jp)
+                    # df_vals_cp = df_vals_cp.append(new_pt)
+                    # # -------------------------------------
+                    # # Add robot cp and jp measurements
+                    # # -------------------------------------
+                    # new_pt = DvrkMotions.create_df_with_robot_cp(replay_device, index, jp, jaw_jp)
+                    # df_vals_cp = df_vals_cp.append(new_pt)
+                    # new_pt = DvrkMotions.create_df_with_robot_jp(replay_device, index)
+                    # df_vals_jp = df_vals_jp.append(new_pt)
 
-                    #Save values
+                    # Save values
                     df_vals_cp.to_csv(robot_files / ("robot_cp_temp.txt"), index=None)
                     df_vals_jp.to_csv(robot_files / ("robot_jp_temp.txt"), index=None)
 
