@@ -25,6 +25,7 @@ from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Frame import Frame
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial
+from kincalib.utils.CmnUtils import *
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -230,6 +231,21 @@ def main():
         robot_df.to_csv(dst_p / "robot_joints.txt")
         tracker_df.to_csv(dst_p / "tracker_joints.txt")
         opt_df.to_csv(dst_p / "opt_error.txt")
+
+    # Calculate stats
+    valid_steps = opt_df.loc[opt_df["opt"] < 0.001]["step"]
+    robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 2:].to_numpy()
+    tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 2:].to_numpy()
+    diff = robot_valid - tracker_valid
+    diff_mean = diff.mean(axis=0)
+    diff_std = diff.std(axis=0)
+
+    log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
+    log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
+    log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
+    log.info(f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}")
+    log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
+    log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
 
     # plot
     plot_joints(robot_df, tracker_df)

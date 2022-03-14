@@ -6,6 +6,7 @@ documents
 Marker_design
 temp/
 data/
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -38,7 +38,7 @@ python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "test" -b 
 
 Calculating ground-truth joint values
 ```
-python3 scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r data/03_replay_trajectory/d04-rec-07-traj01 -t --trajid 1
+python3 scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r data/03_replay_trajectory/d04-rec-07-traj01 -t --trajid 1 --reset
 ```
 
 # To do 

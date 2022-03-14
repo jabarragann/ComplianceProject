@@ -30,6 +30,7 @@ from kincalib.utils.ExperimentUtils import load_registration_data, calculate_mid
 from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D, dist_circle3_plane
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
+from kincalib.utils.CmnUtils import *
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -221,19 +222,6 @@ def plot_results():
     pitch_axis_df = pd.DataFrame(pitch_axis, columns=["px", "py", "pz"])
     roll_axis = np.load(f_path / "error_metric_roll_axis.npy")
     roll_axis_df = pd.DataFrame(roll_axis, columns=["px", "py", "pz"])
-
-    def mean_std_str_vect(mean_vect, std_vect):
-        str = "["
-        plus_minus_sign = "\u00B1"
-        for m, s in zip(mean_vect.squeeze(), std_vect.squeeze()):
-            str += f"{m:+0.04f}{plus_minus_sign}{s:0.04f},"
-        return str[:-1] + "]"
-
-    def mean_std_str(mean, std):
-        str = ""
-        plus_minus_sign = "\u00B1"
-        str += f"{mean:+0.04f}{plus_minus_sign}{std:0.04f},"
-        return str[:-1]
 
     plus_minus_sign = "\u00B1"
     log.info(f"Error report for {root}. (N={list_area.shape[0]})")

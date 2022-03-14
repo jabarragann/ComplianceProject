@@ -28,6 +28,21 @@ log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
+def mean_std_str_vect(mean_vect, std_vect):
+    str = "["
+    plus_minus_sign = "\u00B1"
+    for m, s in zip(mean_vect.squeeze(), std_vect.squeeze()):
+        str += f"{m:+0.04f}{plus_minus_sign}{s:0.04f},"
+    return str[:-1] + "]"
+
+
+def mean_std_str(mean, std):
+    str = ""
+    plus_minus_sign = "\u00B1"
+    str += f"{mean:+0.04f}{plus_minus_sign}{std:0.04f},"
+    return str[:-1]
+
+
 def pykdl2frame(frame: PyKDL.Frame):
     mat = pm.toMatrix(frame)
     return Frame(mat[:3, :3], mat[:3, 3])
@@ -63,9 +78,7 @@ def calculate_mean_frame(
         log.warning(f"Position std {position_std}")
         log.warning(f"Orientation std {orientation_std}")
 
-    mean_frame = PyKDL.Frame(
-        PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
-    )
+    mean_frame = PyKDL.Frame(PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean))
     return mean_frame, position_std, orientation_std
 
 
