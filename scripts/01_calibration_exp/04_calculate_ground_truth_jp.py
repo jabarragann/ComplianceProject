@@ -142,6 +142,9 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         new_pt = pd.DataFrame(d, columns=cols_tracker)
         df_tracker = df_tracker.append(new_pt)
 
+        # if step > 400:
+        #     break
+
     return df_robot, df_tracker, df_opt  # opt_error
 
 
@@ -192,9 +195,9 @@ def main():
         # ------------------------------------------------------------
         # Read calculated joint values
         # ------------------------------------------------------------
-        robot_df = pd.read_csv(dst_p / "robot_joints.txt")
-        tracker_df = pd.read_csv(dst_p / "tracker_joints.txt")
-        opt_df = pd.read_csv(dst_p / "opt_error.txt")
+        robot_df = pd.read_csv(dst_p / "robot_joints.txt", index_col=None)
+        tracker_df = pd.read_csv(dst_p / "tracker_joints.txt", index_col=None)
+        opt_df = pd.read_csv(dst_p / "opt_error.txt", index_col=None)
     else:
         # ------------------------------------------------------------
         # Calculate joints
@@ -228,14 +231,14 @@ def main():
         # Save data
         if not dst_p.exists():
             dst_p.mkdir(parents=True)
-        robot_df.to_csv(dst_p / "robot_joints.txt")
-        tracker_df.to_csv(dst_p / "tracker_joints.txt")
-        opt_df.to_csv(dst_p / "opt_error.txt")
+        robot_df.to_csv(dst_p / "robot_joints.txt", index=False)
+        tracker_df.to_csv(dst_p / "tracker_joints.txt", index=False)
+        opt_df.to_csv(dst_p / "opt_error.txt", index=False)
 
     # Calculate stats
     valid_steps = opt_df.loc[opt_df["opt"] < 0.001]["step"]
-    robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 2:].to_numpy()
-    tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 2:].to_numpy()
+    robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
+    tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     diff = robot_valid - tracker_valid
     diff_mean = diff.mean(axis=0)
     diff_std = diff.std(axis=0)

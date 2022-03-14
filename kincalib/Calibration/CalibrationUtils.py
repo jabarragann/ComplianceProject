@@ -142,12 +142,12 @@ class JointEstimator:
 
     @staticmethod
     def joints123_ikins_calculation(px, py, pz):
-        L1 = -0.4318
-        Ltool = 0.4162
+        L1 = 0.4318  # Check DVRK outer_insertion
+        Ltool = 0.4162  # Check DVRK outer roll DH parameters
 
         tq1 = np.arctan2(px, -pz)
         tq2 = np.arctan2(-py, np.sqrt(px ** 2 + pz ** 2))
-        tq3 = np.sqrt(px ** 2 + py ** 2 + pz ** 2) + L1 + Ltool
+        tq3 = np.sqrt(px ** 2 + py ** 2 + pz ** 2) + L1 - Ltool  ##+ 0.03
         return tq1, tq2, tq3
 
     # @staticmethod
