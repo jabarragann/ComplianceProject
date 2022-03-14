@@ -20,6 +20,9 @@ from numpy import sin, cos
 from scipy.optimize import dual_annealing
 
 marker_file = Path("./share/custom_marker_id_112.json")
+from kincalib.utils.Logger import Logger
+
+log = Logger(__name__).log
 
 
 def fkins_v1(q5, q6, unit: str = "rad"):
@@ -98,15 +101,6 @@ class JointEstimator:
         T_RT = self.T_RT @ T_TP
         return self.joints123_ikins_calculation(*T_RT.p.squeeze().tolist())
 
-    @staticmethod
-    def solve_transcendental1(a, b, c):
-        assert a ** 2 + b ** 2 - c ** 2 > 0, "no solution"
-
-        t = np.arctan2(np.sqrt(a ** 2 + b ** 2 - c ** 2), c)
-        s1 = np.arctan2(b, a) + t
-        s2 = np.arctan2(b, a) - t
-        return s1, s2
-
     # objective function
     def kin_objective(self, q, fid_in_P):
         q5, q6 = q
@@ -133,16 +127,17 @@ class JointEstimator:
         bounds = [[r_min, r_max], [r_min, r_max]]
         # perform the simulated annealing search
         result = dual_annealing(self.kin_objective, bounds, args=(wrist_fid_P,))
-        # summarize the result
-        print("Status : %s" % result["message"])
-        print("Total Evaluations: %d" % result["nfev"])
         # evaluate solution
         solution = result["x"]
         evaluation = self.kin_objective(solution, fid_in_P=wrist_fid_P)
-        print("Solution: f(%s) = %.5f" % (solution, evaluation))
 
-        print("Solution in degrees")
-        print(solution[0] * 180 / np.pi, solution[1] * 180 / np.pi)
+        # summarize the result
+        # log.debug("Status : %s" % result["message"])
+        # log.debug("Total Evaluations: %d" % result["nfev"])
+        # log.debug("Solution: f(%s) = %.5f" % (solution, evaluation))
+        # log.debug("Solution in degrees")
+        # log.debug(solution[0] * 180 / np.pi, solution[1] * 180 / np.pi)
+
         return solution[0], solution[1], evaluation
 
     @staticmethod
@@ -154,6 +149,15 @@ class JointEstimator:
         tq2 = np.arctan2(-py, np.sqrt(px ** 2 + pz ** 2))
         tq3 = np.sqrt(px ** 2 + py ** 2 + pz ** 2) + L1 + Ltool
         return tq1, tq2, tq3
+
+    # @staticmethod
+    # def solve_transcendental1(a, b, c):
+    #     assert a ** 2 + b ** 2 - c ** 2 > 0, "no solution"
+
+    #     t = np.arctan2(np.sqrt(a ** 2 + b ** 2 - c ** 2), c)
+    #     s1 = np.arctan2(b, a) + t
+    #     s2 = np.arctan2(b, a) - t
+    #     return s1, s2
 
 
 class CalibrationUtils:

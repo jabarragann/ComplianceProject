@@ -97,8 +97,12 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
 
     cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
     cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+    cols_opt = ["step", "opt"]
+
     df_robot = pd.DataFrame(columns=cols_robot)
     df_tracker = pd.DataFrame(columns=cols_tracker)
+    df_opt = pd.DataFrame(columns=cols_opt)
+
     opt_error = []
     # for idx in range(robot_jp.shape[0]):
     for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
@@ -122,6 +126,9 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         # Calculate joints 4,5,6
         # tq4, tq5, tq6 = 0, 0, 0
         tq5, tq6, evaluation = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
+        d = np.array([step, evaluation]).reshape(1, -1)
+        new_pt = pd.DataFrame(d, columns=cols_opt)
+        df_opt = df_opt.append(new_pt)
         opt_error.append(evaluation)
         tq4 = 0
 
@@ -134,7 +141,7 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         new_pt = pd.DataFrame(d, columns=cols_tracker)
         df_tracker = df_tracker.append(new_pt)
 
-    return df_robot, df_tracker, opt_error
+    return df_robot, df_tracker, df_opt  # opt_error
 
 
 def plot_joints(robot_df, tracker_df):
@@ -144,10 +151,10 @@ def plot_joints(robot_df, tracker_df):
     for i in range(6):
         # fmt:off
         axes[i].set_title(f"joint {i+1}")
-        axes[i].plot(robot_df[f"rq{i+1}"], color="blue")
-        axes[i].plot(robot_df[f"rq{i+1}"], marker="*", linestyle="None", color="blue", label="robot")
-        axes[i].plot(tracker_df[f"tq{i+1}"], color="orange")
-        axes[i].plot(tracker_df[f"tq{i+1}"], marker="*", linestyle="None", color="orange", label="tracker")
+        axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), color="blue")
+        axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), marker="*", linestyle="None", color="blue", label="robot")
+        axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
+        axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
         # fmt:on
     axes[0].legend()
 
@@ -172,44 +179,65 @@ def main():
     root = Path(args.root)
     marker_file = Path("./share/custom_marker_id_112.json")
 
-    robot_jp = root / "robot_mov" / "robot_jp_temp.txt"
-    robot_jp = pd.read_csv(robot_jp)
-    robot_cp = root / "robot_mov" / "robot_cp_temp.txt"
-    robot_cp = pd.read_csv(robot_cp)
-    registration_data_path = root / "registration_results"
+    if args.test:
+        robot_jp_p = root / f"test_trajectories/{args.trajid:02d}" / "test_traj_jp.txt"
+        robot_cp_p = root / f"test_trajectories/{args.trajid:02d}" / "test_traj_cp.txt"
+    else:
+        robot_jp_p = root / "robot_mov" / "robot_jp_temp.txt"
+        robot_cp_p = root / "robot_mov" / "robot_cp_temp.txt"
 
-    registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
-    T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
-    T_RT = T_TR.inv()
-    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
-    T_PM = T_MP.inv()
-    wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
+    dst_p = robot_cp_p.parent / "result"
+    if (robot_cp_p.parent / "result" / "robot_joints.txt").exists() and not args.reset:
+        # ------------------------------------------------------------
+        # Read calculated joint values
+        # ------------------------------------------------------------
+        robot_df = pd.read_csv(dst_p / "robot_joints.txt")
+        tracker_df = pd.read_csv(dst_p / "tracker_joints.txt")
+        opt_df = pd.read_csv(dst_p / "opt_error.txt")
+    else:
+        # ------------------------------------------------------------
+        # Calculate joints
+        # ------------------------------------------------------------
+        # Read data
+        robot_jp = pd.read_csv(robot_jp_p)
+        robot_cp = pd.read_csv(robot_cp_p)
+        registration_data_path = root / "registration_results"
+        registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
+        # calculate joints
+        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+        T_RT = T_TR.inv()
+        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+        T_PM = T_MP.inv()
+        wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
-    if not (registration_data_path / "registration_data.txt").exists():
-        log.error("Missing registration data file")
-    if not (registration_data_path / "robot2tracker_t.npy").exists():
-        log.error("Missing robot tracker transformation")
+        if not (registration_data_path / "registration_data.txt").exists():
+            log.error("Missing registration data file")
+        if not (registration_data_path / "robot2tracker_t.npy").exists():
+            log.error("Missing robot tracker transformation")
 
-    reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
-    # T_TR = np.load(registration_data_path / "robot2tracker_t.npy")
-    # T_TR = Frame(T_TR[:3, :3], T_TR[:3, 3])
+        reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
 
-    # Calculate ground truth joints
-    # Version1
-    # robot_df, tracker_df = obtain_true_joints(reg_data, robot_jp, robot_cp, T_TR)
+        # Calculate ground truth joints
+        # Version1
+        # robot_df, tracker_df = obtain_true_joints(reg_data, robot_jp, robot_cp, T_TR)
+        # Version2
+        j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
+        robot_df, tracker_df, opt_df = obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
 
-    # Version2
-    j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-    robot_df, tracker_df, opt_error = obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
+        # Save data
+        if not dst_p.exists():
+            dst_p.mkdir(parents=True)
+        robot_df.to_csv(dst_p / "robot_joints.txt")
+        tracker_df.to_csv(dst_p / "tracker_joints.txt")
+        opt_df.to_csv(dst_p / "opt_error.txt")
 
     # plot
     plot_joints(robot_df, tracker_df)
     fig, ax = plt.subplots(1, 1)
     create_histogram(
-        np.array(opt_error), axes=ax, title=f"Optimization error", xlabel="objective function at optimal solution"
+        opt_df["opt"], axes=ax, title=f"Optimization error", xlabel="objective function at optimal solution"
     )
     plt.show()
-    pass
 
 
 if __name__ == "__main__":
@@ -217,8 +245,11 @@ if __name__ == "__main__":
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-07-traj01", 
                     help="root dir") 
+    parser.add_argument('-t','--test', action='store_true',help="Use test data")
+    parser.add_argument("--trajid", type=int, help="The id of the test trajectory to use") 
     parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                     help="log level") #fmt:on
+    parser.add_argument('--reset', action='store_true',help="Recalculate joint values")
     args = parser.parse_args()
     log_level = args.log
     log = Logger("pitch_exp_analize2", log_level=log_level).log
