@@ -15,8 +15,10 @@ from sensor_msgs.msg import JointState
 import tf_conversions.posemath as pm
 import numpy as np
 import argparse
+from kincalib.utils.Logger import Logger
 
-np.set_printoptions(precision=3, suppress=True)
+log = Logger(__name__).log
+np.set_printoptions(precision=4, suppress=True, sign=" ")
 rospy.init_node("service_client")
 
 parser = argparse.ArgumentParser(description="DVRK forward kinematic service example")
@@ -55,7 +57,7 @@ joints.name = [
 
 ########################################
 ## Request kinematic frames
-j1 = [0.0, 0.0, 0.12, 0.0, 0.0, 0.0, 0.0]
+j1 = [np.pi / 4, 0.0, 0.12, np.pi / 4, np.pi / 4, 0.0, 0.0]
 
 for i in range(7):
     j = j1[:i]
@@ -65,7 +67,7 @@ for i in range(7):
     msg = msg.cp.pose
     end_effector_frame = pm.toMatrix(pm.fromMsg(msg))
 
-    print(f"Frame {i}\n Joint values f:{j}\n{end_effector_frame}")
+    log.info(f"Frame {i}\n Joint values f:{j}\n{end_effector_frame}")
 
 
-print(msg)
+log.debug(msg)
