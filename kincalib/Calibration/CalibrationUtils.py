@@ -1,12 +1,22 @@
+# Python modules
 from re import I
+from numpy import sin, cos
+from scipy.optimize import dual_annealing
+from dataclasses import dataclass
 from typing import List, Tuple
 import numpy as np
 from collections import defaultdict
+import pandas as pd
 from pathlib import Path
+
+# Robotics toolbox
 from roboticstoolbox import ETS as ET
 import roboticstoolbox as rtb
 from spatialmath import SE3
-import pandas as pd
+from spatialmath.base import trnorm
+from roboticstoolbox import DHRobot, RevoluteMDH
+
+# My modules
 from kincalib.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
@@ -15,10 +25,8 @@ from kincalib.utils.ExperimentUtils import (
     separate_markerandfiducial,
 )
 from kincalib.utils.Frame import Frame
-from dataclasses import dataclass
-from numpy import sin, cos
-from scipy.optimize import dual_annealing
 from kincalib.Motion.DvrkKin import DvrkPsmKin
+
 
 marker_file = Path("./share/custom_marker_id_112.json")
 from kincalib.utils.Logger import Logger
@@ -107,19 +115,44 @@ class JointEstimator:
         error = fid_in_P - fkins_v2(q5, q6) @ self.wrist_fid_Y_h
         return np.linalg.norm(error)
 
+    # Estimate q4 attempt1
+    # def estimate_q4(self, q1: float, q2: float, q3: float, T_MT: Frame):
+    #     T_TM = T_MT.inv()
+    #     # Calculate the third frame of the DVRK in tracker space
+    #     T_R_F3 = self.psm_kin.fkine_chain([q1, q2, q3])
+    #     T_T_F3 = self.T_TR @ T_R_F3
+    #     # Calculate pitch frame in tracker space
+    #     T_TP = T_TM @ self.T_MP
+
+    #     log.debug("Q4 calculation.Dot product of z axis should be almost 1")
+    #     log.debug(f"z axis Dot product: {np.dot(T_TP.r[2,:3],T_T_F3.r[2,:3])}")
+    #     log.debug(f"x axis Dot product: {np.dot(T_TP.r[0,:3],T_T_F3.r[0,:3])}")
+    #     # Joint 4 can derived from the x axis of the previously calculated frames.
+    #     return np.arccos(np.dot(T_TP.r[0, :3], T_T_F3.r[0, :3]))
+
     def estimate_q4(self, q1: float, q2: float, q3: float, T_MT: Frame):
         T_TM = T_MT.inv()
         # Calculate the third frame of the DVRK in tracker space
+        # This is going to be the base transform.
         T_R_F3 = self.psm_kin.fkine_chain([q1, q2, q3])
         T_T_F3 = self.T_TR @ T_R_F3
-        # Calculate pitch frame in tracker space
-        T_TP = T_TM @ self.T_MP
+        # Re orthogonalize.
+        T_T_F3 = SE3(trnorm(trnorm(np.array(T_T_F3))))
 
-        log.debug("Q4 calculation.Dot product of z axis should be almost 1")
-        log.debug(f"z axis Dot product: {np.dot(T_TP.r[2,:3],T_T_F3.r[2,:3])}")
-        log.debug(f"x axis Dot product: {np.dot(T_TP.r[0,:3],T_T_F3.r[0,:3])}")
-        # Joint 4 can derived from the x axis of the previously calculated frames.
-        return np.arccos(np.dot(T_TP.r[0, :3], T_T_F3.r[0, :3]))
+        # Calculate pitch frame in tracker space.
+        # This is the target pose
+        T_TP = T_TM @ self.T_MP
+        # Re orthogonalize.
+        T_TP = SE3(trnorm(trnorm(np.array(T_TP))))
+
+        # Create a 1 joint robot
+        joint_3_4 = DHRobot([RevoluteMDH(a=0.0, alpha=0.0, d=DvrkPsmKin.ltool, offset=0)], base=T_T_F3)
+        sol = joint_3_4.ikine_LM(T_TP)
+        rad2deg = lambda x: x * 180 / np.pi
+        log.info(f"Solution: {rad2deg(sol.q)}")
+        log.info(f"Residual: {sol.residual:0.4e}")
+
+        return sol.q[0]
 
     def estimate_q56(self, T_MT: Frame, wrist_fid_T: np.ndarray):
         wrist_fid_P = self.T_PM @ T_MT @ wrist_fid_T
