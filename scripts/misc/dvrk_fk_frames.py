@@ -58,6 +58,7 @@ joints.name = [
 ########################################
 ## Request kinematic frames
 j1 = [np.pi / 4, 0.0, 0.12, np.pi / 4, np.pi / 4, 0.0, 0.0]
+# j1 = [0.0, 0.0, 0.12, 0.0, 0.0, 0.0, 0.0]
 
 for i in range(7):
     j = j1[:i]

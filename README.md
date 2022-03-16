@@ -45,6 +45,7 @@ python3 scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r data/03_re
 
 * Multiple marker problem solutions. 
 * ftk_uilts::identify_marker functions might be creating outlier data.
+* Rename the pitch frame to the roll frame. See the frame that is calculated in the registration script.
 
 # Failure cases that I need to revise
 

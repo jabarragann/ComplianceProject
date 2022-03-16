@@ -18,6 +18,7 @@ from kincalib.utils.Frame import Frame
 from dataclasses import dataclass
 from numpy import sin, cos
 from scipy.optimize import dual_annealing
+from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 marker_file = Path("./share/custom_marker_id_112.json")
 from kincalib.utils.Logger import Logger
@@ -25,31 +26,30 @@ from kincalib.utils.Logger import Logger
 log = Logger(__name__).log
 
 
-def fkins_v1(q5, q6, unit: str = "rad"):
-    pitch2yaw = 0.0092
-    if unit == "deg":
-        q5 = q5 * np.pi / 180
-        q6 = q6 * np.pi / 180
+# def fkins_v1(q5, q6, unit: str = "rad"):
+#     pitch2yaw = 0.0092
+#     if unit == "deg":
+#         q5 = q5 * np.pi / 180
+#         q6 = q6 * np.pi / 180
 
-    alpha = 90 * np.pi / 180
-    # fmt:off
-    transf = [ \
-    [-sin(q5)*sin(q6)*cos(alpha)+cos(q5)*cos(q6), -sin(q5)*cos(alpha)*cos(q6)-sin(q6)*cos(q5),sin(alpha)*sin(q5),pitch2yaw*cos(q5)],\
-    [ sin(q5)*cos(q6)+sin(q6)*cos(alpha)*cos(q5),-sin(q5)*sin(q6)+cos(alpha)*cos(q5)*cos(q6),-sin(alpha)*cos(q5),pitch2yaw*sin(q5)],\
-    [ sin(alpha)*sin(q6), sin(alpha)*cos(q6), 0 , cos(alpha)],\
-    [0,0,0,1]
-    ]
-    # fmt:on
-    return np.array(transf)
+#     alpha = 90 * np.pi / 180
+#     # fmt:off
+#     transf = [ \
+#     [-sin(q5)*sin(q6)*cos(alpha)+cos(q5)*cos(q6), -sin(q5)*cos(alpha)*cos(q6)-sin(q6)*cos(q5),sin(alpha)*sin(q5),pitch2yaw*cos(q5)],\
+#     [ sin(q5)*cos(q6)+sin(q6)*cos(alpha)*cos(q5),-sin(q5)*sin(q6)+cos(alpha)*cos(q5)*cos(q6),-sin(alpha)*cos(q5),pitch2yaw*sin(q5)],\
+#     [ sin(alpha)*sin(q6), sin(alpha)*cos(q6), 0 , cos(alpha)],\
+#     [0,0,0,1]
+#     ]
+#     # fmt:on
+#     return np.array(transf)
 
 
 def fkins_v2(q5, q6):
     """Angles especified in rad"""
-    pitch2yaw = 0.0092
     E = (
         ET.rx(-90, "deg")
         * ET.rz((-90) * np.pi / 180 + q5)
-        * ET.tx(pitch2yaw)
+        * ET.tx(DvrkPsmKin.lpitch2yaw)
         * ET.rx(-90, "deg")
         * ET.rz((-90) * np.pi / 180 + q6)
     )
@@ -62,7 +62,7 @@ class JointEstimator:
 
     Args:
     T_RT (Frame): Transformation from tracker to robot
-    T_MP (Frame): Transformation from Marker to Pitch frame.
+    T_MP (Frame): Transformation from pitch frame to marker.
     fid_pos_Y (np.ndarray): Location of wrist fiducial in Yaw frame
     """
 
@@ -75,16 +75,15 @@ class JointEstimator:
             self.wrist_fid_Y = self.wrist_fid_Y.squeeze()
 
         self.T_PM = self.T_MP.inv()
+        self.T_TR = self.T_RT.inv()
 
+        # Convert to homogenous representation
         t = np.ones((4, 1))
         t[:3, :] = self.wrist_fid_Y.reshape(3, 1)
         self.wrist_fid_Y_h = t
 
-        # Robot model
-        pitch2yaw = 0.0092
-        end_effector = SE3(*self.wrist_fid_Y)
-        E = ET.rz() * ET.tx(pitch2yaw) * ET.rx(90, "deg") * ET.rz()
-        self.robot_model = rtb.ERobot(E, name="wrist_model", tool=end_effector)
+        # PSM kinematic model
+        self.psm_kin = DvrkPsmKin()
 
     def estimate_q123(self, T_TM: Frame) -> Tuple[float]:
         """Estimate j1,j2,j3 from the marker measurement
@@ -107,6 +106,20 @@ class JointEstimator:
 
         error = fid_in_P - fkins_v2(q5, q6) @ self.wrist_fid_Y_h
         return np.linalg.norm(error)
+
+    def estimate_q4(self, q1: float, q2: float, q3: float, T_MT: Frame):
+        T_TM = T_MT.inv()
+        # Calculate the third frame of the DVRK in tracker space
+        T_R_F3 = self.psm_kin.fkine_chain([q1, q2, q3])
+        T_T_F3 = self.T_TR @ T_R_F3
+        # Calculate pitch frame in tracker space
+        T_TP = T_TM @ self.T_MP
+
+        log.debug("Q4 calculation.Dot product of z axis should be almost 1")
+        log.debug(f"z axis Dot product: {np.dot(T_TP.r[2,:3],T_T_F3.r[2,:3])}")
+        log.debug(f"x axis Dot product: {np.dot(T_TP.r[0,:3],T_T_F3.r[0,:3])}")
+        # Joint 4 can derived from the x axis of the previously calculated frames.
+        return np.arccos(np.dot(T_TP.r[0, :3], T_T_F3.r[0, :3]))
 
     def estimate_q56(self, T_MT: Frame, wrist_fid_T: np.ndarray):
         wrist_fid_P = self.T_PM @ T_MT @ wrist_fid_T

@@ -124,14 +124,15 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         # Calculate q1, q2 and q3
         tq1, tq2, tq3 = estimator.estimate_q123(T_TM)
 
-        # Calculate joints 4,5,6
-        # tq4, tq5, tq6 = 0, 0, 0
+        # Calculate joint 4
+        tq4 = estimator.estimate_q4(tq1, tq2, tq3, T_TM.inv())
+
+        # Calculate joints 5,6
         tq5, tq6, evaluation = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
         d = np.array([step, evaluation]).reshape(1, -1)
         new_pt = pd.DataFrame(d, columns=cols_opt)
         df_opt = df_opt.append(new_pt)
-        opt_error.append(evaluation)
-        tq4 = 0
+        # opt_error.append(evaluation)
 
         # Save data
         d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)

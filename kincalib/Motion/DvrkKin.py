@@ -5,6 +5,7 @@ from numpy import pi
 import numpy as np
 from spatialmath import SE3
 from kincalib.utils.Logger import Logger
+from kincalib.utils.Frame import Frame
 
 log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
@@ -33,10 +34,10 @@ class DvrkPsmKin(DHRobot):
     def __init__(self):
         super(DvrkPsmKin, self).__init__(DvrkPsmKin.links, tool=DvrkPsmKin.tool_offset, name="DVRK PSM")
 
-    def fkine(self, q, **kwargs):
+    def fkine(self, q, **kwargs) -> SE3:
         return super().fkine(q, **kwargs)
 
-    def fkine_chain(self, q, **kwargs):
+    def fkine_chain(self, q, **kwargs) -> Frame:
         """Calculate the forward kinematics for an intermediate frame of the kinematic chain.
 
         Args:
@@ -61,16 +62,17 @@ class DvrkPsmKin(DHRobot):
 
         if self._base is not None:
             Tr = self._base * Tr
-        if self._tool is not None:
-            Tr = Tr * self._tool
+
         T.append(Tr)
-        return T
+        return Frame.init_from_matrix(T.data[0])
 
 
 if __name__ == "__main__":
     psm = DvrkPsmKin()
     print(psm)
+    # log.info("3rd kinematic chain of the DVRK")
+    # log.info(psm.fkine_chain([0.0, 0.0, 0.12]))
     log.info("4th kinematic chain of the DVRK")
-    log.info(psm.fkine_chain([pi / 4, 0.0, 0.12, pi / 4, pi / 4]).data[0])
+    log.info(psm.fkine_chain([pi / 4, 0.0, 0.12, pi / 4]))
     log.info("DVRK forward kinematics")
     log.info(psm.fkine([pi / 4, 0.0, 0.12, pi / 4, pi / 4, 0]).data[0])
