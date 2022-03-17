@@ -98,7 +98,7 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
 
     cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
     cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
-    cols_opt = ["step", "opt"]
+    cols_opt = ["step", "q4res", "q56res"]
 
     df_robot = pd.DataFrame(columns=cols_robot)
     df_tracker = pd.DataFrame(columns=cols_tracker)
@@ -125,11 +125,13 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         tq1, tq2, tq3 = estimator.estimate_q123(T_TM)
 
         # Calculate joint 4
-        tq4 = estimator.estimate_q4(tq1, tq2, tq3, T_TM.inv())
+        tq4, q4res = estimator.estimate_q4(tq1, tq2, tq3, T_TM.inv())
 
         # Calculate joints 5,6
-        tq5, tq6, evaluation = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
-        d = np.array([step, evaluation]).reshape(1, -1)
+        tq5, tq6, q56res = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
+
+        # Optimization residuals
+        d = np.array([step, q4res, q56res]).reshape(1, -1)
         new_pt = pd.DataFrame(d, columns=cols_opt)
         df_opt = df_opt.append(new_pt)
         # opt_error.append(evaluation)
@@ -237,7 +239,7 @@ def main():
         opt_df.to_csv(dst_p / "opt_error.txt", index=False)
 
     # Calculate stats
-    valid_steps = opt_df.loc[opt_df["opt"] < 0.001]["step"]
+    valid_steps = opt_df.loc[opt_df["q56res"] < 0.001]["step"]
     robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     diff = robot_valid - tracker_valid
@@ -253,10 +255,12 @@ def main():
 
     # plot
     plot_joints(robot_df, tracker_df)
-    fig, ax = plt.subplots(1, 1)
+    fig, ax = plt.subplots(2, 1)
+    create_histogram(opt_df["q4res"], axes=ax[0], title=f"Q4 Optimization error", xlabel="Optimization residual error")
     create_histogram(
-        opt_df["opt"], axes=ax, title=f"Optimization error", xlabel="objective function at optimal solution"
+        opt_df["q56res"], axes=ax[1], title=f"Q56 Optimization error", xlabel="Optimization residual error"
     )
+    fig.set_tight_layout(True)
     plt.show()
 
 
