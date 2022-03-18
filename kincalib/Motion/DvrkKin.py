@@ -1,9 +1,14 @@
-from re import I
+# Robotics toolbox
 from roboticstoolbox.robot import DHRobot
 from roboticstoolbox.robot.DHLink import RevoluteDH, RevoluteMDH, PrismaticMDH
+from spatialmath.base import trnorm
+from spatialmath import SE3
+
+# Python
 from numpy import pi
 import numpy as np
-from spatialmath import SE3
+
+# Custom
 from kincalib.utils.Logger import Logger
 from kincalib.utils.Frame import Frame
 
@@ -25,19 +30,30 @@ class DvrkPsmKin(DHRobot):
     ]
 
     # fmt:off
+    # Base transforms based on DVRK console configuration file
     tool_offset = np.array([ [ 0.0, -1.0,  0.0,  0.0],
                              [ 0.0,  0.0,  1.0,  0.0],
                              [-1.0,  0.0,  0.0,  0.0],
                              [ 0.0,  0.0,  0.0,  1.0]])
+
+    base_transform = np.array([[  1.0,  0.0,          0.0,          0.20],
+                              [  0.0, -0.866025404,  0.5,          0.0 ],
+                              [  0.0, -0.5,         -0.866025404,  0.0 ],
+                              [  0.0,  0.0,          0.0,          1.0 ]])
     # fmt:on
 
     def __init__(self):
-        super(DvrkPsmKin, self).__init__(DvrkPsmKin.links, tool=DvrkPsmKin.tool_offset, name="DVRK PSM")
+        self.tool_offset = SE3(trnorm(DvrkPsmKin.tool_offset))
+        self.base_transform = SE3(trnorm(DvrkPsmKin.base_transform))
+
+        super(DvrkPsmKin, self).__init__(
+            DvrkPsmKin.links, tool=self.tool_offset, base=self.base_transform, name="DVRK PSM"
+        )
 
     def fkine(self, q, **kwargs) -> SE3:
         return super().fkine(q, **kwargs)
 
-    def fkine_chain(self, q, **kwargs) -> Frame:
+    def fkine_chain(self, q, ignore_base=False, **kwargs) -> Frame:
         """Calculate the forward kinematics for an intermediate frame of the kinematic chain.
 
         Args:
@@ -50,29 +66,37 @@ class DvrkPsmKin(DHRobot):
 
         if isinstance(q, list):
             q = np.array(q)
-
-        q = q.squeeze()
         if len(q.shape) > 1:
-            raise ("q should be a one dimensional array containing the joints")
+            q = q.squeeze()
+        if len(q.shape) > 1:
+            raise Exception("q should be a one dimensional array containing the joints")
+        if q.shape[0] > len(self.links):
+            raise Exception("q should not exceed the number of joints")
 
         # Calculate the forward kinematics
         Tr = SE3()
-        for q, L in zip(q, self.links):
-            Tr *= L.A(q)
+        for qi, L in zip(q, self.links):
+            Tr *= L.A(qi)
 
-        if self._base is not None:
+        if self._base is not None and not ignore_base:
             Tr = self._base * Tr
+        # Only add the base transformation if all the joint values are given.
+        if q.shape[0] == len(self.links):
+            Tr = Tr * self._tool
 
         T.append(Tr)
-        return Frame.init_from_matrix(T.data[0])
+        return T.data[0]
 
 
 if __name__ == "__main__":
     psm = DvrkPsmKin()
     print(psm)
+    j = [pi / 4, 0.0, 0.12, pi / 4, pi / 4, 0]
     # log.info("3rd kinematic chain of the DVRK")
     # log.info(psm.fkine_chain([0.0, 0.0, 0.12]))
     log.info("4th kinematic chain of the DVRK")
-    log.info(psm.fkine_chain([pi / 4, 0.0, 0.12, pi / 4]))
-    log.info("DVRK forward kinematics")
-    log.info(psm.fkine([pi / 4, 0.0, 0.12, pi / 4, pi / 4, 0]).data[0])
+    log.info(psm.fkine_chain(j[:4]))
+    log.info("dvrk fkine func")
+    log.info(psm.fkine(j).data[0])
+    log.info("dvrk fkine_chain func")
+    log.info(psm.fkine_chain(j))
