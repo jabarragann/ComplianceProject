@@ -26,16 +26,13 @@ from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 
+from kincalib.utils.Logger import Logger
+
+log = Logger(__name__).log
+
 
 class RosbagUtils:
-    def __init__(self, path: Path, log=None) -> None:
-
-        if log is None:
-            # Create Logger with unique name
-            # print statements can duplicate if the same name is used in multiple loggers
-            self.log = Logger("ros_bag_log" + path.name).log
-        else:
-            self.log = log
+    def __init__(self, path: Path) -> None:
 
         self.path = path
         self.name = path.name
@@ -50,9 +47,9 @@ class RosbagUtils:
         for i in range(0, n):
             types.append(topics_headers[i][0])
 
-        self.log.info(f"Topics available in {self.name}")
+        log.info(f"Topics available in {self.name}")
         for i in range(n):
-            self.log.info(f"Name: {topics[i]:40s} type: {types[i]}")
+            log.info(f"Name: {topics[i]:40s} type: {types[i]}")
 
     def read_messages(self, topics: List[str]):
         msg_dict = defaultdict(list)
@@ -71,7 +68,7 @@ class RosbagUtils:
                 msg_dict_ts[bag_topic].append(t)
 
         if setpoints_out_of_order > 0:
-            self.log.error(f"Messages out of order: {setpoints_out_of_order}")
+            log.error(f"Messages out of order: {setpoints_out_of_order}")
 
         return msg_dict, msg_dict_ts
 
@@ -89,9 +86,7 @@ class RosbagUtils:
             filename = self.path.parent / (self.path.with_suffix("").name + "_cropped.bag")
 
         with rosbag.Bag(filename, "w") as outbag:
-            for topic, msg, t in self.rosbag_handler.read_messages(
-                start_time=min_ts, end_time=max_ts
-            ):
+            for topic, msg, t in self.rosbag_handler.read_messages(start_time=min_ts, end_time=max_ts):
                 outbag.write(topic, msg, t)
 
     @staticmethod
@@ -125,10 +120,10 @@ if __name__ == "__main__":
     # Test rosbag utils class
     # ------------------------------------------------------------
     log = Logger("rosbag_utils").log
-    root = Path("./data/psm2_trajectories/")
-    file_p = root / "test_trajectory1.bag"
+    root = Path("data/psm2_trajectories")
+    file_p = root / "pitch_exp_traj_01_test.bag"
 
-    rb = RosbagUtils(file_p, log=log)
+    rb = RosbagUtils(file_p)
     rb.print_topics_info()
 
     # ------------------------------------------------------------

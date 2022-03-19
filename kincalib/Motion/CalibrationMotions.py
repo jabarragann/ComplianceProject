@@ -1,44 +1,45 @@
-from re import I
 import dvrk
 import time
 import sys
 import numpy as np
-from kincalib.Atracsys.ftk_500_api import ftk_500
-from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
+from typing import List
+import rospy
 import pandas as pd
 import tf_conversions.posemath as pm
 from pathlib import Path
 from itertools import product
 from rich.progress import track
+
+from kincalib.Atracsys.ftk_500_api import ftk_500
+from kincalib.utils.Logger import Logger
+from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.utils.Logger import Logger
-from typing import List
-import rospy
+from kincalib.Motion.DataRecorder import AtracsysCartesianRecord
 
 log = Logger(__name__).log
 
 
-class DvrkMotions:
-    """Data collection formats
+class CalibrationMotions:
+    # """Data collection formats
 
-    step: step in the trajectory
-    qi:   Joint value
-    m_t: type of object. This can be 'm' (marker), 'f' (fiducial) or 'r' (robot)
-    m_id: obj id. This is only meaningful for markers and fiducials
-    px,py,pz: position of frame
-    qx,qy,qz,qz: Quaternion orientation of frame
+    # step: step in the trajectory
+    # qi:   Joint value
+    # m_t: type of object. This can be 'm' (marker), 'f' (fiducial) or 'r' (robot)
+    # m_id: obj id. This is only meaningful for markers and fiducials
+    # px,py,pz: position of frame
+    # qx,qy,qz,qz: Quaternion orientation of frame
 
-    """
+    # """
 
-    # fmt: off
-    # cq->command joint position
-    df_cols_cp = ["step","q1" ,"q2" ,"q3" , "q4", "q5", "q6", "q7", "m_t", "m_id",
-                    "px", "py", "pz", "qx", "qy", "qz", "qw"] 
-    # df_cols_cp = [ "step", "q4", "q5", "q6", "q7", "m_t", "m_id",
-    #                 "px", "py", "pz", "qx", "qy", "qz", "qw"] 
-    df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7"]
-    # fmt: on
+    # # fmt: off
+    # # cq->command joint position
+    # df_cols_cp = ["step","q1" ,"q2" ,"q3" , "q4", "q5", "q6", "q7", "m_t", "m_id",
+    #                 "px", "py", "pz", "qx", "qy", "qz", "qw"]
+    # # df_cols_cp = [ "step", "q4", "q5", "q6", "q7", "m_t", "m_id",
+    # #                 "px", "py", "pz", "qx", "qy", "qz", "qw"]
+    # df_cols_jp = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7"]
+    # # fmt: on
 
     # ------------------------------------------------------------
     # Generate trajectories for each of the robot joints
@@ -84,78 +85,78 @@ class DvrkMotions:
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
-    def create_df_with_robot_jp(robot_handler: ReplayDevice, idx) -> pd.DataFrame:
-        jp = robot_handler.measured_jp()
-        jaw_jp = robot_handler.jaw_jp()
-        jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
-        jp = np.array(jp).reshape((1, 8))
-        new_pt = pd.DataFrame(jp, columns=DvrkMotions.df_cols_jp)
-        return new_pt
+    # def create_df_with_robot_jp(robot_handler: ReplayDevice, idx) -> pd.DataFrame:
+    #     jp = robot_handler.measured_jp()
+    #     jaw_jp = robot_handler.jaw_jp()
+    #     jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
+    #     jp = np.array(jp).reshape((1, 8))
+    #     new_pt = pd.DataFrame(jp, columns=DvrkMotions.df_cols_jp)
+    #     return new_pt
 
-    @staticmethod
-    def create_df_with_robot_cp(robot_handler: ReplayDevice, idx, joints: List[float], q7) -> pd.DataFrame:
-        """Create a df with the robot end-effector cartesian position. Use this functions for
-         data collecitons
+    # @staticmethod
+    # def create_df_with_robot_cp(robot_handler: ReplayDevice, idx, joints: List[float], q7) -> pd.DataFrame:
+    #     """Create a df with the robot end-effector cartesian position. Use this functions for
+    #      data collecitons
 
-        Args:
-            robot_handler (ReplayDevice): robot handler
-            idx ([type]): Step of the trajectory
-            joints (List[float]): List containing the commanded joints values of the robot.
+    #     Args:
+    #         robot_handler (ReplayDevice): robot handler
+    #         idx ([type]): Step of the trajectory
+    #         joints (List[float]): List containing the commanded joints values of the robot.
 
-        Returns:
-            - pd.DataFrame with cp of the robot.
-        """
-        if isinstance(joints, np.ndarray):
-            joints = joints.squeeze().tolist()
+    #     Returns:
+    #         - pd.DataFrame with cp of the robot.
+    #     """
+    #     if isinstance(joints, np.ndarray):
+    #         joints = joints.squeeze().tolist()
 
-        robot_frame = robot_handler.measured_cp()
-        r_p = list(robot_frame.p)
-        r_q = robot_frame.M.GetQuaternion()
-        # fmt: off
-        d = [idx]+joints+[q7,"r", 11, r_p[0], r_p[1], r_p[2], r_q[0], r_q[1], r_q[2], r_q[3]]
-        # fmt: on
-        d = np.array(d).reshape((1, 17))
-        new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
-        return new_pt
+    #     robot_frame = robot_handler.measured_cp()
+    #     r_p = list(robot_frame.p)
+    #     r_q = robot_frame.M.GetQuaternion()
+    #     # fmt: off
+    #     d = [idx]+joints+[q7,"r", 11, r_p[0], r_p[1], r_p[2], r_q[0], r_q[1], r_q[2], r_q[3]]
+    #     # fmt: on
+    #     d = np.array(d).reshape((1, 17))
+    #     new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
+    #     return new_pt
 
-    @staticmethod
-    def create_df_with_measurements(ftk_handler, expected_markers, idx, joints: List[float], q7) -> pd.DataFrame:
+    # @staticmethod
+    # def create_df_with_measurements(ftk_handler, expected_markers, idx, joints: List[float], q7) -> pd.DataFrame:
 
-        if isinstance(joints, np.ndarray):
-            joints = joints.squeeze().tolist()
+    #     if isinstance(joints, np.ndarray):
+    #         joints = joints.squeeze().tolist()
 
-        # Read atracsys data for 1 second - fiducials data
-        # Sensor_vals will have several measurements of the static fiducials
-        mean_frame, mean_value = ftk_handler.obtain_processed_measurement(expected_markers, t=500, sample_time=15)
-        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+    #     # Read atracsys data for 1 second - fiducials data
+    #     # Sensor_vals will have several measurements of the static fiducials
+    #     mean_frame, mean_value = ftk_handler.obtain_processed_measurement(expected_markers, t=500, sample_time=15)
+    #     df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
 
-        # Add fiducials to dataframe
-        # df columns: ["step","q4","q5","q6","q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
-        if mean_value is not None:
-            for mid, k in enumerate(range(mean_value.shape[0])):
-                # fmt:off
-                d = [ idx]+joints+ [q7, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
-                # fmt:on
-                d = np.array(d).reshape((1, 17))
-                new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
-                df_vals = df_vals.append(new_pt)
-        else:
-            log.warning("No fiducial found")
-        # Add marker pose to dataframe
-        if mean_frame is not None:
-            p = list(mean_frame.p)
-            q = mean_frame.M.GetQuaternion()
-            d = [idx] + joints + [q7, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
-            d = np.array(d).reshape((1, 17))
-            new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
-            df_vals = df_vals.append(new_pt)
-        else:
-            log.warning("No markers found")
+    #     # Add fiducials to dataframe
+    #     # df columns: ["step","q4","q5","q6","q7", "m_t", "m_id", "px", "py", "pz", "qx", "qy", "qz", "qw"]
+    #     if mean_value is not None:
+    #         for mid, k in enumerate(range(mean_value.shape[0])):
+    #             # fmt:off
+    #             d = [ idx]+joints+ [q7, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
+    #             # fmt:on
+    #             d = np.array(d).reshape((1, 17))
+    #             new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
+    #             df_vals = df_vals.append(new_pt)
+    #     else:
+    #         log.warning("No fiducial found")
+    #     # Add marker pose to dataframe
+    #     if mean_frame is not None:
+    #         p = list(mean_frame.p)
+    #         q = mean_frame.M.GetQuaternion()
+    #         d = [idx] + joints + [q7, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
+    #         d = np.array(d).reshape((1, 17))
+    #         new_pt = pd.DataFrame(d, columns=DvrkMotions.df_cols_cp)
+    #         df_vals = df_vals.append(new_pt)
+    #     else:
+    #         log.warning("No markers found")
 
-        if mean_frame is None and mean_value is None:
-            return None
-        else:
-            return df_vals
+    #     if mean_frame is None and mean_value is None:
+    #         return None
+    #     else:
+    #         return df_vals
 
     # ------------------------------------------------------------
     # DVRK motions
@@ -168,10 +169,10 @@ class DvrkMotions:
         # Init outer roll(Shaft)
         init_jp[3] = -0.1589
         # Generate outer yaw trajectory
-        outer_yaw_trajectory = DvrkMotions.generate_outer_yaw()
+        outer_yaw_trajectory = CalibrationMotions.generate_outer_yaw()
         outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [init_jp[2]]))
         # Generate outer pitch trajectory
-        outer_pitch_trajectory = DvrkMotions.generate_outer_pitch()
+        outer_pitch_trajectory = CalibrationMotions.generate_outer_pitch()
         outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [init_jp[2]]))
 
         outer_yaw_file = root / "outer_yaw.txt"
@@ -180,13 +181,13 @@ class DvrkMotions:
         # Outer yaw trajectory (q1)
         init_jp[0] = 0.0
         init_jp[1] = 0.0
-        DvrkMotions.outer_joints_motion(
+        CalibrationMotions.outer_joints_motion(
             init_jp, psm_handler, expected_markers, save, filename=outer_yaw_file, trajectory=outer_yaw_trajectory
         )
         # Outer pitch trajectory (q2)
         init_jp[0] = 0.0
         init_jp[1] = 0.0
-        DvrkMotions.outer_joints_motion(
+        CalibrationMotions.outer_joints_motion(
             init_jp, psm_handler, expected_markers, save, filename=outer_pitch_file, trajectory=outer_pitch_trajectory
         )
 
@@ -207,15 +208,15 @@ class DvrkMotions:
             filename (Path, optional): [description]. Defaults to None.
 
         """
-        pitch_trajectory = DvrkMotions.generate_pitch_motion()
-        roll_trajectory = DvrkMotions.generate_roll_motion()
+        pitch_trajectory = CalibrationMotions.generate_pitch_motion()
+        roll_trajectory = CalibrationMotions.generate_roll_motion()
 
         pitch_file = filename.parent / (filename.with_suffix("").name + "_pitch.txt")
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
         #DvrkMotions.pitch_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file, trajectory=pitch_trajectory)
-        DvrkMotions.pitch_roll_together_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file)
-        DvrkMotions.roll_motion(  init_jp, psm_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
+        CalibrationMotions.pitch_roll_together_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file)
+        CalibrationMotions.roll_motion(  init_jp, psm_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
         # fmt:on
 
     @staticmethod
@@ -236,22 +237,22 @@ class DvrkMotions:
 
         """
 
-        pitch_trajectory = DvrkMotions.generate_pitch_motion()
-        yaw_trajectory = DvrkMotions.generate_yaw_motion()
+        pitch_trajectory = CalibrationMotions.generate_pitch_motion()
+        yaw_trajectory = CalibrationMotions.generate_yaw_motion()
         pitch_yaw_traj = []
         roll_v = [0.2, -0.3]
         for r in roll_v:
             pitch_yaw_traj += list(product([r], pitch_trajectory, [0.0])) + list(product([r], [0.0], yaw_trajectory))
-        roll_traj = DvrkMotions.generate_roll_motion()
+        roll_traj = CalibrationMotions.generate_roll_motion()
         roll_traj = list(product(roll_traj, [0], [0]))
         pitch_yaw_file = filename.parent / (filename.with_suffix("").name + "_pitch_yaw.txt")
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
         # roll trajectory
-        DvrkMotions.wrist_joints_motion( init_jp, psm_handler, expected_markers, save,
+        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, expected_markers, save,
                                  filename=roll_file, trajectory=roll_traj)
         # pitch trajectory
-        DvrkMotions.wrist_joints_motion( init_jp, psm_handler, expected_markers, save,
+        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, expected_markers, save,
                                                 filename=pitch_yaw_file,trajectory=pitch_yaw_traj)
         # fmt:on
 
@@ -282,8 +283,10 @@ class DvrkMotions:
             raise Exception("filename not give")
 
         ftk_handler = ftk_500("custom_marker_112")
-        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+        df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
 
+        # Create record to store the measured data
+        sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
@@ -300,14 +303,16 @@ class DvrkMotions:
             psm_handler.move_jp(init_jp).wait()
             time.sleep(0.15)
 
-            new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_markers, counter, init_jp, q7)
-            if save:
-                if df_vals is not None:
-                    df_vals = df_vals.append(new_pt)
+            sensor_record.create_new_entry(counter, init_jp, q7)
+            # new_pt = CalibrationMotions.create_df_with_measurements(ftk_handler, expected_markers, counter, init_jp, q7)
+            # if save:
+            #     if df_vals is not None:
+            #         df_vals = df_vals.append(new_pt)
         # Save experiment
         # log.debug(df_vals.head())
         if save:
-            save_without_overwritting(df_vals, Path(filename))
+            sensor_record.to_csv(safe_save=True)
+            # save_without_overwritting(df_vals, Path(filename))
 
     @staticmethod
     def wrist_joints_motion(
@@ -337,13 +342,14 @@ class DvrkMotions:
         if filename is None:
             raise Exception("filename not give")
 
-        pitch_trajectory = DvrkMotions.generate_pitch_motion()
+        pitch_trajectory = CalibrationMotions.generate_pitch_motion()
         roll_trajectory = [0.2, -0.3]
         total = len(roll_trajectory) * len(pitch_trajectory)
 
         ftk_handler = ftk_500("custom_marker_112")
-        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
-
+        # df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
+        # Create record to store the measured data
+        sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
@@ -360,162 +366,168 @@ class DvrkMotions:
             psm_handler.move_jp(init_jp).wait()
             time.sleep(0.15)
 
-            new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_markers, counter, init_jp, q7)
-            if save:
-                if df_vals is not None:
-                    df_vals = df_vals.append(new_pt)
+            sensor_record.create_new_entry()
+            # new_pt = CalibrationMotions.create_df_with_measurements(ftk_handler, expected_markers, counter, init_jp, q7)
+            # if save:
+            #     if df_vals is not None:
+            #         df_vals = df_vals.append(new_pt)
         # Save experiment
         # log.debug(df_vals.head())
         if save:
-            save_without_overwritting(df_vals, Path(filename))
+            sensor_record.create_new_entry()
+            # save_without_overwritting(df_vals, Path(filename))
 
     # ------------------------------------------------------------
     # REDUNDANT METHODS:
     # This method should be deprecated infavor of wrist_joint_motion()
     # ------------------------------------------------------------
-    @staticmethod
-    def pitch_roll_together_motion(
-        init_jp, psm_handler, log, expected_markers=4, save: bool = False, filename: Path = None
-    ):
-        """Identify pitch axis by moving outer roll (shaft movement) and wrist pitch joint.
+    # @staticmethod
+    # def pitch_roll_together_motion(
+    #     init_jp, psm_handler, log, expected_markers=4, save: bool = False, filename: Path = None
+    # ):
+    #     """Identify pitch axis by moving outer roll (shaft movement) and wrist pitch joint.
 
-        Args:
-            init_jp ([type]): [description]
-            psm_handler ([type]): [description]
-            log ([type]): [description]
-            expected_markers (int, optional): [description]. Defaults to 4.
-            save (bool, optional): [description]. Defaults to True.
-            filename (Path, optional): [description]. Defaults to None.
-        """
-        pitch_trajectory = DvrkMotions.generate_pitch_motion()
-        roll_trajectory = [0.2, -0.3]
-        total = len(roll_trajectory) * len(pitch_trajectory)
+    #     Args:
+    #         init_jp ([type]): [description]
+    #         psm_handler ([type]): [description]
+    #         log ([type]): [description]
+    #         expected_markers (int, optional): [description]. Defaults to 4.
+    #         save (bool, optional): [description]. Defaults to True.
+    #         filename (Path, optional): [description]. Defaults to None.
+    #     """
+    #     pitch_trajectory = CalibrationMotions.generate_pitch_motion()
+    #     roll_trajectory = [0.2, -0.3]
+    #     total = len(roll_trajectory) * len(pitch_trajectory)
 
-        ftk_handler = ftk_500("custom_marker_112")
-        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+    #     ftk_handler = ftk_500("custom_marker_112")
+    #     df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
 
-        # Move to initial position
-        psm_handler.move_jp(init_jp).wait()
-        time.sleep(1)
-        # Start trajectory
-        counter = 0
-        for q4, q5 in track(
-            product(roll_trajectory, pitch_trajectory),
-            total=total,
-            description="-- Trajectory Progress -- ",
-        ):
-            counter += 1
-            log.info(f"q4 {q4:+.4f} q5 {q5:+.4f}")
-            # Move only q4 and q5
-            init_jp[3] = q4
-            init_jp[4] = q5
-            init_jp[5] = 0.0
-            q6 = init_jp[5]
-            q7 = psm_handler.jaw_jp()
-            psm_handler.move_jp(init_jp).wait()
-            time.sleep(0.5)
+    #     # Move to initial position
+    #     psm_handler.move_jp(init_jp).wait()
+    #     time.sleep(1)
+    #     # Start trajectory
+    #     counter = 0
+    #     for q4, q5 in track(
+    #         product(roll_trajectory, pitch_trajectory),
+    #         total=total,
+    #         description="-- Trajectory Progress -- ",
+    #     ):
+    #         counter += 1
+    #         log.info(f"q4 {q4:+.4f} q5 {q5:+.4f}")
+    #         # Move only q4 and q5
+    #         init_jp[3] = q4
+    #         init_jp[4] = q5
+    #         init_jp[5] = 0.0
+    #         q6 = init_jp[5]
+    #         q7 = psm_handler.jaw_jp()
+    #         psm_handler.move_jp(init_jp).wait()
+    #         time.sleep(0.5)
 
-            if save:
-                new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_markers, counter, init_jp, q7)
-                if df_vals is not None:
-                    df_vals = df_vals.append(new_pt)
+    #         if save:
+    #             new_pt = CalibrationMotions.create_df_with_measurements(
+    #                 ftk_handler, expected_markers, counter, init_jp, q7
+    #             )
+    #             if df_vals is not None:
+    #                 df_vals = df_vals.append(new_pt)
 
-        # Save experiment
-        log.debug(df_vals.head())
-        if save:
-            save_without_overwritting(df_vals, Path(filename))
-            # df_vals.to_csv("./data/02_pitch_experiment/pitch_exp03.txt", index=None)
+    #     # Save experiment
+    #     log.debug(df_vals.head())
+    #     if save:
+    #         save_without_overwritting(df_vals, Path(filename))
+    #         # df_vals.to_csv("./data/02_pitch_experiment/pitch_exp03.txt", index=None)
 
-    @staticmethod
-    def roll_motion(
-        init_jp,
-        psm_handler,
-        log,
-        expected_markers=4,
-        save: bool = True,
-        filename: Path = None,
-        trajectory=None,
-    ):
+    # @staticmethod
+    # def roll_motion(
+    #     init_jp,
+    #     psm_handler,
+    #     log,
+    #     expected_markers=4,
+    #     save: bool = True,
+    #     filename: Path = None,
+    #     trajectory=None,
+    # ):
 
-        ftk_handler = ftk_500("custom_marker_112")
-        if trajectory is None:
-            trajectory = DvrkMotions.generate_roll_motion()
+    #     ftk_handler = ftk_500("custom_marker_112")
+    #     if trajectory is None:
+    #         trajectory = CalibrationMotions.generate_roll_motion()
 
-        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+    #     df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
 
-        # Move to initial position
-        psm_handler.move_jp(init_jp).wait()
-        time.sleep(1)
+    #     # Move to initial position
+    #     psm_handler.move_jp(init_jp).wait()
+    #     time.sleep(1)
 
-        q4 = 0.0
-        q5 = 0.0
-        # Move roll joint from min_roll to max_roll
-        idx = -1
-        for q4 in track(trajectory, "-- Trajectory Progress -- "):
-            idx += 1
-            log.info(f"q4-{idx}@{q4*180/np.pi:0.2f}(deg)@{q4:0.2f}(rad)")
-            # Move only q4 and q5
-            init_jp[3] = q4
-            init_jp[4] = q5
-            init_jp[5] = 0.0
-            q6 = init_jp[5]
-            q7 = psm_handler.jaw_jp()
-            psm_handler.move_jp(init_jp).wait()
-            time.sleep(0.5)
+    #     q4 = 0.0
+    #     q5 = 0.0
+    #     # Move roll joint from min_roll to max_roll
+    #     idx = -1
+    #     for q4 in track(trajectory, "-- Trajectory Progress -- "):
+    #         idx += 1
+    #         log.info(f"q4-{idx}@{q4*180/np.pi:0.2f}(deg)@{q4:0.2f}(rad)")
+    #         # Move only q4 and q5
+    #         init_jp[3] = q4
+    #         init_jp[4] = q5
+    #         init_jp[5] = 0.0
+    #         q6 = init_jp[5]
+    #         q7 = psm_handler.jaw_jp()
+    #         psm_handler.move_jp(init_jp).wait()
+    #         time.sleep(0.5)
 
-            if save:
-                new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_markers, idx, init_jp, q7, log)
-                if df_vals is not None:
-                    df_vals = df_vals.append(new_pt)
-        # Save experiment
-        log.debug(df_vals.head())
-        if save:
-            save_without_overwritting(df_vals, Path(filename))
+    #         if save:
+    #             new_pt = CalibrationMotions.create_df_with_measurements(
+    #                 ftk_handler, expected_markers, idx, init_jp, q7, log
+    #             )
+    #             if df_vals is not None:
+    #                 df_vals = df_vals.append(new_pt)
+    #     # Save experiment
+    #     log.debug(df_vals.head())
+    #     if save:
+    #         save_without_overwritting(df_vals, Path(filename))
 
-    @staticmethod
-    def pitch_motion(
-        init_jp,
-        psm_handler,
-        log,
-        expected_markers=4,
-        save: bool = True,
-        filename: Path = None,
-        trajectory=None,
-    ):
+    # @staticmethod
+    # def pitch_motion(
+    #     init_jp,
+    #     psm_handler,
+    #     log,
+    #     expected_markers=4,
+    #     save: bool = True,
+    #     filename: Path = None,
+    #     trajectory=None,
+    # ):
 
-        ftk_handler = ftk_500("custom_marker_112")
-        if trajectory is None:
-            trajectory = DvrkMotions.generate_pitch_motion()
-        df_vals = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
+    #     ftk_handler = ftk_500("custom_marker_112")
+    #     if trajectory is None:
+    #         trajectory = CalibrationMotions.generate_pitch_motion()
+    #     df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
 
-        # Move to initial position
-        psm_handler.move_jp(init_jp).wait()
-        time.sleep(1)
+    #     # Move to initial position
+    #     psm_handler.move_jp(init_jp).wait()
+    #     time.sleep(1)
 
-        q4 = init_jp[3]
-        q5 = init_jp[4]
-        # Move pitch joint from min_pitch to max_pitch
-        idx = -1
-        for q5 in track(trajectory, "-- Trajectory Progress -- "):
-            idx += 1
-            log.info(f"q5-{idx}@{q5*180/np.pi:0.2f}(deg)@{q5:0.2f}(rad)")
-            # Move only q4 and q5
-            init_jp[3] = q4
-            init_jp[4] = q5
-            init_jp[5] = 0.0
-            q6 = init_jp[5]
-            q7 = psm_handler.jaw_jp()
-            psm_handler.move_jp(init_jp).wait()
-            time.sleep(0.5)
+    #     q4 = init_jp[3]
+    #     q5 = init_jp[4]
+    #     # Move pitch joint from min_pitch to max_pitch
+    #     idx = -1
+    #     for q5 in track(trajectory, "-- Trajectory Progress -- "):
+    #         idx += 1
+    #         log.info(f"q5-{idx}@{q5*180/np.pi:0.2f}(deg)@{q5:0.2f}(rad)")
+    #         # Move only q4 and q5
+    #         init_jp[3] = q4
+    #         init_jp[4] = q5
+    #         init_jp[5] = 0.0
+    #         q6 = init_jp[5]
+    #         q7 = psm_handler.jaw_jp()
+    #         psm_handler.move_jp(init_jp).wait()
+    #         time.sleep(0.5)
 
-            if save:
-                new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_markers, idx, init_jp, q7)
-                if df_vals is not None:
-                    df_vals = df_vals.append(new_pt)
-        # Save experiment
-        log.debug(df_vals.head())
-        if save:
-            save_without_overwritting(df_vals, Path(filename))
+    #         if save:
+    #             new_pt = CalibrationMotions.create_df_with_measurements(ftk_handler, expected_markers, idx, init_jp, q7)
+    #             if df_vals is not None:
+    #                 df_vals = df_vals.append(new_pt)
+    #     # Save experiment
+    #     log.debug(df_vals.head())
+    #     if save:
+    #         save_without_overwritting(df_vals, Path(filename))
 
 
 if __name__ == "__main__":
@@ -557,7 +569,9 @@ if __name__ == "__main__":
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     # )
 
-    DvrkMotions.outer_pitch_yaw_motion(init_jp, psm_handler=psm_handler, expected_markers=4, save=False, root=filename)
+    CalibrationMotions.outer_pitch_yaw_motion(
+        init_jp, psm_handler=psm_handler, expected_markers=4, save=False, root=filename
+    )
 
     # DvrkMotions.pitch_yaw_roll_independent_motion(
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=False, filename=filename

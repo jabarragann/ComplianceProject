@@ -14,16 +14,16 @@ import numpy
 import PyKDL
 import argparse
 from pathlib import Path
-from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.Logger import Logger
 import tf_conversions.posemath as pm
-from kincalib.Atracsys.ftk_500_api import ftk_500
-from kincalib.utils.SavingUtilities import save_without_overwritting
 import pandas as pd
 from rich.logging import RichHandler
 from rich.progress import track
 
-from kincalib.Motion.dvrk_motion import DvrkMotions
+from kincalib.utils.RosbagUtils import RosbagUtils
+from kincalib.utils.Logger import Logger
+from kincalib.Atracsys.ftk_500_api import ftk_500
+from kincalib.utils.SavingUtilities import save_without_overwritting
+from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
 
 
@@ -121,17 +121,17 @@ class RosbagReplay:
         # -------------------------------------
         # Add sensor cp measurements
         # -------------------------------------
-        new_pt = DvrkMotions.create_df_with_measurements(ftk_handler, expected_spheres, index, jp, jaw_jp)
+        new_pt = CalibrationMotions.create_df_with_measurements(ftk_handler, expected_spheres, index, jp, jaw_jp)
         df_vals_cp = df_vals_cp.append(new_pt)
         # -------------------------------------
         # Add robot cp measurements
         # -------------------------------------
-        new_pt = DvrkMotions.create_df_with_robot_cp(replay_device, index, jp, jaw_jp)
+        new_pt = CalibrationMotions.create_df_with_robot_cp(replay_device, index, jp, jaw_jp)
         df_vals_cp = df_vals_cp.append(new_pt)
         # -------------------------------------
         # Add robot cp and jp measurements
         # -------------------------------------
-        new_pt = DvrkMotions.create_df_with_robot_jp(replay_device, index)
+        new_pt = CalibrationMotions.create_df_with_robot_jp(replay_device, index)
         df_vals_jp = df_vals_jp.append(new_pt)
 
         return df_vals_cp, df_vals_jp
@@ -205,8 +205,8 @@ class RosbagReplay:
         # Create ftk handler
         ftk_handler = ftk_500(marker_name=marker_name)
         # Create data frames
-        df_vals_cp = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
-        df_vals_jp = pd.DataFrame(columns=DvrkMotions.df_cols_jp)
+        df_vals_cp = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
+        df_vals_jp = pd.DataFrame(columns=CalibrationMotions.df_cols_jp)
 
         for index in track(range(total), "-- Trajectory Progress -- "):
             # record start time
@@ -285,13 +285,13 @@ class RosbagReplay:
         ftk_handler = ftk_500(marker_name=marker_name)
 
         # Create data frames
-        df_vals_cp = pd.DataFrame(columns=DvrkMotions.df_cols_cp)
-        df_vals_jp = pd.DataFrame(columns=DvrkMotions.df_cols_jp)
+        df_vals_cp = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
+        df_vals_jp = pd.DataFrame(columns=CalibrationMotions.df_cols_jp)
 
         # ------------------------------------------------------------
         # Collect outer joints calibration data
         # ------------------------------------------------------------
-        DvrkMotions.outer_pitch_yaw_motion(
+        CalibrationMotions.outer_pitch_yaw_motion(
             replay_device.measured_jp(), psm_handler=replay_device, expected_markers=4, save=True, root=outer_js_files
         )
 
@@ -327,7 +327,7 @@ class RosbagReplay:
                     # Wrist motions
                     # ------------------------------------------------------------
                     init_jp = replay_device.measured_jp()
-                    DvrkMotions.pitch_yaw_roll_independent_motion(
+                    CalibrationMotions.pitch_yaw_roll_independent_motion(
                         init_jp,
                         psm_handler=replay_device,
                         expected_markers=4,
