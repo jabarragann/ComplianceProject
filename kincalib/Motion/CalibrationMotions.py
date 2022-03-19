@@ -283,7 +283,7 @@ class CalibrationMotions:
             raise Exception("filename not give")
 
         ftk_handler = ftk_500("custom_marker_112")
-        df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
+        # df_vals = pd.DataFrame(columns=CalibrationMotions.df_cols_cp)
 
         # Create record to store the measured data
         sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
@@ -311,7 +311,7 @@ class CalibrationMotions:
         # Save experiment
         # log.debug(df_vals.head())
         if save:
-            sensor_record.to_csv(safe_save=True)
+            sensor_record.to_csv(safe_save=False)
             # save_without_overwritting(df_vals, Path(filename))
 
     @staticmethod
@@ -366,7 +366,7 @@ class CalibrationMotions:
             psm_handler.move_jp(init_jp).wait()
             time.sleep(0.15)
 
-            sensor_record.create_new_entry()
+            sensor_record.create_new_entry(counter, init_jp, q7)
             # new_pt = CalibrationMotions.create_df_with_measurements(ftk_handler, expected_markers, counter, init_jp, q7)
             # if save:
             #     if df_vals is not None:
@@ -374,7 +374,7 @@ class CalibrationMotions:
         # Save experiment
         # log.debug(df_vals.head())
         if save:
-            sensor_record.create_new_entry()
+            sensor_record.to_csv(safe_save=False)
             # save_without_overwritting(df_vals, Path(filename))
 
     # ------------------------------------------------------------

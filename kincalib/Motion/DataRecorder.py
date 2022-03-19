@@ -64,6 +64,8 @@ class CalibrationRecord(Record):
         self.cp_record = RobotSensorRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
+        self.create_paths()
+
     def create_paths(self):
         if not self.root_dir.exists():
             self.root_dir.mkdir(parents=True)
@@ -72,13 +74,13 @@ class CalibrationRecord(Record):
         if not self.test_files.exists():
             self.test_files.mkdir(parents=True)
 
-    def create_new_entry(self):
-        self.cp_record.create_new_entry()
-        self.jp_record.create_new_entry()
+    def create_new_entry(self, idx, joints, q7):
+        self.cp_record.create_new_entry(idx, joints, q7)
+        self.jp_record.create_new_entry(idx)
 
-    def save(self):
-        self.cp_record.save()
-        self.jp_record.save()
+    def to_csv(self, safe_save=True):
+        self.cp_record.to_csv(safe_save)
+        self.jp_record.to_csv(safe_save)
 
 
 class CartesianRecord:
@@ -106,9 +108,9 @@ class RobotSensorRecord(Record):
         self.robot_record = RobotCartesianRecord(robot_handler, None)
         self.sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers, None)
 
-    def create_new_entry(self):
-        self.robot_record.create_new_entry()
-        self.sensor_record.create_new_entry()
+    def create_new_entry(self, idx, joints, q7):
+        self.robot_record.create_new_entry(idx, joints, q7)
+        self.sensor_record.create_new_entry(idx, joints, q7)
 
     def to_csv(self, safe_save=True):
         combined_df = pd.concat((self.sensor_record.df, self.robot_record.df))
@@ -199,16 +201,19 @@ class AtracsysCartesianRecord(Record):
 class JointRecord(Record):
     # fmt: off
     df_cols = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7",
-               "t1", "t2", "t3", "t4", "t5", "t6", "t7" ]
+               "t1", "t2", "t3", "t4", "t5", "t6" ]
     # fmt: on
     def __init__(self, robot_handler, filename: Path):
         super().__init__(JointRecord.df_cols, filename)
         self.robot_handler = robot_handler
 
     def create_new_entry(self, idx):
-        jp = self.robot_handler.measured_jp()
+        js = self.robot_handler.measured_js()
+
+        jp = js[0]  # joint pos
+        jt = js[2]  # joint torque
         jaw_jp = self.robot_handler.jaw_jp()
-        jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
+        jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp] + [jt[0], jt[1], jt[2], jt[3], jt[4], jt[5]]
         jp = np.array(jp).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(jp, columns=self.df_cols)
 

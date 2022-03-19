@@ -51,7 +51,8 @@ class TrajectoryPlayer:
             self.wrist_files.mkdir(parents=True)
 
     def replay_trajectory(self, measure=True, saving=True, calibration=False):
-        if self.mode == "calib":
+
+        if self.mode == "calib" and measure:
             # Outer joints calibration
             CalibrationMotions.outer_pitch_yaw_motion(
                 self.replay_device.measured_jp(),
@@ -62,40 +63,46 @@ class TrajectoryPlayer:
             )
 
         start_time = time.time()
+        last_bag_time = self.trajectory[0].header.stamp.to_sec()
+
         for index, new_js in enumerate(self.trajectory):
             # record start time
             loop_start_time = time.time()
             # compute expected dt
-            new_bag_time = self.setpoints[index].header.stamp.to_sec()
+            new_bag_time = self.trajectory[index].header.stamp.to_sec()
             delta_bag_time = new_bag_time - last_bag_time
             last_bag_time = new_bag_time
 
             # replay
             if index % 40 == 0:
-                self.log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
+                log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
                 # Move
-                self.replay_device.move_jp(numpy.array(new_js)).wait()
+                self.replay_device.move_jp(numpy.array(new_js.position)).wait()
 
-                marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
-                    self.expected_markers, t=200, sample_time=15
-                )
-                if marker_pose is not None:
-                    self.calibration_record.create_new_entry()
+                if measure:
+                    marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
+                        self.expected_markers, t=200, sample_time=15
+                    )
+                    if marker_pose is not None:
+                        # Measure
+                        jp = self.replay_device.measured_jp()
+                        jaw_jp = self.replay_device.jaw.measured_jp()[0]
+                        self.calibration_record.create_new_entry(index, jp, jaw_jp)
 
-                    if calibration:
-                        # wrist joints calibration
-                        init_jp = self.replay_device.measured_jp()
-                        CalibrationMotions.pitch_yaw_roll_independent_motion(
-                            init_jp,
-                            psm_handler=self.replay_device,
-                            expected_markers=4,
-                            save=True,
-                            filename=self.wrist_files / f"step{index:03d}_wrist_motion.txt",
-                        )
+                        if calibration and measure:
+                            # wrist joints calibration
+                            init_jp = self.replay_device.measured_jp()
+                            CalibrationMotions.pitch_yaw_roll_independent_motion(
+                                init_jp,
+                                psm_handler=self.replay_device,
+                                expected_markers=4,
+                                save=True,
+                                filename=self.wrist_files / f"step{index:03d}_wrist_motion.txt",
+                            )
 
-                    self.calibration_record.to_csv()
-                else:
-                    self.log.warning("No marker pose detected.")
+                        self.calibration_record.to_csv(safe_save=False)
+                    else:
+                        log.warning("No marker pose detected.")
 
             # try to keep motion synchronized
             loop_end_time = time.time()
@@ -104,7 +111,7 @@ class TrajectoryPlayer:
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-        self.log.info("Time to replay trajectory: %f seconds" % (time.time() - start_time))
+        log.info("Time to replay trajectory: %f seconds" % (time.time() - start_time))
 
 
 @dataclass
@@ -151,13 +158,16 @@ class Trajectory:
     def __next__(self):
         if self.iteration_idx < len(self.setpoints):
             result = self.setpoints[self.iteration_idx]
-            self.n += 1
+            self.iteration_idx += 1
             return result
         else:
             raise StopIteration
 
     def __getitem__(self, i):
         return self.setpoints[i]
+
+    def __len__(self):
+        return len(self.setpoints)
 
     @classmethod
     def from_ros_bag(cls, rosbag_handle: RosbagUtils, namespace="PSM2") -> Trajectory:

@@ -39,6 +39,7 @@ def main():
     expected_spheres = 4
     marker_name = "custom_marker_112"
     arm_namespace = "PSM2"
+    testid = args.testid if args.mode == "test" else 0
     rospy.init_node("dvrk_bag_replay", anonymous=True)
 
     # ------------------------------------------------------------
@@ -74,7 +75,7 @@ def main():
         root=root,
         marker_name=marker_name,
         mode=args.mode,
-        test_id=args.test_id,
+        test_id=testid,
     )
 
     # make sure the arm is powered
@@ -115,6 +116,8 @@ parser = argparse.ArgumentParser()
 # fmt: off
 parser.add_argument("-m","--mode", choices=["calib","test"], default="calib",
 help="Select 'calib' mode for calibration collection. Select 'test' to collect a test trajectory")
+
+parser.add_argument("-t","--testid", help="testid required for test mode")
 
 parser.add_argument("-b", "--rosbag",type=str,
                     default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
