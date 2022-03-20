@@ -114,14 +114,16 @@ class RobotSensorRecord(Record):
 
     def to_csv(self, safe_save=True):
         combined_df = pd.concat((self.sensor_record.df, self.robot_record.df))
+        self.df = combined_df
+        super().to_csv(safe_save)
 
-        if not self.filename.parent.exists():
-            log.warning(f"Parent directory not found. Creating path {self.filename.parent}")
-            self.filename.parent.mkdir(parents=True)
-        if safe_save:
-            save_without_overwritting(combined_df, self.filename)
-        else:
-            self.df.to_csv(self.filename)
+        # if not self.filename.parent.exists():
+        #     log.warning(f"Parent directory not found. Creating path {self.filename.parent}")
+        #     self.filename.parent.mkdir(parents=True)
+        # if safe_save:
+        #     save_without_overwritting(combined_df, self.filename)
+        # else:
+        #     self.combined_df.to_csv(self.filename)
 
 
 class RobotCartesianRecord(Record):

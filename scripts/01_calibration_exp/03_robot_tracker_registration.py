@@ -285,7 +285,7 @@ def calculate_axes_in_marker(pitch_ori_T, pitch_yaw_circles: dict, roll_circle, 
 
 def obtain_registration_data(root: Path):
     # Robot points
-    robot_jp = root / "robot_mov" / "robot_jp_temp.txt"
+    robot_jp = root / "robot_mov" / "robot_jp.txt"
     robot_jp = pd.read_csv(robot_jp)
     pitch_robot = pitch_orig_in_robot(robot_jp)  # df with columns = [step,px,py,pz]
 

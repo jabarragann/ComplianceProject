@@ -190,8 +190,8 @@ def main():
         robot_jp_p = root / f"test_trajectories/{args.trajid:02d}" / "test_traj_jp.txt"
         robot_cp_p = root / f"test_trajectories/{args.trajid:02d}" / "test_traj_cp.txt"
     else:
-        robot_jp_p = root / "robot_mov" / "robot_jp_temp.txt"
-        robot_cp_p = root / "robot_mov" / "robot_cp_temp.txt"
+        robot_jp_p = root / "robot_mov" / "robot_jp.txt"
+        robot_cp_p = root / "robot_mov" / "robot_cp.txt"
 
     dst_p = robot_cp_p.parent / "result"
     if (robot_cp_p.parent / "result" / "robot_joints.txt").exists() and not args.reset:

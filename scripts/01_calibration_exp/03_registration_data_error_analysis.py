@@ -282,7 +282,7 @@ def plot_results():
 # ------------------------------------------------------------
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-07-traj01", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-08-traj02", 
                         help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
@@ -291,5 +291,5 @@ log_level = args.log
 log = Logger("pitch error analysis", log_level=log_level).log
 
 if __name__ == "__main__":
-    # main()
+    main()
     plot_results()

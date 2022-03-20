@@ -134,7 +134,7 @@ class JointEstimator:
         T_TM = T_MT.inv()
         # Calculate the third frame of the DVRK in tracker space
         # This is going to be the base transform.
-        T_R_F3 = self.psm_kin.fkine_chain([q1, q2, q3])
+        T_R_F3 = Frame.init_from_matrix(self.psm_kin.fkine_chain([q1, q2, q3]))
         T_T_F3 = self.T_TR @ T_R_F3
         # Re orthogonalize.
         T_T_F3 = SE3(trnorm(trnorm(np.array(T_T_F3))))

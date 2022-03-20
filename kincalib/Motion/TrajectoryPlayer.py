@@ -84,6 +84,8 @@ class TrajectoryPlayer:
                         self.expected_markers, t=200, sample_time=15
                     )
                     if marker_pose is not None:
+                        # Save robot initial position
+                        self.calibration_record.to_csv(safe_save=False)
                         # Measure
                         jp = self.replay_device.measured_jp()
                         jaw_jp = self.replay_device.jaw.measured_jp()[0]
@@ -100,7 +102,6 @@ class TrajectoryPlayer:
                                 filename=self.wrist_files / f"step{index:03d}_wrist_motion.txt",
                             )
 
-                        self.calibration_record.to_csv(safe_save=False)
                     else:
                         log.warning("No marker pose detected.")
 
