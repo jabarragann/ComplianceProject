@@ -2,13 +2,18 @@ from __future__ import annotations
 
 # Python
 from pathlib import Path
-from re import I
+from random import Random
 import time
 from typing import Union
 from dataclasses import dataclass, field
 from black import out
 import numpy as np
 import numpy
+from typing import List
+
+# ros
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Header
 
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
@@ -20,6 +25,7 @@ from kincalib.Atracsys.ftk_500_api import ftk_500
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
+from collections import namedtuple
 
 log = Logger(__name__).log
 
@@ -84,7 +90,7 @@ class TrajectoryPlayer:
                     self.expected_markers, t=200, sample_time=15
                 )
                 if marker_pose is not None:
-                    # Save robot initial position
+                    # Measure robot position and save it in the record
                     self.calibration_record.to_csv(safe_save=False)
                     # Measure
                     jp = self.replay_device.measured_jp()
@@ -104,6 +110,8 @@ class TrajectoryPlayer:
 
                 else:
                     log.warning("No marker pose detected.")
+            else:
+                time.sleep(0.2)
 
             # try to keep motion synchronized
             loop_end_time = time.time()
@@ -227,13 +235,41 @@ class Trajectory:
 
 @dataclass
 class RandomJointTrajectory(Trajectory):
+    class PsmJointLimits:
+        # Specified in rad
+        q1_range = np.array([-0.60, 0.70])
+        q2_range = np.array([-0.49, 0.47])
+        q3_range = np.array([0.13, 0.22])
+        q4_range = np.array([-0.35, 1.0])
+        q5_range = np.array([-1.34, 1.34])
+        q6_range = np.array([-1.34, 1.34])
 
-    # class JointLimits:
+    @staticmethod
+    def generate_random_joint():
+        limits = RandomJointTrajectory.PsmJointLimits
+        q1 = np.random.uniform(limits.q1_range[0], limits.q1_range[1])
+        q2 = np.random.uniform(limits.q2_range[0], limits.q2_range[1])
+        q3 = np.random.uniform(limits.q3_range[0], limits.q3_range[1])
+        q4 = np.random.uniform(limits.q4_range[0], limits.q4_range[1])
+        q5 = np.random.uniform(limits.q5_range[0], limits.q5_range[1])
+        q6 = np.random.uniform(limits.q6_range[0], limits.q6_range[1])
+        return [q1, q2, q3, q4, q5, q6]
 
     @classmethod
-    def generate_trajectory(samples):
-        pass
+    def generate_trajectory(cls, samples: int):
+        setpoints = []
+        for i in range(samples):
+            setpoint = JointState()
+            setpoint.name = ["q1", "q2", "q3", "q4", "q5", "q6"]
+            setpoint.position = RandomJointTrajectory.generate_random_joint()
+            setpoints.append(setpoint)
+
+        return RandomJointTrajectory(sampling_factor=1, setpoints=setpoints)
 
 
 if __name__ == "__main__":
-    traj = Trajectory()
+    traj = RandomJointTrajectory.generate_trajectory(2000)
+    log.info(traj.setpoints[0])
+    log.info(traj.setpoints[0].position)
+    log.info(traj.setpoints[0].header.stamp.to_sec())
+    log.info(len(traj))

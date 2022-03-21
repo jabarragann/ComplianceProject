@@ -48,6 +48,7 @@ class CalibrationRecord(Record):
         # Create paths
         self.root_dir = root_dir
         self.robot_files = root_dir / "robot_mov"
+        self.mode = mode
         if mode == "test":
             assert test_id is not None, "undefined test id"
             self.test_files = root_dir / f"test_trajectories/{test_id:02d}"
@@ -71,8 +72,9 @@ class CalibrationRecord(Record):
             self.root_dir.mkdir(parents=True)
         if not self.robot_files.exists():
             self.robot_files.mkdir(parents=True)
-        if not self.test_files.exists():
-            self.test_files.mkdir(parents=True)
+        if self.mode == "test":
+            if not self.test_files.exists():
+                self.test_files.mkdir(parents=True)
 
     def create_new_entry(self, idx, joints, q7):
         self.cp_record.create_new_entry(idx, joints, q7)

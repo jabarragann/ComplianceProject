@@ -40,21 +40,22 @@ def main():
     marker_name = "custom_marker_112"
     arm_namespace = "PSM2"
     testid = args.testid if args.mode == "test" else 0
-    sampling_factor = 20 if args.mode == "test" else 40
+    sampling_factor = 20 if args.mode == "test" else 60
     rospy.init_node("dvrk_bag_replay", anonymous=True)
 
     # ------------------------------------------------------------
     # Create trajectory from rosbag or random trajectory
     # ------------------------------------------------------------
 
-    rosbag_path = Path(args.rosbag)
-    rosbag_handle = RosbagUtils(rosbag_path)
-    rosbag_handle.print_topics_info()
-    rosbag_handle.print_number_msg()
-    # replay = RosbagReplay(rosbag)
-    # replay.rosbag_utils.print_topics_info()
-
-    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
+    if args.rosbag is not None:
+        rosbag_path = Path(args.rosbag)
+        rosbag_handle = RosbagUtils(rosbag_path)
+        rosbag_handle.print_topics_info()
+        rosbag_handle.print_number_msg()
+        trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
+    else:
+        log.info(f"Creating random trajectory")
+        trajectory = RandomJointTrajectory.generate_trajectory(25)
 
     log.info(f"Trajectory size {len(trajectory)}")
 
@@ -124,11 +125,15 @@ help="Select 'calib' mode for calibration collection. Select 'test' to collect a
 
 parser.add_argument("-t","--testid",type=int, help="testid required for test mode")
 
+# parser.add_argument("-b", "--rosbag",type=str,
+#                     default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
+#                     help="rosbag trajectory to replay")
 parser.add_argument("-b", "--rosbag",type=str,
-                    default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
+                    default=None,
                     help="rosbag trajectory to replay")
 parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-07-traj01", 
                         help="root dir to save the data.")                     
+
 parser.add_argument( "-f", "--file", type=str, default="test_traj01", 
                         help="filename where a test trajectory data will be saved. execute_measure() func") 
 args = parser.parse_args()
