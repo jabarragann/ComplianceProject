@@ -40,6 +40,7 @@ def main():
     marker_name = "custom_marker_112"
     arm_namespace = "PSM2"
     testid = args.testid if args.mode == "test" else 0
+    sampling_factor = 20 if args.mode == "test" else 40
     rospy.init_node("dvrk_bag_replay", anonymous=True)
 
     # ------------------------------------------------------------
@@ -49,10 +50,13 @@ def main():
     rosbag_path = Path(args.rosbag)
     rosbag_handle = RosbagUtils(rosbag_path)
     rosbag_handle.print_topics_info()
+    rosbag_handle.print_number_msg()
     # replay = RosbagReplay(rosbag)
     # replay.rosbag_utils.print_topics_info()
 
-    trajectory = Trajectory.from_ros_bag(rosbag_handle)
+    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
+
+    log.info(f"Trajectory size {len(trajectory)}")
 
     # ------------------------------------------------------------
     # Get robot ready
@@ -93,8 +97,9 @@ def main():
     # Execute trajectory
     # ------------------------------------------------------------
     log.info("Collection information")
-    log.info(f"Data root dir:   {args.root}")
-    log.info(f"Trajectory name: {args.rosbag}")
+    log.info(f"Data root dir:     {args.root}")
+    log.info(f"Trajectory name:   {args.rosbag}")
+    log.info(f"Trajectory length: {len(trajectory)}")
     log.info(f"Mode: {args.mode} ")
     input('-> Press "Enter" to start data collection trajectory')
 
@@ -117,7 +122,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-m","--mode", choices=["calib","test"], default="calib",
 help="Select 'calib' mode for calibration collection. Select 'test' to collect a test trajectory")
 
-parser.add_argument("-t","--testid", help="testid required for test mode")
+parser.add_argument("-t","--testid",type=int, help="testid required for test mode")
 
 parser.add_argument("-b", "--rosbag",type=str,
                     default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",

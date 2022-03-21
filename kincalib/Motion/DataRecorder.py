@@ -48,7 +48,7 @@ class CalibrationRecord(Record):
         # Create paths
         self.root_dir = root_dir
         self.robot_files = root_dir / "robot_mov"
-        if mode == "calib":
+        if mode == "test":
             assert test_id is not None, "undefined test id"
             self.test_files = root_dir / f"test_trajectories/{test_id:02d}"
 

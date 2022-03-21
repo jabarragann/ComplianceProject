@@ -72,6 +72,13 @@ class RosbagUtils:
 
         return msg_dict, msg_dict_ts
 
+    def print_number_msg(self):
+        topics = ["/PSM2/measured_js"]
+        msg_dict, msg_dict_ts = self.read_messages(topics)
+
+        for i in range(len(topics)):
+            log.info(f"Number of messages in {topics[i]}: {len(msg_dict[topics[i]])} ")
+
     def save_crop_bag(self, min_ts: rospy.Time, max_ts, filename: Path = None):
         """Create a new rosbag containing only msg between min_ts and max_ts.
         If the filename is not specified, the following file name will be use:
@@ -121,7 +128,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     log = Logger("rosbag_utils").log
     root = Path("data/psm2_trajectories")
-    file_p = root / "pitch_exp_traj_01_test.bag"
+    file_p = root / "pitch_exp_traj_03_test_cropped.bag"
 
     rb = RosbagUtils(file_p)
     rb.print_topics_info()
