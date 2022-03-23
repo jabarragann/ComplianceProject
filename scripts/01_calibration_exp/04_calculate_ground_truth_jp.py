@@ -118,6 +118,9 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         if len(pose_arr) == 0:
             log.warning(f"Marker pose in {step} not found")
             continue
+        if wrist_fiducials.shape[0] == 0:
+            log.warning(f"Wrist fiducial in {step} not found")
+            continue
         assert len(pose_arr) == 1, "There should only be one marker pose at each step."
         T_TM = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
 

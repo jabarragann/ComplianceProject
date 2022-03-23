@@ -149,8 +149,8 @@ class JointEstimator:
         joint_3_4 = DHRobot([RevoluteMDH(a=0.0, alpha=0.0, d=DvrkPsmKin.ltool, offset=0)], base=T_T_F3)
         sol = joint_3_4.ikine_LM(T_TP)
         rad2deg = lambda x: x * 180 / np.pi
-        log.info(f"Solution: {rad2deg(sol.q)}")
-        log.info(f"Residual: {sol.residual:0.4e}")
+        # log.info(f"Solution: {rad2deg(sol.q)}")
+        # log.info(f"Residual: {sol.residual:0.4e}")
 
         return sol.q[0], sol.residual
 
