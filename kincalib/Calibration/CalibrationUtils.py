@@ -134,7 +134,7 @@ class JointEstimator:
         T_TM = T_MT.inv()
         # Calculate the third frame of the DVRK in tracker space
         # This is going to be the base transform.
-        T_R_F3 = Frame.init_from_matrix(self.psm_kin.fkine_chain([q1, q2, q3]))
+        T_R_F3 = Frame.init_from_matrix(self.psm_kin.fkine_chain([q1, q2, q3], ignore_base=True))
         T_T_F3 = self.T_TR @ T_R_F3
         # Re orthogonalize.
         T_T_F3 = SE3(trnorm(trnorm(np.array(T_T_F3))))
@@ -149,8 +149,8 @@ class JointEstimator:
         joint_3_4 = DHRobot([RevoluteMDH(a=0.0, alpha=0.0, d=DvrkPsmKin.ltool, offset=0)], base=T_T_F3)
         sol = joint_3_4.ikine_LM(T_TP)
         rad2deg = lambda x: x * 180 / np.pi
-        # log.info(f"Solution: {rad2deg(sol.q)}")
-        # log.info(f"Residual: {sol.residual:0.4e}")
+        log.info(f"Solution: {rad2deg(sol.q)}")
+        log.info(f"Residual: {sol.residual:0.4e}")
 
         return sol.q[0], sol.residual
 

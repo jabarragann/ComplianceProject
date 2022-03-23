@@ -187,8 +187,8 @@ def main():
     marker_file = Path("./share/custom_marker_id_112.json")
 
     if args.test:
-        robot_jp_p = root / f"test_trajectories/{args.trajid:02d}" / "test_traj_jp.txt"
-        robot_cp_p = root / f"test_trajectories/{args.trajid:02d}" / "test_traj_cp.txt"
+        robot_jp_p = root / f"test_trajectories/{args.trajid:02d}" / "robot_jp.txt"
+        robot_cp_p = root / f"test_trajectories/{args.trajid:02d}" / "robot_cp.txt"
     else:
         robot_jp_p = root / "robot_mov" / "robot_jp.txt"
         robot_cp_p = root / "robot_mov" / "robot_cp.txt"
