@@ -1,3 +1,6 @@
+"""
+Script to calculate the signed angle between two vectors.
+"""
 # Python imports
 from pathlib import Path
 import time
@@ -24,12 +27,31 @@ from kincalib.utils.Logger import Logger
 log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
+from numpy import cos, sin, arctan2
+
+c = cos
+s = sin
+
 
 def main():
     # ------------------------------------------------------------
     # Sample comment
     # ------------------------------------------------------------
-    pass
+
+    # fmt:off
+    rot_z = lambda x: np.array([[c(x),-s(x),0],
+                                [s(x), c(x),0],
+                                [0,    0,   1]])
+    # fmt:on
+    vn = np.array([0, 0, 1])
+    theta = -45 * np.pi / 180
+    va = np.array([1, 0, 0])
+    vb = rot_z(theta) @ va
+    vn = vn / np.linalg.norm(vn)
+    log.info(va)
+    log.info(vb)
+    theta_est = arctan2(np.cross(va, vb).dot(vn), np.dot(va, vb))
+    log.info(f"theta est {theta_est*180/np.pi:0.04}")
 
 
 if __name__ == "__main__":

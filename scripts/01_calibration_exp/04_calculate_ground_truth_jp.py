@@ -249,6 +249,7 @@ def main():
     diff_mean = diff.mean(axis=0)
     diff_std = diff.std(axis=0)
 
+    log.info(f"Results in degrees")
     log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
     log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
     log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
@@ -256,10 +257,18 @@ def main():
     log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
     log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
 
+    log.info(f"Results in rad")
+    log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
+    log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
+    log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
+    log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
+    log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
+    log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+
     # plot
     plot_joints(robot_df, tracker_df)
     fig, ax = plt.subplots(2, 1)
-    create_histogram(opt_df["q4res"], axes=ax[0], title=f"Q4 Optimization error", xlabel="Optimization residual error")
+    create_histogram(opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error")
     create_histogram(
         opt_df["q56res"], axes=ax[1], title=f"Q56 Optimization error", xlabel="Optimization residual error"
     )
