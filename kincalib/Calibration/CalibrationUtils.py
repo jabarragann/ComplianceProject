@@ -8,6 +8,7 @@ import numpy as np
 from collections import defaultdict
 import pandas as pd
 from pathlib import Path
+from numpy import arctan2
 
 # Robotics toolbox
 from roboticstoolbox import ETS as ET
@@ -137,22 +138,39 @@ class JointEstimator:
         T_R_F3 = Frame.init_from_matrix(self.psm_kin.fkine_chain([q1, q2, q3], ignore_base=True))
         T_T_F3 = self.T_TR @ T_R_F3
         # Re orthogonalize.
-        T_T_F3 = SE3(trnorm(trnorm(np.array(T_T_F3))))
+        T_T_F3 = trnorm(trnorm(np.array(T_T_F3)))
 
         # Calculate pitch frame in tracker space.
         # This is the target pose
         T_TP = T_TM @ self.T_MP
         # Re orthogonalize.
-        T_TP = SE3(trnorm(trnorm(np.array(T_TP))))
+        T_TP = trnorm(trnorm(np.array(T_TP)))
 
-        # Create a 1 joint robot
-        joint_3_4 = DHRobot([RevoluteMDH(a=0.0, alpha=0.0, d=DvrkPsmKin.ltool, offset=0)], base=T_T_F3)
-        sol = joint_3_4.ikine_LM(T_TP)
-        rad2deg = lambda x: x * 180 / np.pi
-        log.info(f"Solution: {rad2deg(sol.q)}")
-        log.info(f"Residual: {sol.residual:0.4e}")
+        # Calculate error metric
+        # error metric should be almost one
+        # Z-axis of both frames should point in the same direction
+        q4_error = np.dot(T_TP[:3, 2], T_T_F3[:3, 2])
 
-        return sol.q[0], sol.residual
+        # Calculate q4
+        # Formulation from -> https://stackoverflow.com/questions/5188561/signed-angle-between-two-3d-vectors-with-same-origin-within-the-same-plane
+        va = T_T_F3[:3, 0]  # x3 axis (see DVRK manual)
+        vb = T_TP[:3, 0]  # x4 axis (see DVRK manual)
+        vn = T_T_F3[:3, 2]  # Vector pointing along instrument shaft
+        q4_est = arctan2(np.cross(va, vb).dot(vn), np.dot(va, vb))
+
+        # log.info(f"Solution: {q4_est}")
+        # log.info(f"Residual: {q4_error}")
+
+        return q4_est, q4_error
+
+        # # Create a 1 joint robot
+        # joint_3_4 = DHRobot([RevoluteMDH(a=0.0, alpha=0.0, d=DvrkPsmKin.ltool, offset=0)], base=T_T_F3)
+        # sol = joint_3_4.ikine_LM(T_TP)
+        # rad2deg = lambda x: x * 180 / np.pi
+        # log.info(f"Solution: {rad2deg(sol.q)}")
+        # log.info(f"Residual: {sol.residual:0.4e}")
+
+        # return sol.q[0], sol.residual
 
     def estimate_q56(self, T_MT: Frame, wrist_fid_T: np.ndarray):
         wrist_fid_P = self.T_PM @ T_MT @ wrist_fid_T

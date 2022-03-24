@@ -19,7 +19,9 @@ import rospy
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
+from kincalib.utils.Logger import Logger
 
+log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
