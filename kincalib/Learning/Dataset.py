@@ -89,6 +89,8 @@ class Normalizer:
     def __call__(self, x):
         return (x - self.mean) / self.std
 
+    def reverse(self,x):
+        return (x*self.std) + self.mean
 
 if __name__ == "__main__":
     # ------------------------------------------------------------
