@@ -10,7 +10,7 @@ from pathlib import Path
 from itertools import product
 from rich.progress import track
 
-from kincalib.Atracsys.ftk_500_api import ftk_500
+from kincalib.Sensors.ftk_500_api import ftk_500
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Motion.ReplayDevice import ReplayDevice

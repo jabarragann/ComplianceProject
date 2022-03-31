@@ -15,6 +15,12 @@ http://wiki.ros.org/action/show/rosmsg?action=show&redirect=rossrv
 
 
 # Commands 
+## Launching sensors
+Forse sensor
+```
+rosrun atinetft_ros atinetft_xml -i 192.168.0.2 __ns:=force_sensor
+```
+
 ## Creating ros bags
 Recording a rosbag with a PSM trajectory
 ```
