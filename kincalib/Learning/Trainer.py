@@ -31,7 +31,7 @@ class Trainer(ABC):
     root: Path
     gpu_boole: bool = True
     optimize_hyperparams: bool = False
-    save_checkpoint: bool = True
+    save: bool = True
 
     def __post_init__(self):
         self.init_epoch = 0
@@ -81,13 +81,12 @@ class Trainer(ABC):
             self.init_epoch = self.final_epoch
 
             # Saving models
-            if valid_acc > self.best_valid_acc and self.save_checkpoint:
+            if valid_acc > self.best_valid_acc and self.save:
                 log.info("saving best validation model")
                 self.best_valid_acc = valid_acc
                 self.save_checkpoint("best_checkpoint.pt")
-            if self.save_checkpoint:
-                log.info("saving last checkpoint model")
-                self.save_checkpoint("last_checkpoint.pt")
+            if self.save:
+                self.save_checkpoint("final_checkpoint.pt")
 
             # Print epoch information
             time2 = time.time()
@@ -147,6 +146,10 @@ class Trainer(ABC):
         self.best_valid_acc = self.checkpoint_handler.get_var("best_valid_acc")
 
     def save_checkpoint(self, filename):
+        # Save training params json
+        self.save_training_parameters(self.root)
+
+        # Save Checkpoint
         self.checkpoint_handler.store_var(var_name="best_valid_acc", value=self.best_valid_acc)
         self.checkpoint_handler.store_var(var_name="last_epoch", value=self.final_epoch)
         self.checkpoint_handler.save_checkpoint(

@@ -37,12 +37,15 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-    epochs = 1260
+    epochs = 560
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/ModelsCheckpoints/Studies/TestStudy/")
     root = study_root / "best_model"
     data_dir = Path("data/03_replay_trajectory/d04-rec-10-traj01")
     log = Logger("main").log
+
+    if not root.exists():
+        root.mkdir(parents=True)
 
     # args
     parser = argparse.ArgumentParser()
@@ -56,7 +59,7 @@ if __name__ == "__main__":
         log.info(f"Load: {study_root/study_name}")
         study = pickle.load(open(study_root / study_name, "rb"))
 
-    best_trial = study.best_trial
+    best_trial: optuna.Trial = study.best_trial
     log.info(f"Total number of trials {len(study.trials)}")
     log.info(f"Best acc: {best_trial.value}")
     for key, value in best_trial.params.items():
@@ -97,14 +100,14 @@ if __name__ == "__main__":
         optimizer,
         loss_metric,
         epochs=epochs,
-        batch_size=best_trial.params["batch_size"],
         root=root,
         gpu_boole=True,
+        save=True,
     )
 
     # Check for checkpoints
     if args.loadcheckpoint:
-        checkpath = root / "best_checkpoint.pt"
+        checkpath = root / "final_checkpoint.pt"
         if checkpath.exists():
             trainer_handler.load_checkpoint(checkpath)
             log.info(f"resuming training from epoch {trainer_handler.init_epoch}")
@@ -116,17 +119,6 @@ if __name__ == "__main__":
     ## Train model
     loss_batch_store = trainer_handler.train_loop(verbose=False)
     log.info("*" * 30)
-
-    # ------------------------------------------------------------
-    # Save results
-    # ------------------------------------------------------------
-
-    trainer_handler.save_training_stats(root)
-    trainer_handler.save_training_parameters(root)
-
-    # Save model
-    torch.save(model.state_dict(), root / "model_state.pt")
-    trainer_handler.save_checkpoint("final_checkpoint.pt")
 
     # ------------------------------------------------------------
     # Results after training

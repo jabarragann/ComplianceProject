@@ -69,7 +69,7 @@ class RegressionStudy1(OptuneStudyAbstract):
             root=self.root / f"iter_{trial_id:04d}",
             gpu_boole=True,
             optimize_hyperparams=True,
-            save_models=False,
+            save_checkpoint=False,
         )
 
         # Train

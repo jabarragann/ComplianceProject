@@ -17,7 +17,7 @@ class TrainingBoard:
         # Todo: Raise exception if the checkpoint does not has the required attributes
 
         self.checkpoint = checkpoint
-        self.init_from_root(root)
+        # self.init_from_root(root)
 
     def init_from_root(self, root):
         self.train_acc_store = np.load(root / "train_acc.npy")
