@@ -28,31 +28,27 @@ class Trainer(ABC):
     optimizer: nn.Module
     loss_metric: nn.Module
     epochs: int
-    batch_size: int
     root: Path
     gpu_boole: bool = True
     optimize_hyperparams: bool = False
-    save_models: bool = True
+    save_checkpoint: bool = True
 
     def __post_init__(self):
-        self.loss_batch_store = []
-        self.train_acc_store = []
-        self.valid_acc_store = []
-
         self.init_epoch = 0
         self.final_epoch = 0
         self.batch_count = 0
         self.best_valid_acc = 0.0
-
         self.checkpoint_handler = CheckpointHandler()
 
-    def train_loop(self, trial=None, verbose=True):
+    def train_loop(self, trial: optuna.Trial = None, verbose=True):
         log.info(f"Starting Training")
         valid_acc = 0
         for epoch in track(range(self.init_epoch, self.epochs), "Training network"):
             time1 = time.time()
             loss_sum = 0
             total = 0
+
+            # Batch loop
             for i, (x, y) in enumerate(self.train_loader):
                 if self.gpu_boole:
                     x = x.cuda()
@@ -65,8 +61,7 @@ class Trainer(ABC):
                 loss.backward()
                 self.optimizer.step()  # Update parameters
 
-                # Save stats at the end of batch
-                self.loss_batch_store.append(loss.cpu().data.item())
+                # End of batch stats
                 self.checkpoint_handler.store_running_var(
                     var_name="train_loss_batch", iteration=self.batch_count, value=loss.cpu().data.item()
                 )
@@ -74,29 +69,25 @@ class Trainer(ABC):
                 loss_sum += loss * y.shape[0]
                 total += y.shape[0]
 
-            # Save stats at the end of epoch
+            # End of epoch statistics
             train_loss = loss_sum / total
             train_loss = train_loss.cpu().item()
-            self.checkpoint_handler.store_running_var(var_name="train_loss", iteration=epoch, value=train_loss)
             train_acc = self.calculate_acc(self.train_loader)
-            self.checkpoint_handler.store_running_var(var_name="train_acc", iteration=epoch, value=train_acc)
             valid_acc = self.calculate_acc(self.valid_loader)
+            self.checkpoint_handler.store_running_var(var_name="train_loss", iteration=epoch, value=train_loss)
+            self.checkpoint_handler.store_running_var(var_name="train_acc", iteration=epoch, value=train_acc)
             self.checkpoint_handler.store_running_var(var_name="valid_acc", iteration=epoch, value=valid_acc)
-            self.train_acc_store.append(train_acc)
-            self.valid_acc_store.append(valid_acc)
             self.final_epoch = epoch
+            self.init_epoch = self.final_epoch
 
-            if valid_acc > self.best_valid_acc and self.save_models:
+            # Saving models
+            if valid_acc > self.best_valid_acc and self.save_checkpoint:
                 log.info("saving best validation model")
                 self.best_valid_acc = valid_acc
                 self.save_checkpoint("best_checkpoint.pt")
-
-            # Optune callbacks
-            if self.optimize_hyperparams:
-                # Optune prune mechanism
-                trial.report(valid_acc, epoch)
-                if trial.should_prune():
-                    raise optuna.exceptions.TrialPruned()
+            if self.save_checkpoint:
+                log.info("saving last checkpoint model")
+                self.save_checkpoint("last_checkpoint.pt")
 
             # Print epoch information
             time2 = time.time()
@@ -108,12 +99,12 @@ class Trainer(ABC):
                 log.info(f"Valid accuracy:    {valid_acc:0.6f}")
                 log.info(f"*" * 30)
 
-            # save last model
-            self.best_valid_acc = valid_acc
-            self.init_epoch = self.final_epoch
-            if self.save_models:
-                log.info("saving last checkpoint model")
-                self.save_checkpoint("last_checkpoint.pt")
+            # Optune callbacks
+            if self.optimize_hyperparams:
+                # Optune prune mechanism
+                trial.report(valid_acc, epoch)
+                if trial.should_prune():
+                    raise optuna.exceptions.TrialPruned()
 
         return valid_acc
 
@@ -140,17 +131,12 @@ class Trainer(ABC):
         train_params = {
             "lr": self.optimizer.param_groups[0]["lr"],
             "epochs": self.epochs,
-            "batch": self.batch_size,
+            "batch": self.train_loader.batch_size,
             "opt": {"name": str(type(self.optimizer)), "parameters": self.optimizer.defaults},
         }
 
         with open(root / "trainer_parameters.json", "w") as f:
             json.dump(train_params, f, indent=3)
-
-    def save_training_stats(self, root):
-        np.save(root / f"train_loss.npy", self.loss_batch_store)
-        np.save(root / f"train_acc.npy", self.train_acc_store)
-        np.save(root / f"valid_acc.npy", self.valid_acc_store)
 
     def load_checkpoint(self, root: Path):
         self.checkpoint_handler, self.net, self.optimizer = CheckpointHandler.load_checkpoint_with_model(
@@ -162,6 +148,7 @@ class Trainer(ABC):
 
     def save_checkpoint(self, filename):
         self.checkpoint_handler.store_var(var_name="best_valid_acc", value=self.best_valid_acc)
+        self.checkpoint_handler.store_var(var_name="last_epoch", value=self.final_epoch)
         self.checkpoint_handler.save_checkpoint(
             checkpoint_path=self.root / filename,
             iteration=self.final_epoch,

@@ -3,7 +3,6 @@ import optuna
 from abc import ABC, abstractclassmethod
 import pickle
 from dataclasses import dataclass
-from torch.utils.data import DataLoader, Dataset
 
 # Save state
 class SaveStateCallback:
