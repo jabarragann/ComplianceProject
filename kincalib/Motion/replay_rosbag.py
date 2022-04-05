@@ -1,5 +1,6 @@
 """
 Rosbag replay script for PSM arm
+OLD FILE THIS CAN BE REMOVED. IT WAS DEPRECATED FOR TrajectoryPlayer.py
 """
 from __future__ import annotations
 from random import sample
