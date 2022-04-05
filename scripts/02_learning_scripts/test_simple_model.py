@@ -61,6 +61,7 @@ if __name__ == "__main__":
 
     # datapaths
     root = Path(f"data/ModelsCheckpoints/T{training_round:02d}/")
+    # root = Path(f"data/ModelsCheckpoints/Studies/TestStudy/best_model")
 
     # Setup
     log = Logger("regression").log

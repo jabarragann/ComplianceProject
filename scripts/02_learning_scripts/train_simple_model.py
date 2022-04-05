@@ -23,9 +23,7 @@ from pytorchcheckpoint.checkpoint import CheckpointHandler
 
 ## Parameters
 # Dataloaders
-train_batch_size = 5
-valid_batch_size = 5
-test_batch_size = 5
+batch_size = 256
 num_workers = 3
 # Optimization
 learning_rate = 0.001
@@ -43,7 +41,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--round", type=int, help="Model training round", default=1)
+    parser.add_argument("-r", "--round", type=int, help="Model training round", default=3)
     parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
     parser.add_argument("-e", "--epochs", type=int, default=252, help="epochs")
     args = parser.parse_args()
@@ -73,8 +71,8 @@ if __name__ == "__main__":
     valid_dataset = JointsDataset(*valid_data[:], normalizer)
 
     # Create Dataloaders
-    train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
-    validation_dataloader = DataLoader(valid_dataset, batch_size=valid_batch_size, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    validation_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
     log.info(f"Training size   {len(train_dataset)}")
     log.info(f"Validation size {len(valid_dataset)}")
@@ -104,7 +102,7 @@ if __name__ == "__main__":
         optimizer,
         loss_metric,
         epochs,
-        train_batch_size,
+        batch_size,
         root=root,
         gpu_boole=True,
     )
@@ -121,7 +119,7 @@ if __name__ == "__main__":
     log.info(f"DSC before training {acc:0.04}")
 
     ## Train model
-    loss_batch_store = trainer_handler.train_loop()
+    loss_batch_store = trainer_handler.train_loop(verbose=False)
     log.info("*" * 30)
 
     # ------------------------------------------------------------

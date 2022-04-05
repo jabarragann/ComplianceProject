@@ -1,15 +1,18 @@
 from abc import ABC, abstractclassmethod
 import json
 from pathlib import Path
-from pickletools import optimize
-import torch
 import numpy as np
 import time
 from rich.progress import track
 from dataclasses import dataclass
+
+# Torch
+import optuna
+import torch
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
 
+# Custom
 from kincalib.utils.Logger import Logger
 from pytorchcheckpoint.checkpoint import CheckpointHandler
 
@@ -28,6 +31,8 @@ class Trainer(ABC):
     batch_size: int
     root: Path
     gpu_boole: bool = True
+    optimize_hyperparams: bool = False
+    save_models: bool = True
 
     def __post_init__(self):
         self.loss_batch_store = []
@@ -41,15 +46,11 @@ class Trainer(ABC):
 
         self.checkpoint_handler = CheckpointHandler()
 
-    def train_loop(self):
-        self.loss_batch_store = []
-        self.train_acc_store = []
-        self.valid_acc_store = []
-
+    def train_loop(self, trial=None, verbose=True):
         log.info(f"Starting Training")
+        valid_acc = 0
         for epoch in track(range(self.init_epoch, self.epochs), "Training network"):
-            time1 = time.time()  # timekeeping
-
+            time1 = time.time()
             loss_sum = 0
             total = 0
             for i, (x, y) in enumerate(self.train_loader):
@@ -62,10 +63,9 @@ class Trainer(ABC):
                 outputs = self.net(x)
                 loss = self.loss_metric(outputs, y)  # REMEMBER loss(OUTPUTS,LABELS)
                 loss.backward()
-                # performing update:
-                self.optimizer.step()
+                self.optimizer.step()  # Update parameters
 
-                # Save training stats
+                # Save stats at the end of batch
                 self.loss_batch_store.append(loss.cpu().data.item())
                 self.checkpoint_handler.store_running_var(
                     var_name="train_loss_batch", iteration=self.batch_count, value=loss.cpu().data.item()
@@ -74,7 +74,7 @@ class Trainer(ABC):
                 loss_sum += loss * y.shape[0]
                 total += y.shape[0]
 
-            log.info(f"Epoch {epoch}/{self.epochs-1}:")
+            # Save stats at the end of epoch
             train_loss = loss_sum / total
             train_loss = train_loss.cpu().item()
             self.checkpoint_handler.store_running_var(var_name="train_loss", iteration=epoch, value=train_loss)
@@ -86,17 +86,36 @@ class Trainer(ABC):
             self.valid_acc_store.append(valid_acc)
             self.final_epoch = epoch
 
-            if valid_acc > self.best_valid_acc:
+            if valid_acc > self.best_valid_acc and self.save_models:
                 log.info("saving best validation model")
-                self.best_valid_acc
+                self.best_valid_acc = valid_acc
                 self.save_checkpoint("best_checkpoint.pt")
 
-            time2 = time.time()  # timekeeping
-            log.info(f"Elapsed time for epoch: { time2 - time1:0.04f} s")
-            log.info(f"Training loss:     {train_loss:0.8f}")
-            log.info(f"Training accuracy: {train_acc:0.6f}")
-            log.info(f"Valid accuracy:    {valid_acc:0.6f}")
-            log.info(f"*" * 30)
+            # Optune callbacks
+            if self.optimize_hyperparams:
+                # Optune prune mechanism
+                trial.report(valid_acc, epoch)
+                if trial.should_prune():
+                    raise optuna.exceptions.TrialPruned()
+
+            # Print epoch information
+            time2 = time.time()
+            if verbose:
+                log.info(f"Epoch {epoch}/{self.epochs-1}:")
+                log.info(f"Elapsed time for epoch: { time2 - time1:0.04f} s")
+                log.info(f"Training loss:     {train_loss:0.8f}")
+                log.info(f"Training accuracy: {train_acc:0.6f}")
+                log.info(f"Valid accuracy:    {valid_acc:0.6f}")
+                log.info(f"*" * 30)
+
+            # save last model
+            self.best_valid_acc = valid_acc
+            self.init_epoch = self.final_epoch
+            if self.save_models:
+                log.info("saving last checkpoint model")
+                self.save_checkpoint("last_checkpoint.pt")
+
+        return valid_acc
 
     @abstractclassmethod
     def calculate_acc(self, dataloader: DataLoader):

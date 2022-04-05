@@ -89,8 +89,9 @@ class Normalizer:
     def __call__(self, x):
         return (x - self.mean) / self.std
 
-    def reverse(self,x):
-        return (x*self.std) + self.mean
+    def reverse(self, x):
+        return (x * self.std) + self.mean
+
 
 if __name__ == "__main__":
     # ------------------------------------------------------------
@@ -121,6 +122,7 @@ if __name__ == "__main__":
     log.info(f"valid x mean {x.mean():0.4f}")
     log.info(f"valid x std {x.std():0.4f}")
 
-    # dataloader = DataLoader(train_dataset, batch_size=5, shuffle=True)
-    # for x, mask in dataloader:
-    #     pass
+    dataloader = DataLoader(train_dataset, batch_size=5, shuffle=True)
+    for x, mask in dataloader:
+        log.info(x.shape)
+        break
