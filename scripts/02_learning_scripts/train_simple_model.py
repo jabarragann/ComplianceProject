@@ -17,9 +17,8 @@ import torch.nn as nn
 from kincalib.utils.Logger import Logger
 from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
 from kincalib.Learning.Models import MLP
-from kincalib.Learning.Trainer import TrainRegressionNet, Trainer
-from kincalib.Learning.TrainingBoard import TrainingBoard
-from pytorchcheckpoint.checkpoint import CheckpointHandler
+from kincalib.Learning.Trainer import TrainRegressionNet
+from torchsuite.TrainingBoard import TrainingBoard
 
 ## Parameters
 # Dataloaders
@@ -41,9 +40,9 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--round", type=int, help="Model training round", default=3)
+    parser.add_argument("-r", "--round", type=int, help="Model training round", default=4)
     parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
-    parser.add_argument("-e", "--epochs", type=int, default=252, help="epochs")
+    parser.add_argument("-e", "--epochs", type=int, default=552, help="epochs")
     args = parser.parse_args()
     epochs = args.epochs
     training_round = args.round
@@ -102,14 +101,13 @@ if __name__ == "__main__":
         optimizer,
         loss_metric,
         epochs,
-        batch_size,
         root=root,
         gpu_boole=True,
     )
 
     # Check for checkpoints
     if args.loadcheckpoint:
-        checkpath = root / "best_checkpoint.pt"
+        checkpath = root / "final_checkpoint.pt"
         if checkpath.exists():
             trainer_handler.load_checkpoint(checkpath)
             log.info(f"resuming training from epoch {trainer_handler.init_epoch}")
@@ -125,8 +123,6 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Save results
     # ------------------------------------------------------------
-
-    trainer_handler.save_training_stats(root)
     trainer_handler.save_training_parameters(root)
 
     # Save model

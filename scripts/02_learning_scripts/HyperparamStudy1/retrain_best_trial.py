@@ -15,10 +15,12 @@ from torch.utils.data import DataLoader
 
 # Custom
 from kincalib.Learning.Dataset import JointsDataset, JointsRawDataset, Normalizer
-from kincalib.Learning.HyperparameterTuner import OptuneStudyAbstract
-from kincalib.Learning.Trainer import TrainRegressionNet
 from kincalib.Learning.Models import MLP, CustomMLP
-from kincalib.Learning.TrainingBoard import TrainingBoard
+from kincalib.Learning.Trainer import TrainRegressionNet
+
+from torchsuite.HyperparameterTuner import OptuneStudyAbstract
+from torchsuite.TrainingBoard import TrainingBoard
+
 from kincalib.utils.CmnUtils import mean_std_str
 from kincalib.utils.Logger import Logger
 
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     epochs = 560
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/ModelsCheckpoints/Studies/TestStudy/")
-    root = study_root / "best_model"
+    root = study_root / "best_model3"
     data_dir = Path("data/03_replay_trajectory/d04-rec-10-traj01")
     log = Logger("main").log
 
