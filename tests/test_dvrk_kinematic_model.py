@@ -51,9 +51,9 @@ def main():
     # Read data
     # ------------------------------------------------------------
     root = Path("data/03_replay_trajectory/d04-rec-07-traj01/robot_mov")
-    robot_cp_df = pd.read_csv(root / "robot_cp_temp.txt")
+    robot_cp_df = pd.read_csv(root / "robot_cp.txt")
     robot_cp_df = robot_cp_df.loc[robot_cp_df["m_t"] == "r"]
-    robot_jp_df = pd.read_csv(root / "robot_jp_temp.txt")
+    robot_jp_df = pd.read_csv(root / "robot_jp.txt")
 
     # ------------------------------------------------------------
     # Calculate cartesian using custom kinematic model
