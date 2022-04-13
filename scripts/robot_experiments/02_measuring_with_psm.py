@@ -143,7 +143,7 @@ def main():
 
     # Checking
     psm_fkin_with_tool = DvrkPsmKin(tool_offset=tool_offset_exp, base_transform=np.identity(4))
-    loc_str = "A_C"
+    loc_str = "7_C"
     loc = loc_str.strip().split("_")
     recorder_handle = Recorder(loc, psm_handle, psm_fkin_with_tool, Path("Collection" + loc_str + ".csv"))
     log.info(
@@ -155,11 +155,8 @@ def main():
 
     print("Recording the kinematic information with IO ...")
     # Loop until you receive a keyboard interruption
-    N: int = 10
     while not rospy.core.is_shutdown():
         rospy.rostime.wallsleep(0.5)
-        if recorder_handle.idx == N + 1:
-            break
 
     recorder_handle.save_csv()
 
