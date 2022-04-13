@@ -10,9 +10,12 @@ from pathlib import Path
 from typing import List, Tuple, Set
 from rich.logging import RichHandler
 from rich.progress import track
+from spatialmath.base import r2q
 
 # ROS and DVRK imports
 import dvrk
+from kincalib.Motion.DataRecorder import Record
+from kincalib.Motion.PsmIO import PsmIO
 import rospy
 import tf_conversions.posemath as pm
 
@@ -51,21 +54,67 @@ tool_offset = np.array([ [ 0.0, -1.0,  0.0,  0.0],
                          [-1.0,  0.0,  0.0,  0.0],
                          [ 0.0,  0.0,  0.0,  1.0]])
 
-base_transform =np.array([[  1.0,  0.0,          0.0,          0.20],
-                          [  0.0, -0.866025404,  0.5,          0.0 ],
-                          [  0.0, -0.5,         -0.866025404,  0.0 ],
-                          [  0.0,  0.0,          0.0,          1.0 ]])
-
 # Base transforms for measuring experiments
-tool_offset_exp = np.array([[ 0.0, -1.0,  0.0,  0.0],
+tool_offset_exp = np.array([[ 0.0, -1.0,  0.0,  0.0  ],
                             [ 0.0,  0.0,  1.0,  0.019],
-                            [-1.0,  0.0,  0.0,  0.0],
-                            [ 0.0,  0.0,  0.0,  1.0]])
+                            [-1.0,  0.0,  0.0,  0.0  ],
+                            [ 0.0,  0.0,  0.0,  1.0  ]])
 
-base_transform_exp =np.array([[  1.0,  0.0,          0.0,          0.20],
-                              [  0.0, -0.866025404,  0.5,          0.0 ],
-                              [  0.0, -0.5,         -0.866025404,  0.0 ],
-                              [  0.0,  0.0,          0.0,          1.0 ]])
+class KinematicRecord(Record):
+    # fmt: off
+    df_cols = ["idx", "label", "q1", "q2", "q3", "q4", "q5", "q6",
+            "x", "y", "z", "qx", "qy", "qz","qw"]
+    # fmt: on
+
+    def __init__(self, filename: Path):
+        super().__init__(KinematicRecord.df_cols, filename)
+
+    def create_new_entry(self, data):
+        # Add data
+        new_pt = pd.DataFrame(data, columns=self.df_cols)
+        self.df = self.df.append(new_pt)
+
+
+class Recorder:
+    def __init__(self,loc_labels:List[str], replay_device: ReplayDevice, dvrk_fkin: DvrkPsmKin, filename: Path) -> None:
+        # Create DVRK kinematic model
+        self.psm_fkin = dvrk_fkin
+
+        # Create CRTK PSM listener
+        self.psm_handle = replay_device
+
+        # Create df to store information
+        self.dst_path = Path("data/04_robot_measuring_experiments/measuring")
+        self.filename = self.dst_path / filename
+        self.idx = 0
+        self.record = KinematicRecord(self.filename)
+        self.loc_labels = loc_labels
+
+    def __call__(self):
+        self.collect_data()
+
+    def collect_data(self):
+        jp = self.psm_handle.measured_jp()
+        model_cp: np.ndarray = self.psm_fkin.fkine(jp).data[0]
+
+        # df_cols = ["idx", "q1", "q2", "q3", "q4", "q5", "q6",
+        #         "x", "y", "z", "qx", "qy", "qz","qw"]
+        loc = self.loc_labels[(self.idx+1)%2]
+        joints = [self.idx,loc, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5]]
+        position = model_cp[:3, 3].tolist()
+        orientation = r2q(model_cp[:3, :3]).tolist()
+        data = joints + position + orientation
+        data = np.array(data).reshape((1, -1))
+
+        log.info(f"step{self.idx} - collected position on {loc[0]}: {np.array(position)}")
+
+        if self.idx > 0:
+            self.record.create_new_entry(data)
+        self.idx += 1
+
+    def save_csv(self):
+        self.record.to_csv(safe_save=False)
+
 
 # fmt:on
 def main():
@@ -74,7 +123,7 @@ def main():
     # ------------------------------------------------------------
     psm_handle = ReplayDevice("PSM2", expected_interval=0.01)
     psm_handle.home_device()
-    psm_fkin = DvrkPsmKin(tool_offset=tool_offset, base_transform=base_transform)
+    psm_fkin = DvrkPsmKin(tool_offset=tool_offset, base_transform=np.identity(4))
     time.sleep(0.2)
 
     # ------------------------------------------------------------
@@ -93,23 +142,36 @@ def main():
     # ------------------------------------------------------------
 
     # Checking
-    psm_fkin_correct_tool = DvrkPsmKin(tool_offset=tool_offset_exp, base_transform=np.identity(4))
-    # log.info(psm_fkin_correct_tool.fkine(np.zeros(6)).data[0]) # just to debug the tool offset
-
-    # loc: str = input("Input phantom locations separed by a space: ")
-    loc = "A C"
-    loc = loc.strip().split(" ")
+    psm_fkin_with_tool = DvrkPsmKin(tool_offset=tool_offset_exp, base_transform=np.identity(4))
+    loc_str = "A_C"
+    loc = loc_str.strip().split("_")
+    recorder_handle = Recorder(loc, psm_handle, psm_fkin_with_tool, Path("Collection" + loc_str + ".csv"))
     log.info(
-        f"Distance between {loc[0]} and {loc[1]} (True): {np.linalg.norm(phantom_coord[loc[0]]-phantom_coord[loc[1]]):0.4f}"
+        f"Distance between {loc[0]} and {loc[1]} in mm (True): {np.linalg.norm(phantom_coord[loc[0]]-phantom_coord[loc[1]]):0.4f}"
     )
 
-    input(f"collect dvrk joints on {loc[0]} and press enter")
-    cp1 = psm_fkin_correct_tool.fkine(psm_handle.measured_jp()).data[0]
+    psm_io2 = PsmIO("PSM2", action=recorder_handle)
+    time.sleep(0.2)
 
-    input(f"collect dvrk joints on {loc[1]} and press enter")
-    cp2 = psm_fkin_correct_tool.fkine(psm_handle.measured_jp()).data[0]
+    print("Recording the kinematic information with IO ...")
+    # Loop until you receive a keyboard interruption
+    N: int = 10
+    while not rospy.core.is_shutdown():
+        rospy.rostime.wallsleep(0.5)
+        if recorder_handle.idx == N + 1:
+            break
 
-    log.info(f"Distance between {loc[0]} and {loc[1]} (Measured): {np.linalg.norm(cp1[:3,3]- cp2[:3,3]*1000):0.04f}")
+    recorder_handle.save_csv()
+
+    # input(f"collect dvrk joints on {loc[0]} and press enter")
+    # cp1 = psm_fkin_correct_tool.fkine(psm_handle.measured_jp()).data[0]
+
+    # input(f"collect dvrk joints on {loc[1]} and press enter")
+    # cp2 = psm_fkin_correct_tool.fkine(psm_handle.measured_jp()).data[0]
+
+    # log.info(
+    #     f"Distance between {loc[0]} and {loc[1]} in mm (Measured): {np.linalg.norm(cp1[:3,3]- cp2[:3,3])*1000:0.04f}"
+    # )
 
 
 if __name__ == "__main__":
