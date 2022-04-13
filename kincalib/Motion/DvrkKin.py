@@ -36,15 +36,21 @@ class DvrkPsmKin(DHRobot):
                              [-1.0,  0.0,  0.0,  0.0],
                              [ 0.0,  0.0,  0.0,  1.0]])
 
-    base_transform = np.array([[  1.0,  0.0,          0.0,          0.20],
+    base_transform =np.array([[  1.0,  0.0,          0.0,          0.20],
                               [  0.0, -0.866025404,  0.5,          0.0 ],
                               [  0.0, -0.5,         -0.866025404,  0.0 ],
                               [  0.0,  0.0,          0.0,          1.0 ]])
     # fmt:on
 
-    def __init__(self):
-        self.tool_offset = SE3(trnorm(DvrkPsmKin.tool_offset))
-        self.base_transform = SE3(trnorm(DvrkPsmKin.base_transform))
+    def __init__(self, tool_offset=None, base_transform=None):
+        if tool_offset is None:
+            self.tool_offset = SE3(trnorm(DvrkPsmKin.tool_offset))
+        else:
+            self.tool_offset = SE3(trnorm(tool_offset))
+        if base_transform is None:
+            self.base_transform = SE3(trnorm(DvrkPsmKin.base_transform))
+        else:
+            self.base_transform = SE3(trnorm(base_transform))
 
         super(DvrkPsmKin, self).__init__(
             DvrkPsmKin.links, tool=self.tool_offset, base=self.base_transform, name="DVRK PSM"
@@ -97,6 +103,6 @@ if __name__ == "__main__":
     log.info("4th kinematic chain of the DVRK")
     log.info(psm.fkine_chain(j[:4]))
     log.info("dvrk fkine func")
-    log.info(psm.fkine(j).data[0])
+    log.info(psm.fkine(j).data[0])  # .SE3.data[0] returns a ndarray
     log.info("dvrk fkine_chain func")
     log.info(psm.fkine_chain(j))

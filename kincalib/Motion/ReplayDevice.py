@@ -1,5 +1,9 @@
+from re import I
+import sys
+import time
 import crtk
 from kincalib.utils.Logger import Logger
+import rospy
 
 log = Logger(__name__).log
 
@@ -32,9 +36,24 @@ class ReplayDevice:
         self.crtk_utils.add_setpoint_cp()
         self.jaw = self.__jaw_device(device_namespace + "/jaw", expected_interval, operating_state_instance=self)
 
+        # create node
+        if not rospy.get_node_uri():
+            rospy.init_node("arm_api", anonymous=True, log_level=rospy.WARN)
+            time.sleep(0.2)
+        else:
+            rospy.logdebug(rospy.get_caller_id() + " -> ROS already initialized")
+
     def jaw_jp(self):
         try:
             jaw_pose = self.jaw.measured_jp()[0]
         except RuntimeWarning as e:
             log.error("Run time warning raised when reading jaw jp")
             return -505
+
+    def home_device(self):
+        print("-- Enabling arm")
+        if not self.enable(10):
+            sys.exit("-- Failed to enable within 10 seconds")
+        print("-- Homing arm")
+        if not self.home(10):
+            sys.exit("-- Failed to home within 10 seconds")
