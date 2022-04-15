@@ -46,7 +46,7 @@ def main():
     # ------------------------------------------------------------
     # Load and plot
     # ------------------------------------------------------------
-    loc_str = "7_C"
+    loc_str = "A_C"
     loc = loc_str.strip().split("_")
 
     path = Path(f"data/04_robot_measuring_experiments/measuring/Collection{loc_str}.csv")
