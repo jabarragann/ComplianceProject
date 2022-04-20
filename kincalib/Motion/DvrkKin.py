@@ -31,15 +31,14 @@ class DvrkPsmKin(DHRobot):
 
     # fmt:off
     # Base transforms based on DVRK console configuration file
-    tool_offset = np.array([ [ 0.0, -1.0,  0.0,  0.0],
-                             [ 0.0,  0.0,  1.0,  0.0],
-                             [-1.0,  0.0,  0.0,  0.0],
-                             [ 0.0,  0.0,  0.0,  1.0]])
-
-    base_transform =np.array([[  1.0,  0.0,          0.0,          0.20],
-                              [  0.0, -0.866025404,  0.5,          0.0 ],
-                              [  0.0, -0.5,         -0.866025404,  0.0 ],
-                              [  0.0,  0.0,          0.0,          1.0 ]])
+    tool_offset = np.array([[ 0.0, -1.0,  0.0,  0.0  ],
+                            [ 0.0,  0.0,  1.0,  0.019],
+                            [-1.0,  0.0,  0.0,  0.0  ],
+                            [ 0.0,  0.0,  0.0,  1.0  ]])
+    # base_transform =np.array([[  1.0,  0.0,          0.0,          0.20],
+    #                           [  0.0, -0.866025404,  0.5,          0.0 ],
+    #                           [  0.0, -0.5,         -0.866025404,  0.0 ],
+    #                           [  0.0,  0.0,          0.0,          1.0 ]])
     # fmt:on
 
     def __init__(self, tool_offset=None, base_transform=None):
@@ -48,7 +47,7 @@ class DvrkPsmKin(DHRobot):
         else:
             self.tool_offset = SE3(trnorm(tool_offset))
         if base_transform is None:
-            self.base_transform = SE3(trnorm(DvrkPsmKin.base_transform))
+            self.base_transform = SE3(trnorm(np.identity(4)))
         else:
             self.base_transform = SE3(trnorm(base_transform))
 
