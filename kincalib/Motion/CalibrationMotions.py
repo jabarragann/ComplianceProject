@@ -15,7 +15,7 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.utils.Logger import Logger
-from kincalib.Motion.DataRecorder import AtracsysCartesianRecord
+from kincalib.Recording.DataRecord import AtracsysCartesianRecord
 
 log = Logger(__name__).log
 

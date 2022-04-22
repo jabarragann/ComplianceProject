@@ -18,7 +18,7 @@ from std_msgs.msg import Header
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
-from kincalib.Motion.DataRecorder import CalibrationRecord
+from kincalib.Recording.DataRecord import CalibrationRecord
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
 from kincalib.Sensors.ftk_500_api import ftk_500
@@ -31,45 +31,19 @@ log = Logger(__name__).log
 
 
 class TrajectoryPlayer:
-    def __init__(
-        self, replay_device, trajectory, expected_markers, root: Path, marker_name: str, mode: str, test_id: int
-    ):
-        assert mode in ["calib", "test"], "mode needs to be calib or test"
-        self.mode = mode
-        self.expected_markers = expected_markers
+    def __init__(self, replay_device, trajectory, before_motion_cb: List = [], after_motion_cb: List = []):
         self.trajectory = trajectory
-        self.ftk_handler = ftk_500(marker_name)
         self.replay_device = replay_device
-        self.calibration_record = CalibrationRecord(
-            ftk_handler=self.ftk_handler,
-            robot_handler=self.replay_device,
-            expected_markers=expected_markers,
-            root_dir=root,
-            mode=mode,
-            test_id=test_id,
-        )
+        self.after_motion_cb = after_motion_cb
+        self.before_motion_cb = before_motion_cb
 
-        self.outer_js_files = root / "outer_mov"
-        self.wrist_files = root / "pitch_roll_mov"
-        if not self.outer_js_files.exists():
-            self.outer_js_files.mkdir(parents=True)
-        if not self.wrist_files.exists():
-            self.wrist_files.mkdir(parents=True)
-
-    def replay_trajectory(self, measure=True, saving=True, calibration=False):
-
-        if self.mode == "calib" and measure:
-            # Outer joints calibration
-            CalibrationMotions.outer_pitch_yaw_motion(
-                self.replay_device.measured_jp(),
-                psm_handler=self.replay_device,
-                expected_markers=4,
-                save=True,
-                root=self.outer_js_files,
-            )
+    def replay_trajectory(self, execute_cb: bool = True):
 
         start_time = time.time()
         last_bag_time = self.trajectory[0].header.stamp.to_sec()
+
+        # Before motion callbacks
+        [cb() for cb in self.before_motion_cb]
 
         for index, new_js in enumerate(self.trajectory):
             # record start time
@@ -79,39 +53,12 @@ class TrajectoryPlayer:
             delta_bag_time = new_bag_time - last_bag_time
             last_bag_time = new_bag_time
 
-            # replay
-            log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
-
             # Move
-            self.replay_device.move_jp(numpy.array(new_js.position)).wait()
+            log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
+            self.replay_device.move_jp(numpy.array(new_js.position)).wait()  # wait until motion is finished
 
-            if measure:
-                marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
-                    self.expected_markers, t=200, sample_time=15
-                )
-                if marker_pose is not None:
-                    # Measure robot position and save it in the record
-                    self.calibration_record.to_csv(safe_save=False)
-                    # Measure
-                    jp = self.replay_device.measured_jp()
-                    jaw_jp = self.replay_device.jaw.measured_jp()[0]
-                    self.calibration_record.create_new_entry(index, jp, jaw_jp)
-
-                    if calibration and measure:
-                        # wrist joints calibration
-                        init_jp = self.replay_device.measured_jp()
-                        CalibrationMotions.pitch_yaw_roll_independent_motion(
-                            init_jp,
-                            psm_handler=self.replay_device,
-                            expected_markers=4,
-                            save=True,
-                            filename=self.wrist_files / f"step{index:03d}_wrist_motion.txt",
-                        )
-
-                else:
-                    log.warning("No marker pose detected.")
-            else:
-                time.sleep(0.2)
+            # After motion callbacks
+            [cb(**{"wrist_calib_index": index}) for cb in self.after_motion_cb]
 
             # try to keep motion synchronized
             loop_end_time = time.time()
@@ -119,6 +66,9 @@ class TrajectoryPlayer:
             # if process takes time larger than console rate, don't sleep
             if sleep_time > 0:
                 time.sleep(sleep_time)
+            # Safety sleep
+            if loop_end_time - loop_start_time < 0.1:
+                time.sleep(0.1)
 
         log.info("Time to replay trajectory: %f seconds" % (time.time() - start_time))
 
@@ -268,8 +218,23 @@ class RandomJointTrajectory(Trajectory):
 
 
 if __name__ == "__main__":
-    traj = RandomJointTrajectory.generate_trajectory(2000)
-    log.info(traj.setpoints[0])
-    log.info(traj.setpoints[0].position)
-    log.info(traj.setpoints[0].header.stamp.to_sec())
-    log.info(len(traj))
+    rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag")
+    rosbag_handle = RosbagUtils(rosbag_path)
+    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=60)
+    # trajectory = RandomJointTrajectory.generate_trajectory(2000)
+
+    log.info(f"Initial pt {trajectory.setpoints[0].position}")
+    log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
+    log.info(f"number of points {len(trajectory)}")
+
+    arm_namespace = "PSM2"
+    arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
+    arm.home_device()
+
+    trajectory_player = TrajectoryPlayer(arm, trajectory)
+
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    if ans == "y":
+        trajectory_player.replay_trajectory(execute_cb=True)
+    else:
+        exit(0)

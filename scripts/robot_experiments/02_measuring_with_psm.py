@@ -14,7 +14,7 @@ from spatialmath.base import r2q
 
 # ROS and DVRK imports
 import dvrk
-from kincalib.Motion.DataRecorder import Record
+from kincalib.Recording.DataRecord import Record
 from kincalib.Motion.PsmIO import PsmIO
 import rospy
 import tf_conversions.posemath as pm

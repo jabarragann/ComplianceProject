@@ -19,7 +19,7 @@ from spatialmath.base import r2q
 # ROS and DVRK imports
 import PyKDL
 import dvrk
-from kincalib.Motion.DataRecorder import Record
+from kincalib.Recording.DataRecord import Record
 from kincalib.Motion.PsmIO import PsmIO
 import rospy
 import tf_conversions.posemath as pm
@@ -151,6 +151,8 @@ def main():
         f"Distance between {loc[0]} and {loc[1]} in mm (True): {np.linalg.norm(phantom_coord[loc[0]]-phantom_coord[loc[1]]):0.4f}"
     )
     psm_io2 = PsmIO("PSM2", action=recorder_handle)
+
+    # input("press enter to start collection\n")
     time.sleep(0.2)
 
     # ------------------------------------------------------------
@@ -158,26 +160,27 @@ def main():
     # ------------------------------------------------------------
     # Motion parameters
     step_size = 0.003  # 5mm
-    numb_step = 4
+    numb_step = 6
 
     # Move to init position
-    init_p = PyKDL.Vector(0.0369, 0.0271, -0.2204)
+    init_p = PyKDL.Vector(0.0365, 0.0248, -0.2233)
     init_goal_cp = psm_handle.setpoint_cp()
     init_goal_cp.p = init_p
     psm_handle.move_cp(init_goal_cp).wait()
 
-    input("Start motion\n")
+    # input("Press enter to start motion\n")
     log.info(f"{0:02d}-init cp goal {np.array(list(init_goal_cp.p))}")
 
     for i in range(numb_step):
         # Move robot down by step size
         cp = psm_handle.setpoint_cp()
         cp.p[2] -= step_size
-        psm_handle.move_cp(cp)  # servo_cp could also work
+        psm_handle.servo_cp(cp)  # servo_cp could also work
         log.info(f"{i:02d}-cp goal {np.array(list(cp.p))}")
         time.sleep(1.0)
 
     # Move to initial position
+    # input("")
     psm_handle.move_cp(init_goal_cp).wait()
 
     # log.info(f"cp goal {np.array(psm_handle.setpoint_cp().p)}")
