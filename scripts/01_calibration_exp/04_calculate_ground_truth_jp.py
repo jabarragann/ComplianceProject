@@ -26,6 +26,7 @@ from kincalib.utils.Frame import Frame
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial
 from kincalib.utils.CmnUtils import *
+from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -180,6 +181,21 @@ def create_histogram(data, axes, title=None, xlabel=None):
     # plt.show()
 
 
+def calculate_cartesian(joints: np.ndarray):
+    psm_model = DvrkPsmKin()
+    cartesian_pose = psm_model.fkine(joints)
+
+    # Analyse only the position accuracy of the robot
+    cols = ["X", "Y", "Z"]
+    cartesian_df = pd.DataFrame(columns=cols)
+    for p in cartesian_pose.data:
+        posi = p[:3, 3]
+        new_df = pd.DataFrame(posi.reshape(1, -1), columns=cols)
+        cartesian_df = cartesian_df.append(new_df)
+
+    return cartesian_df
+
+
 def main():
     # ------------------------------------------------------------
     # Setup
@@ -242,12 +258,24 @@ def main():
         opt_df.to_csv(dst_p / "opt_error.txt", index=False)
 
     # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.001]["step"]
+    valid_steps = opt_df.loc[opt_df["q56res"] < 0.001]["step"]  # Use the residual to get valid steps.
     robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     diff = robot_valid - tracker_valid
     diff_mean = diff.mean(axis=0)
     diff_std = diff.std(axis=0)
+
+    # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
+    robot_cp = calculate_cartesian(robot_valid)
+    tracker_cp = calculate_cartesian(tracker_valid)
+    cp_error = tracker_cp - robot_cp
+    mean_error = cp_error.apply(np.linalg.norm, 1)
+
+    log.info(f"Cartesian results")
+    log.info(f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}")
+    log.info(f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}")
+    log.info(f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}")
+    log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
 
     log.info(f"Results in degrees")
     log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
@@ -279,7 +307,7 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt:off
-    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-07-traj01", 
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-10-traj01", 
                     help="root dir") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
     parser.add_argument("--trajid", type=int, help="The id of the test trajectory to use") 

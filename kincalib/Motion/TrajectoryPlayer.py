@@ -31,11 +31,38 @@ log = Logger(__name__).log
 
 
 class TrajectoryPlayer:
-    def __init__(self, replay_device, trajectory, before_motion_cb: List = [], after_motion_cb: List = []):
+    def __init__(
+        self,
+        replay_device: ReplayDevice,
+        trajectory: Trajectory,
+        before_motion_loop_cb: List = [],
+        after_motion_cb: List = [],
+    ):
+        """Class to playback a `Trajectory` using a `ReplayDevice`. This class only uses the joint
+        states to replay the trajectory, no cartesian setpoints are used. An additional callback system is used
+        to add extra functionalities before the motion loop and after each motion.
+
+        After motion cb will always receive a index parameter input. To use this argument use the sample signature below.
+        ```
+        def after_motion_cb(index=None):
+            pass
+        ```
+        Parameters
+        ----------
+        replay_device : ReplayDevice
+           Device that will be executing the trajectory
+        trajectory : Trajectory
+            Object that contains a collection of setpoints
+        before_motion_loop_cb : List, optional
+            List of callback functions that will be executed before the motion loop
+        after_motion_cb : List, optional
+            List of callback functions that will be executed after each motion in the motion loop
+
+        """
         self.trajectory = trajectory
         self.replay_device = replay_device
         self.after_motion_cb = after_motion_cb
-        self.before_motion_cb = before_motion_cb
+        self.before_motion_loop_cb = before_motion_loop_cb
 
     def replay_trajectory(self, execute_cb: bool = True):
 
@@ -43,7 +70,8 @@ class TrajectoryPlayer:
         last_bag_time = self.trajectory[0].header.stamp.to_sec()
 
         # Before motion callbacks
-        [cb() for cb in self.before_motion_cb]
+        if execute_cb:
+            [cb() for cb in self.before_motion_loop_cb]
 
         for index, new_js in enumerate(self.trajectory):
             # record start time
@@ -54,11 +82,13 @@ class TrajectoryPlayer:
             last_bag_time = new_bag_time
 
             # Move
+            log.info(f"Executed step {index}")
             log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
             self.replay_device.move_jp(numpy.array(new_js.position)).wait()  # wait until motion is finished
 
             # After motion callbacks
-            [cb(**{"wrist_calib_index": index}) for cb in self.after_motion_cb]
+            if execute_cb:
+                [cb(**{"index": index}) for cb in self.after_motion_cb]
 
             # try to keep motion synchronized
             loop_end_time = time.time()
@@ -75,6 +105,17 @@ class TrajectoryPlayer:
 
 @dataclass
 class Trajectory:
+    """Class storing a collection of joint setpoints to reproduce a trajectory. This class is iterable and should be use
+    with the `TrajectoryPlayer`.
+
+
+    Parameters
+    ----------
+    sampling_factor: int
+       Sample the setpoints every sampling_factor.
+
+    """
+
     sampling_factor: int = 1
     bbmin: np.ndarray = np.zeros(3)
     bbmax: np.ndarray = np.zeros(3)

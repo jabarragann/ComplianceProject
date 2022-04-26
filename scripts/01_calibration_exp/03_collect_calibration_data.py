@@ -13,28 +13,44 @@ from rich.progress import track
 
 # ROS and DVRK imports
 import dvrk
+from kincalib.Recording.DataRecorder import DataRecorder, OuterJointsCalibrationRecorder, WristJointsCalibrationRecorder
 import rospy
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.Motion.replay_rosbag import RosbagReplay
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.Motion.TrajectoryPlayer import TrajectoryPlayer, Trajectory, RandomJointTrajectory
-
 
 log = Logger("collection").log
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    # fmt: off
+    parser.add_argument("-m","--mode", choices=["calib","test"], default="calib",
+        help="Select 'calib' mode for calibration collection. Select 'test' to collect a test trajectory")
+    parser.add_argument("-t","--testid",type=int, help="testid required for test mode")
+    # parser.add_argument("-b", "--rosbag",type=str,
+    #                     default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
+    #                     help="rosbag trajectory to replay")
+    parser.add_argument("-b", "--rosbag",type=str, default=None,
+                        help="rosbag trajectory to replay")
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-14-traj01", 
+                            help="root dir to save the data.")                     
+    parser.add_argument( "-s", "--save", action='store_true',  default=False, 
+                            help="Use this flag to Save recorded data") 
+    args = parser.parse_args()
+    # fmt: on
+
     # ------------------------------------------------------------
     # Script configuration
     # ------------------------------------------------------------
     root = Path(args.root)
     if not root.exists():
         root.mkdir(parents=True)
-        print(f"creating root: {root}")
+        log.info(f"creating root: {root}")
 
     expected_spheres = 4
     marker_name = "custom_marker_112"
@@ -46,7 +62,6 @@ def main():
     # ------------------------------------------------------------
     # Create trajectory from rosbag or random trajectory
     # ------------------------------------------------------------
-
     if args.rosbag is not None:
         rosbag_path = Path(args.rosbag)
         rosbag_handle = RosbagUtils(rosbag_path)
@@ -55,7 +70,7 @@ def main():
         trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
     else:
         log.info(f"Creating random trajectory")
-        trajectory = RandomJointTrajectory.generate_trajectory(250)
+        trajectory = RandomJointTrajectory.generate_trajectory(5)
 
     log.info(f"Trajectory size {len(trajectory)}")
 
@@ -63,25 +78,6 @@ def main():
     # Get robot ready
     # ------------------------------------------------------------
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
-    # arm = dvrk.arm(arm_name=arm_name, expected_interval=0.01)
-    # setpoints = replay.setpoints
-
-    # ------------------------------------------------------------
-    # Extract trajectory and print summary
-    # - Expected topic to use: /<arm>/setpoint_js
-    # ------------------------------------------------------------
-    # replay.collect_trajectory_setpoints()
-    # replay.trajectory_report()
-
-    trajectory_player = TrajectoryPlayer(
-        arm,
-        trajectory,
-        expected_markers=expected_spheres,
-        root=root,
-        marker_name=marker_name,
-        mode=args.mode,
-        test_id=testid,
-    )
 
     # make sure the arm is powered
     print("-- Enabling arm")
@@ -95,49 +91,48 @@ def main():
     arm.move_jp(np.array(trajectory[0].position)).wait()
 
     # ------------------------------------------------------------
-    # Execute trajectory
+    # Config trajectory player
     # ------------------------------------------------------------
+    # Callbacks
+    outer_js_calib_cb = OuterJointsCalibrationRecorder(
+        replay_device=arm, save=args.save, expected_markers=expected_spheres, root=root, marker_name=marker_name
+    )
+    wrist_js_calib_cb = WristJointsCalibrationRecorder(
+        replay_device=arm, save=args.save, expected_markers=expected_spheres, root=root, marker_name=marker_name
+    )
+    data_recorder_cb = DataRecorder(
+        arm, expected_markers=expected_spheres, root=root, marker_name=marker_name, mode=args.mode, test_id=testid
+    )
+
+    if args.mode == "test":
+        trajectory_player = TrajectoryPlayer(
+            arm,
+            trajectory,
+            before_motion_loop_cb=[],
+            after_motion_cb=[data_recorder_cb],
+        )
+    elif args.mode == "calib":
+        trajectory_player = TrajectoryPlayer(
+            arm,
+            trajectory,
+            before_motion_loop_cb=[],  # [outer_js_calib_cb],
+            after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
+        )
+
+    # Execute
     log.info("Collection information")
     log.info(f"Data root dir:     {args.root}")
     log.info(f"Trajectory name:   {args.rosbag}")
+    log.info(f"Save data:         {args.save}")
     log.info(f"Trajectory length: {len(trajectory)}")
-    log.info(f"Mode: {args.mode} ")
-    input('-> Press "Enter" to start data collection trajectory')
+    log.info(f"Mode:              {args.mode} ")
 
-    if args.mode == "test":
-        # Collect a testing trajectory.
-        log.info("Collecting test trajectory")
-        log.info(f"Saving data to  {args.file}")
-        filename = (root / "test_trajectories") / args.file
-        # replay.execute_measure(arm, filename, marker_name, expected_spheres=expected_spheres)
-        trajectory_player.replay_trajectory(measure=True, saving=True, calibration=False)
-    elif args.mode == "calib":
-        # Collect calibration data.
-        log.info("Collecting calibration data")
-        # replay.collect_calibration_data(arm, root, marker_name, expected_spheres=expected_spheres)
-        trajectory_player.replay_trajectory(measure=True, saving=True, calibration=True)
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    if ans == "y":
+        trajectory_player.replay_trajectory(execute_cb=True)
+    else:
+        exit(0)
 
 
-parser = argparse.ArgumentParser()
-# fmt: off
-parser.add_argument("-m","--mode", choices=["calib","test"], default="calib",
-help="Select 'calib' mode for calibration collection. Select 'test' to collect a test trajectory")
-
-parser.add_argument("-t","--testid",type=int, help="testid required for test mode")
-
-# parser.add_argument("-b", "--rosbag",type=str,
-#                     default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
-#                     help="rosbag trajectory to replay")
-parser.add_argument("-b", "--rosbag",type=str,
-                    default=None,
-                    help="rosbag trajectory to replay")
-parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-07-traj01", 
-                        help="root dir to save the data.")                     
-
-parser.add_argument( "-f", "--file", type=str, default="test_traj01", 
-                        help="filename where a test trajectory data will be saved. execute_measure() func") 
-args = parser.parse_args()
-
-# fmt: on
 if __name__ == "__main__":
     main()

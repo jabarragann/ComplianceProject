@@ -40,6 +40,23 @@ class CalibrationRecord(Record):
     def __init__(
         self, ftk_handler, robot_handler, expected_markers, root_dir, mode: str = "calib", test_id: int = None
     ) -> None:
+        """_summary_
+
+        Parameters
+        ----------
+        ftk_handler : _type_
+            _description_
+        robot_handler : _type_
+            _description_
+        expected_markers : _type_
+            _description_
+        root_dir : _type_
+            _description_
+        mode : str, optional
+            Operation mode, by default "calib". Needs to be either 'calib' or 'test'
+        test_id : int, optional
+            _description_, by default None
+        """
 
         assert mode in ["calib", "test"], "mode needs to be calib or test"
         self.ftk_handler = ftk_handler

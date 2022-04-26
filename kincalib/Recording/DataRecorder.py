@@ -35,7 +35,7 @@ log = Logger(__name__).log
 
 class DataRecorder:
     """
-    Callable data class to record data.
+    Callable data class to record data from robot and sensor.
     """
 
     def __init__(self, replay_device, expected_markers: int, root: Path, marker_name: str, mode: str, test_id: int):
@@ -51,12 +51,15 @@ class DataRecorder:
             mode=mode,
             test_id=test_id,
         )
-        self.index = 0
 
-    def __call__(self):
-        self.collect_data()
+    def __call__(self, **kwargs):
+        self.collect_data(**kwargs)
 
-    def collect_data(self):
+    def collect_data(self, index=None):
+        if index is None:
+            log.error("specify index WristJointsCalibrationRecorder")
+            exit(0)
+
         marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
             self.expected_markers, t=200, sample_time=15
         )
@@ -66,11 +69,14 @@ class DataRecorder:
             # Measure
             jp = self.replay_device.measured_jp()
             jaw_jp = self.replay_device.jaw.measured_jp()[0]
-            self.calibration_record.create_new_entry(self.index, jp, jaw_jp)
-            self.index += 1
+            self.calibration_record.create_new_entry(index, jp, jaw_jp)
 
 
 class OuterJointsCalibrationRecorder:
+    """Class to perfom the calibration motion of the outer joints while recording the data from
+    robot and sensor
+    """
+
     def __init__(self, replay_device, save: bool, expected_markers: int, root: Path, marker_name: str):
         self.save = save
         self.replay_device = replay_device
@@ -91,6 +97,10 @@ class OuterJointsCalibrationRecorder:
 
 
 class WristJointsCalibrationRecorder:
+    """Class to perfom the calibration motion of the wrist joints while recording the data from
+    robot and sensor
+    """
+
     def __init__(self, replay_device, save: bool, expected_markers: int, root: Path, marker_name: str):
         self.save = save
         self.replay_device = replay_device
@@ -100,16 +110,17 @@ class WristJointsCalibrationRecorder:
         if not self.wrist_files.exists():
             self.wrist_files.mkdir(parents=True)
 
-    def __call__(self, wrist_calib_index=None) -> Any:
-        if wrist_calib_index is None:
+    def __call__(self, index=None) -> Any:
+        if index is None:
             log.error("specify index WristJointsCalibrationRecorder")
+            exit(0)
 
         CalibrationMotions.pitch_yaw_roll_independent_motion(
             self.replay_device.measured_jp(),
             psm_handler=self.replay_device,
             expected_markers=self.expected_markers,
             save=self.save,
-            filename=self.wrist_files / f"step{wrist_calib_index:03d}_wrist_motion.txt",
+            filename=self.wrist_files / f"step{index:03d}_wrist_motion.txt",
         )
 
 
@@ -134,12 +145,15 @@ if __name__ == "__main__":
     wrist_js_calib_cb = WristJointsCalibrationRecorder(
         replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
     )
+    data_recorder_cb = DataRecorder(arm, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11)
 
     # Create trajectory player with cb
     # trajectory_player = TrajectoryPlayer(
     #     arm, trajectory, before_motion_cb=[outer_js_calib_cb], after_motion_cb=[wrist_js_calib_cb]
     # )
-    trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_cb=[], after_motion_cb=[wrist_js_calib_cb])
+    trajectory_player = TrajectoryPlayer(
+        arm, trajectory, before_motion_loop_cb=[], after_motion_cb=[data_recorder_cb, wrist_js_calib_cb]
+    )
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
