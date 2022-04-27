@@ -61,7 +61,7 @@ class Plotter3D:
         if title is not None:
             self.ax.set_title(title)
 
-    def scatter_3d(self, points: np.ndarray, marker="^", color=None, marker_size=20, label=None) -> None:
+    def scatter_3d(self, points: np.ndarray, marker="^", color=None, marker_size=20, label=None, title=None) -> None:
         """[summary]
 
         Args:
@@ -75,6 +75,8 @@ class Plotter3D:
 
         self.ax.scatter(points[0, :], points[1, :], points[2, :], marker=marker, c=color, s=marker_size, label=label)
         self.ax.legend()
+        if title is not None:
+            self.ax.set_title(title)
 
     def plot():
         plt.show()
