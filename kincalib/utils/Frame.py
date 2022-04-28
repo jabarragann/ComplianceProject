@@ -10,7 +10,7 @@ log = Logger(__name__).log
 
 
 class Frame:
-    def __init__(self, r: np.ndarray, p: np.ndarray, normalization_warning=True) -> None:
+    def __init__(self, r: np.ndarray, p: np.ndarray, normalization_warning=False) -> None:
         """Create a frame with rotation `r` and translation `p`.
         Args:
             r (np.ndarray): Rotation.

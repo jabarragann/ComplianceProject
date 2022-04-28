@@ -1,6 +1,7 @@
 # Python imports
 
 from pathlib import Path
+import pickle
 import time
 import argparse
 import sys
@@ -16,6 +17,7 @@ import re
 from collections import defaultdict
 import traceback
 import seaborn as sns
+from sklearn.metrics import log_loss
 
 # ROS and DVRK imports
 import dvrk
@@ -56,6 +58,13 @@ def main():
     dict_files = load_registration_data(root)
     keys = sorted(list(dict_files.keys()))
 
+    general_metrics = {
+        "total_samples": 0,
+        "no_tracker_data": 0,
+        "rejected": 0,
+        "rejected_by_triangle_area": 0,
+        "rejected_by_pitch2yaw": 0,
+    }
     list_area = []
     list_pitch_orig_M = []
     list_roll_axis_M = []
@@ -67,8 +76,11 @@ def main():
     prev_p_ax = None
     prev_r_ax = None
     for k in keys:
+        log.info(f"loading step {k}")
+        general_metrics["total_samples"] += 1
         if len(list(dict_files[k].keys())) < 2:
             log.warning(f"files for step {k} are not available")
+            general_metrics["no_tracker_data"] += 1
             continue
 
         try:
@@ -77,9 +89,10 @@ def main():
             # Get pitch and yaw circles
             pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[k]["pitch"])
         except Exception as e:
+            general_metrics["no_tracker_data"] += 1
             log.error(f"Exception triggered in step {k}")
             log.error(e)
-            log.debug(traceback.print_exc())
+            # log.debug(traceback.print_exc())
             continue
 
         # Estimate pitch origin with roll and pitch
@@ -173,10 +186,15 @@ def main():
         # Add data to list
         if area < 3:
             list_area.append(area)
+            for k in range(2):
+                u_limit = 0.0093 + 0.009
+                l_limit = 0.0093 - 0.009
+                if pitch2yaw1[k] > u_limit or pitch2yaw1[k] < l_limit:
+                    general_metrics["rejected_by_pitch2yaw"] += 1
+                else:
+                    list_pitch2yaw.append(pitch2yaw1[k])
+                    list_fiducial_Y.append(fiducial_Y[k].squeeze())
 
-            list_pitch2yaw.append(pitch2yaw1)
-            list_fiducial_Y.append(fiducial_Y[0].squeeze())
-            list_fiducial_Y.append(fiducial_Y[1].squeeze())
             # Data from roll 1 position
             list_pitch_orig_M.append(pitch_ori1_M.squeeze())
             list_pitch_axis_M.append(pitch_ax1_M)
@@ -186,6 +204,8 @@ def main():
             list_pitch_axis_M.append(pitch_ax2_M)
             list_roll_axis_M.append(roll_axis2_M)
         else:
+            general_metrics["rejected"] += 1
+            general_metrics["rejected_by_triangle_area"] += 1
             log.warning(f"Data in step {k} was not added to list")
 
     list_area = np.array(list_area)
@@ -199,6 +219,7 @@ def main():
     if not f_path.exists():
         f_path.mkdir(parents=True)
 
+    pickle.dump(general_metrics, open(f_path / "general_metrics.pkl", "wb"))
     np.save(f_path / "error_metric_pitch2yaw", list_pitch2yaw)
     np.save(f_path / "error_metric_fid_in_yaw", list_fiducial_Y)
     np.save(f_path / "error_metric_area", list_area)
@@ -212,7 +233,7 @@ def plot_results():
     f_path = root / "registration_results/error_metrics"
 
     # Plot area histograms
-
+    general_metrics = pickle.load(open(f_path / "general_metrics.pkl", "rb"))
     list_pitch2yaw = np.load(f_path / "error_metric_pitch2yaw.npy")
     list_area = np.load(f_path / "error_metric_area.npy")
     fiducial_Y = np.load(f_path / "error_metric_fid_in_yaw.npy")
@@ -224,6 +245,11 @@ def plot_results():
     roll_axis_df = pd.DataFrame(roll_axis, columns=["px", "py", "pz"])
 
     plus_minus_sign = "\u00B1"
+    print()
+    log.info("General metrics")
+    for k, v in general_metrics.items():
+        log.info(f"{k}: {v}")
+    print()
     log.info(f"Error report for {root}. (N={list_area.shape[0]})")
     log.info(f"Mean area (mm^2): {mean_std_str(list_area.mean(),list_area.std())}")
     log.info(f"pitch2yaw (m):    {mean_std_str(list_pitch2yaw.mean(),list_pitch2yaw.std())}")
@@ -271,8 +297,8 @@ def plot_results():
     # sns.boxplot(y=pitch_axis_df["pz"] - pitch_axis_df["pz"].mean(), ax=axes[2])
 
     plotter = Plotter3D()
-    # plotter.scatter_3d(fiducial_Y.T)
-    plotter.scatter_3d(pitch_axis.T)
+    plotter.scatter_3d(fiducial_Y.T, title=f"Fiducial from Yaw frame N={fiducial_Y.shape[0]}")
+    # plotter.scatter_3d(pitch_axis.T)
     # plotter.scatter_3d(roll_axis.T)
     plt.show()
 
@@ -282,8 +308,9 @@ def plot_results():
 # ------------------------------------------------------------
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-10-traj01", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
                         help="root dir") 
+parser.add_argument( "--reset", action='store_true',default=False,  help="Re calculate error metrics") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                         help="log level") #fmt:on
 args = parser.parse_args()
@@ -291,5 +318,7 @@ log_level = args.log
 log = Logger("pitch error analysis", log_level=log_level).log
 
 if __name__ == "__main__":
-    main()
+    p = Path(args.root)/ "registration_results/error_metrics"
+    if not p.exists() or args.reset:
+        main()
     plot_results()

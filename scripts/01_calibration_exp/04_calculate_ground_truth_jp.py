@@ -307,7 +307,7 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt:off
-    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-10-traj01", 
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
                     help="root dir") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
     parser.add_argument("--trajid", type=int, help="The id of the test trajectory to use") 

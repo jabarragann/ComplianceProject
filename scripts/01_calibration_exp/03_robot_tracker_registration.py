@@ -80,12 +80,12 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     roll_axis_std = roll_axis.std(axis=0)
     # calculate fiducial in yaw
     fiducial_yaw = registration_data[["yfx", "yfy", "yfz"]].to_numpy()
-    fiducial_yaw_mean = fiducial_yaw.mean(axis=0)
-    fiducial_yaw_std = fiducial_yaw.std(axis=0)
+    fiducial_yaw_mean = np.nanmean(fiducial_yaw, axis=0)
+    fiducial_yaw_std = np.nanstd(fiducial_yaw, axis=0)
     # Calculate pitch2yaw
     pitch2yaw = registration_data["pitch2yaw"].to_numpy()
-    pitch2yaw_mean = pitch2yaw.mean()
-    pitch2yaw_std = pitch2yaw.std()
+    pitch2yaw_mean = np.nanmean(pitch2yaw)
+    pitch2yaw_std = np.nanstd(pitch2yaw)
 
     other_values_dict["pitchaxis"] = pitch_axis_mean
     other_values_dict["rollaxis"] = roll_axis_mean
@@ -123,7 +123,7 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     return Frame.init_from_matrix(pitch2marker_T)
 
 
-def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM2/local/query_cp") -> pd.DataFrame:
+def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM1/local/query_cp") -> pd.DataFrame:
     # ------------------------------------------------------------
     # Connect to DVRK fk service
     # ------------------------------------------------------------
@@ -174,6 +174,7 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # fmt: off
     cols_pitch_M = [ "step", "mox", "moy", "moz", "mpx", "mpy", "mpz",
                         "mrx", "mry", "mrz", "yfx", "yfy", "yfz","tfx","tfy","tfz", "pitch2yaw" ]
+    # TFX,TFY,TFZ are not being used
     # fmt: on
     df_results = pd.DataFrame(columns=cols)
     df_pitch_axes = pd.DataFrame(columns=cols_pitch_M)
@@ -230,6 +231,12 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
             pitch_ori_T, pitch_yaw_circles, roll_cir2
         )
+        u_limit = 0.0093 + 0.009
+        l_limit = 0.0093 - 0.009
+        if pitch2yaw1[1] > u_limit or pitch2yaw1[1] < l_limit:
+            fiducial_Y[1][:] = np.nan
+            fiducial_T[1][:] = np.nan
+            pitch2yaw1[1] = np.nan
 
         # Add to dataframe
         # fmt: off
@@ -245,6 +252,26 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def calculate_axes_in_marker(pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax):
+    """Calculate roll axis and pitch axis and pitch origin in the marker frame
+
+    Parameters
+    ----------
+    pitch_ori_T : _type_
+        _description_
+    pitch_yaw_circles : dict
+        _description_
+    roll_circle : _type_
+        _description_
+    prev_p_ax : _type_
+        _description_
+    prev_r_ax : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     # Marker2Tracker
     T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
     pitch_ori1 = (T_TM1.inv() @ pitch_ori_T).squeeze()
@@ -325,7 +352,7 @@ def main():
 
     # Obtain registration data
     registration_data_path = root / "registration_results/registration_data.txt"
-    if registration_data_path.exists():
+    if registration_data_path.exists() and not args.reset:
         log.info("Loading registration data ...")
         registration_data = pd.read_csv(registration_data_path)
     else:
@@ -362,8 +389,9 @@ def main():
 
 parser = argparse.ArgumentParser()
 # fmt:off
-parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-10-traj01", 
+parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
                 help="root dir") 
+parser.add_argument( "--reset", action='store_true',default=False,  help="Re calculate error metrics") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                 help="log level") #fmt:on
 args = parser.parse_args()

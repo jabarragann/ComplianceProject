@@ -51,35 +51,35 @@ class CalibrationMotions:
     # - wrist yaw   (j6)
     # ------------------------------------------------------------
     @staticmethod
-    def generate_outer_yaw(steps: int = 22) -> np.ndarray:
+    def generate_outer_yaw(steps: int = 20) -> np.ndarray:
         min_outer_yaw = -0.6250
         max_outer_yaw = 0.6250
         trajectory = np.linspace(min_outer_yaw, max_outer_yaw, num=steps)
         return trajectory
 
     @staticmethod
-    def generate_outer_pitch(steps: int = 22) -> np.ndarray:
+    def generate_outer_pitch(steps: int = 20) -> np.ndarray:
         min_outer_pitch = -0.4173
         max_outer_pitch = 0.5426
         trajectory = np.linspace(min_outer_pitch, max_outer_pitch, num=steps)
         return trajectory
 
     @staticmethod
-    def generate_pitch_motion(steps: int = 22) -> np.ndarray:
+    def generate_pitch_motion(steps: int = 20) -> np.ndarray:
         min_pitch = -1.39
         max_pitch = 1.39
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
     @staticmethod
-    def generate_roll_motion(steps: int = 22) -> np.ndarray:
+    def generate_roll_motion(steps: int = 20) -> np.ndarray:
         min_pitch = -0.45
         max_pitch = 0.9
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
     @staticmethod
-    def generate_yaw_motion(steps: int = 22) -> np.ndarray:
+    def generate_yaw_motion(steps: int = 20) -> np.ndarray:
         min_pitch = -1.38
         max_pitch = 1.38
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)

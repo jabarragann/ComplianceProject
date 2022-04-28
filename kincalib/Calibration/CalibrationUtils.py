@@ -350,8 +350,9 @@ class CalibrationUtils:
             T_TJ[:3, 2] = yaw_cir.normal
             T_TJ[:3, 3] = yaw_orig_M
             T_TJ = Frame.init_from_matrix(T_TJ)
-            # Get fiducial in jaw coordinates
-            fid_T, solutions = dist_circle3_plane(pitch_cir, roll_circle2.get_plane())
+            # Get fiducial in jaw coordinates==>
+            # Changed calculated the fid_T from pitch_cir and the yaw_circle plane.
+            fid_T, solutions = dist_circle3_plane(pitch_cir, yaw_cir.get_plane())
             fiducial_Y.append(T_TJ.inv() @ fid_T)
             fiducial_T.append(fid_T)
 

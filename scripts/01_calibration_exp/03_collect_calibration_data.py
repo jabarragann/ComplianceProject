@@ -70,7 +70,7 @@ def main():
         trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
     else:
         log.info(f"Creating random trajectory")
-        trajectory = RandomJointTrajectory.generate_trajectory(5)
+        trajectory = RandomJointTrajectory.generate_trajectory(600)
 
     log.info(f"Trajectory size {len(trajectory)}")
 
@@ -115,7 +115,7 @@ def main():
         trajectory_player = TrajectoryPlayer(
             arm,
             trajectory,
-            before_motion_loop_cb=[],  # [outer_js_calib_cb],
+            before_motion_loop_cb=[outer_js_calib_cb],  # [outer_js_calib_cb],
             after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
         )
 
@@ -126,6 +126,7 @@ def main():
     log.info(f"Save data:         {args.save}")
     log.info(f"Trajectory length: {len(trajectory)}")
     log.info(f"Mode:              {args.mode} ")
+    log.info(f"Test id:           {testid} ")
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
