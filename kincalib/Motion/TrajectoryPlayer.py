@@ -85,6 +85,7 @@ class TrajectoryPlayer:
             log.info(f"Executed step {index}")
             log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
             self.replay_device.move_jp(numpy.array(new_js.position)).wait()  # wait until motion is finished
+            time.sleep(0.005)
 
             # After motion callbacks
             if execute_cb:
