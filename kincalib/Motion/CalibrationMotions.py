@@ -72,9 +72,9 @@ class CalibrationMotions:
         return trajectory
 
     @staticmethod
-    def generate_roll_motion(steps: int = 20) -> np.ndarray:
-        min_pitch = -0.45
-        max_pitch = 0.9
+    def generate_roll_motion(steps: int = 24) -> np.ndarray:
+        min_pitch = -0.70
+        max_pitch = 0.55
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
