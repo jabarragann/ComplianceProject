@@ -115,7 +115,7 @@ def main():
         trajectory_player = TrajectoryPlayer(
             arm,
             trajectory,
-            before_motion_loop_cb=[],  # [outer_js_calib_cb],
+            before_motion_loop_cb=[outer_js_calib_cb],  # [outer_js_calib_cb],
             after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
         )
 
