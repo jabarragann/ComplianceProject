@@ -52,25 +52,27 @@ python3 scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r data/03_re
 * Multiple marker problem solutions. 
 * ftk_uilts::identify_marker functions might be creating outlier data.
 * Rename the pitch frame to the roll frame. See the frame that is calculated in the registration script.
+* Todo: make the circle least square estimation robust to outliers
+* Todo: Inspect data for data points that seem very odd.   
 
 # Failure cases that I need to revise
 
 ## Failure in fiducial from Yaw calculation
-## TODO make the circle least square estimation robust to outliers
-With script 02_pitch_yaw_roll_analysis.py
+* With script 02_pitch_yaw_roll_analysis.py
+```
 Calibration data: d04-rec-06-traj01
 Step: 1680
 Problem: Outlier in roll2 data creates a wrong circle 
 
-With script 02_pitch_yaw_roll_analysis.py
 Calibration data: d04-rec-06-traj01
 Step: 240
 Problem: Outlier in roll2 data creates a wrong circle 
 
-With script 02_pitch_yaw_roll_analysis.py
 Calibration data: d04-rec-06-traj01
 Step: 440
 Problem: Outlier in pitch data creates a wrong circle 
+
+```
 
 Ransac might be a good solution.
 https://scikit-image.org/docs/dev/auto_examples/transform/plot_ransac.html
@@ -81,4 +83,3 @@ https://nirpyresearch.com/detecting-outliers-using-mahalanobis-distance-pca-pyth
 https://www.statology.org/how-to-find-iqr-of-box-plot/
 
 ## Failure in rotation axis from Marker
-## Todo: Inspect data for data points that seem very odd.

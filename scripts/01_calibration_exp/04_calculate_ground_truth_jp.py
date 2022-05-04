@@ -149,8 +149,8 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         new_pt = pd.DataFrame(d, columns=cols_tracker)
         df_tracker = df_tracker.append(new_pt)
 
-        # if step > 400:
-        #     break
+        if step > 40:
+            break
 
     return df_robot, df_tracker, df_opt  # opt_error
 
@@ -206,14 +206,30 @@ def main():
     marker_file = Path("./share/custom_marker_id_112.json")
 
     if args.test:
-        robot_jp_p = root / f"test_trajectories/{args.trajid:02d}" / "robot_jp.txt"
-        robot_cp_p = root / f"test_trajectories/{args.trajid:02d}" / "robot_cp.txt"
+        robot_jp_p = root / f"test_trajectories/{args.testid:02d}" / "robot_jp.txt"
+        robot_cp_p = root / f"test_trajectories/{args.testid:02d}" / "robot_cp.txt"
     else:
         robot_jp_p = root / "robot_mov" / "robot_jp.txt"
         robot_cp_p = root / "robot_mov" / "robot_cp.txt"
+    # ------------------------------------------------------------
+    # Calculate tracker joint values
+    # ------------------------------------------------------------
 
-    dst_p = robot_cp_p.parent / "result"
-    if (robot_cp_p.parent / "result" / "robot_joints.txt").exists() and not args.reset:
+    if args.dstdir is None:
+        dst_p = robot_cp_p.parent
+        dst_p = dst_p / "result"
+        registration_data_path = root / "registration_results"
+    else:
+        dst_p = Path(args.dstdir)
+        registration_data_path = dst_p / root.name / "registration_results"
+        dst_p = dst_p / root.name / robot_cp_p.parent.name / "result"  # e.g d04-rec-11-traj01/01/results/
+
+    log.info(f"Storing results in {dst_p}")
+    log.info(f"Loading registration .json from {registration_data_path}")
+    dst_p.mkdir(parents=True, exist_ok=True)
+    input("press enter to start ")
+
+    if (dst_p / "robot_joints.txt").exists() and not args.reset:
         # ------------------------------------------------------------
         # Read calculated joint values
         # ------------------------------------------------------------
@@ -227,7 +243,6 @@ def main():
         # Read data
         robot_jp = pd.read_csv(robot_jp_p)
         robot_cp = pd.read_csv(robot_cp_p)
-        registration_data_path = root / "registration_results"
         registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
         # calculate joints
         T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
@@ -238,8 +253,8 @@ def main():
 
         if not (registration_data_path / "registration_data.txt").exists():
             log.error("Missing registration data file")
-        if not (registration_data_path / "robot2tracker_t.npy").exists():
-            log.error("Missing robot tracker transformation")
+        # if not (registration_data_path / "robot2tracker_t.npy").exists():
+        #     log.error("Missing robot tracker transformation")
 
         reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
 
@@ -256,6 +271,10 @@ def main():
         robot_df.to_csv(dst_p / "robot_joints.txt", index=False)
         tracker_df.to_csv(dst_p / "tracker_joints.txt", index=False)
         opt_df.to_csv(dst_p / "opt_error.txt", index=False)
+
+    # ------------------------------------------------------------
+    # Evaluate results
+    # ------------------------------------------------------------
 
     # Calculate stats
     valid_steps = opt_df.loc[opt_df["q56res"] < 0.001]["step"]  # Use the residual to get valid steps.
@@ -307,13 +326,15 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt:off
-    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-10-traj01", 
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
                     help="root dir") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
-    parser.add_argument("--trajid", type=int, help="The id of the test trajectory to use") 
-    parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
-                    help="log level") #fmt:on
+    parser.add_argument("--testid", type=int, help="The id of the test trajectory to use") 
+    parser.add_argument( "-l", "--log", type=str, default="DEBUG", help="log level") 
     parser.add_argument('--reset', action='store_true',help="Recalculate joint values")
+    parser.add_argument('--dstdir', default=None, help='Directory to save results. This directory must ' \
+                            'contain a calibration .json file.')
+    # fmt:on
     args = parser.parse_args()
     log_level = args.log
     log = Logger("pitch_exp_analize2", log_level=log_level).log

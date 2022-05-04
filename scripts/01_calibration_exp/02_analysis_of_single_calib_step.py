@@ -38,11 +38,11 @@ from kincalib.utils.Frame import Frame
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
-def plot_circles(circles_list, colors=None):
+def plot_circles(circles_list, colors=None, title=None):
     if colors is None:
         colors = ["black"] * len(circles_list)
 
-    plotter = Plotter3D()
+    plotter = Plotter3D(title)
     for ci, color in zip(circles_list, colors):
         plotter.scatter_3d(ci.generate_pts(40), marker="o", color=color)
         plotter.scatter_3d(ci.samples, marker="*", color="blue")
@@ -57,7 +57,7 @@ def main():
     # Load files
     dict_files = load_registration_data(root)
     keys = sorted(list(dict_files.keys()))
-    k = 440  # 1680,440,240
+    k = args.step  # 1680,440,240
     if len(list(dict_files[k].keys())) < 2:
         log.warning(f"files for step {k} are not available")
         exit(0)
@@ -70,10 +70,17 @@ def main():
     # Get pitch and yaw circles
     pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[k]["pitch"])
     # Estimate pitch origin with roll and pitch
-    m1, m2, m3 = calib.calculate_pitch_origin(
-        roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
-    )
+    m1, m2, m3 = calib.calculate_pitch_origin(roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"])
     pitch_orig_est1 = (m1 + m2 + m3) / 3
+    pitch_triangle = Triangle3D([m1, m2, m3])
+    area = pitch_triangle.calculate_area(scale=1000)
+    log.info(f"Pitch triangle area (mm^2): {area:0.4f}")
+
+    # circles = [roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]]
+    # circles = [roll_cir1]
+    # circles = [pitch_yaw_circles[1]["pitch"]]
+    # colors = ["black", "orange", "orange"]
+    # plot_circles(circles, colors, "Pitch origin circles")
 
     for kk in range(2):
         log.info(f"Estimation for roll value {kk}")
@@ -114,20 +121,27 @@ def main():
         log.info(f"wrist fiducial in tracker.          {fiducial_T}")
         log.info(f"wrist fiducial in yaw frame.        {fiducial_J.squeeze()}")
 
-    # Plot
-    # circles = [roll_cir1, roll_cir2, pitch_cir, yaw_cir]
-    # plotter = plot_circles(circles, ["black", "black", "orange", "orange"])
-    circles = [pitch_cir]
-    plotter = plot_circles(circles, ["orange"])
+        # Plot
+        # circles = [roll_cir1, roll_cir2, pitch_cir, yaw_cir]
+        # plotter = plot_circles(circles, ["black", "black", "orange", "orange"])
+        circles = [roll_cir2]
+        plotter = plot_circles(circles, ["orange", "Black"], title=f"Yaw origin analysis {kk}")
 
-    plotter.scatter_3d(np.array(fiducial_T).T, marker="*", marker_size=100, color="green")
-    plotter.scatter_3d(
-        np.array([pitch_orig_est1, pitch_orig_est2, yaw_orig_est]).T,
-        marker="o",
-        marker_size=100,
-        color="green",
-    )
-
+        plotter.scatter_3d(
+            np.array(fiducial_T).T,
+            marker="*",
+            marker_size=100,
+            color="green",
+            label="intersection between roll2 and pitch",
+        )
+        plotter.scatter_3d(
+            np.array([pitch_orig_est1, pitch_orig_est2, yaw_orig_est]).T,
+            marker="o",
+            marker_size=100,
+            color="green",
+            label="pitch/yaw origins",
+        )
+    plotter.ax.legend()
     plt.show()
 
 
@@ -140,7 +154,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-06-traj01", 
                         help="root dir") 
 parser.add_argument( "-l", "--log", type=str, default="INFO", 
-                        help="log level") #fmt:on
+                        help="log level")
+parser.add_argument( "-s", "--step", type=int, default=440, help="step to analyze")  #fmt:on
+
 args = parser.parse_args()
 log_level = args.log
 log = Logger("pitch_exp_analize2", log_level=log_level).log

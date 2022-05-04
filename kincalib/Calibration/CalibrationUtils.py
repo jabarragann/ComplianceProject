@@ -308,6 +308,28 @@ class CalibrationUtils:
         return midpoint1, midpoint2, midpoint3
 
     def calculate_fiducial_from_yaw(pitch_orig_T, pitch_yaw_circles, roll_circle2):
+        """Using the yaw and pitch circle calculate the location of the robot's wrist fiducial from
+        the tracker frame and the yaw frame, and the yaw2pitch distance. This three values will evaluated for
+        each roll position of the robot.
+
+        Parameters
+        ----------
+        pitch_orig_T : _type_
+            _description_
+        pitch_yaw_circles : _type_
+            _description_
+        roll_circle2 : _type_
+            _description_
+
+        Returns
+        -------
+        fiducial_Y: List[np.ndarray]
+            List containing the wrist's fiducial locations from Yaw frame.
+        fiducial_T: List[np.ndarray]
+            List containing the wrist's fiducial location from Tracker frame
+        pitch2yaw1: List[float]
+            List containing pitch2 yaw distances
+        """
         fiducial_Y = []
         fiducial_T = []
         pitch2yaw1 = []
@@ -328,7 +350,10 @@ class CalibrationUtils:
             T_TJ[:3, 2] = yaw_cir.normal
             T_TJ[:3, 3] = yaw_orig_M
             T_TJ = Frame.init_from_matrix(T_TJ)
-            # Get fiducial in jaw coordinates
+            # Get fiducial in jaw coordinates==>
+            # Changed calculated the fid_T:
+            # v1 used pitch_cir and the roll_circle2 plane.
+            # v2 uses pitch_cir and the yaw_circle plane
             fid_T, solutions = dist_circle3_plane(pitch_cir, roll_circle2.get_plane())
             fiducial_Y.append(T_TJ.inv() @ fid_T)
             fiducial_T.append(fid_T)

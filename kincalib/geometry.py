@@ -52,14 +52,16 @@ def dist_circle3_plane(circle: Circle3D, plane: Plane3D) -> np.ndarray:
 
 
 class Plotter3D:
-    def __init__(self) -> None:
+    def __init__(self, title: str = None) -> None:
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(projection="3d")
         self.ax.set_xlabel("X Label")
         self.ax.set_ylabel("Y Label")
         self.ax.set_zlabel("Z Label")
+        if title is not None:
+            self.ax.set_title(title)
 
-    def scatter_3d(self, points: np.ndarray, marker="^", color=None, marker_size=20) -> None:
+    def scatter_3d(self, points: np.ndarray, marker="^", color=None, marker_size=20, label=None, title=None) -> None:
         """[summary]
 
         Args:
@@ -71,9 +73,10 @@ class Plotter3D:
         if len(points.shape) == 1:
             points = points.reshape(-1, 1)
 
-        self.ax.scatter(
-            points[0, :], points[1, :], points[2, :], marker=marker, c=color, s=marker_size
-        )
+        self.ax.scatter(points[0, :], points[1, :], points[2, :], marker=marker, c=color, s=marker_size, label=label)
+        self.ax.legend()
+        if title is not None:
+            self.ax.set_title(title)
 
     def plot():
         plt.show()
@@ -95,9 +98,7 @@ def rodrigues_rot(P, n0, n1):
     # Compute rotated points
     P_rot = np.zeros((len(P), 3))
     for i in range(len(P)):
-        P_rot[i] = (
-            P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
-        )
+        P_rot[i] = P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
 
     return P_rot
 

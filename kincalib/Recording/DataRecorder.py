@@ -59,7 +59,7 @@ class DataRecorder:
         if index is None:
             log.error("specify index WristJointsCalibrationRecorder")
             exit(0)
-
+        log.info("record data")
         marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
             self.expected_markers, t=200, sample_time=15
         )
@@ -114,7 +114,7 @@ class WristJointsCalibrationRecorder:
         if index is None:
             log.error("specify index WristJointsCalibrationRecorder")
             exit(0)
-
+        log.info("calibration")
         CalibrationMotions.pitch_yaw_roll_independent_motion(
             self.replay_device.measured_jp(),
             psm_handler=self.replay_device,

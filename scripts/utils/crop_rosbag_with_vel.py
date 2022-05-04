@@ -56,7 +56,7 @@ def main():
 
     log = Logger("rosbag_utils").log
 
-    rb = RosbagUtils(file_p, log=log)
+    rb = RosbagUtils(file_p)
     rb.print_topics_info()
 
     # ------------------------------------------------------------
@@ -90,7 +90,7 @@ def main():
     # See crop data
     # ------------------------------------------------------------
     file_crop = file_p.parent / (file_p.with_suffix("").name + "_cropped.bag")
-    rb_crop = RosbagUtils(file_crop, log=log)
+    rb_crop = RosbagUtils(file_crop)
     rb_crop.print_topics_info()
 
     topics = ["/PSM2/measured_js", "/PSM2/setpoint_js", "/PSM2/measured_cv"]
