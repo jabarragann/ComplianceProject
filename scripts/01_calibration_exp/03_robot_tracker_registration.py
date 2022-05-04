@@ -324,14 +324,6 @@ def obtain_registration_data(root: Path):
     pitch_df = pd.merge(pitch_tracker, pitch_marker, on="step")
     final_df = pd.merge(pitch_robot, pitch_df, on="step")
 
-    # Save df
-    dst_f = root / "registration_results"
-    if not dst_f.exists():
-        dst_f.mkdir(parents=True)
-
-    dst_f = dst_f / "registration_data.txt"
-    final_df.to_csv(dst_f, index=None)
-
     if final_df.shape[0] == 0:
         raise Exception("No data found for registration")
 
@@ -350,14 +342,21 @@ def main():
     marker_file = Path("./share/custom_marker_id_112.json")
     regex = ""
 
+    # Paths
+    registration_data_path = Path(args.dstdir) / root.name if args.dstdir is not None else root
+    registration_data_path = registration_data_path / "registration_results/"
+    registration_data_path.mkdir(parents=True, exist_ok=True)
+    log.info(f"Look for registration data in {registration_data_path}")
+
     # Obtain registration data
-    registration_data_path = root / "registration_results/registration_data.txt"
-    if registration_data_path.exists() and not args.reset:
+    if (registration_data_path / "registration_data.txt").exists() and not args.reset:
         log.info("Loading registration data ...")
-        registration_data = pd.read_csv(registration_data_path)
+        registration_data = pd.read_csv(registration_data_path / "registration_data.txt")
     else:
-        log.info("Extracting registration data")
+        log.info("Calculating registration data")
         registration_data = obtain_registration_data(root)
+        # Save df
+        registration_data.to_csv(registration_data_path / "registration_data.txt", index=None)
 
     # Calculate registration
     robot2tracker_t = calculate_registration(registration_data, root)
@@ -375,7 +374,7 @@ def main():
     json_data["fiducial_in_jaw"] = axis_dict["fiducial_yaw"].tolist()
     json_data["pitch2yaw"] = axis_dict["pitch2yaw"].tolist()
 
-    new_name = registration_data_path.parent / "registration_values.json"
+    new_name = registration_data_path / "registration_values.json"
     with open(new_name, "w", encoding="utf-8") as f:
         json.dump(json_data, f, ensure_ascii=False, indent=4)
 
@@ -393,7 +392,10 @@ parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_traject
                 help="root dir") 
 parser.add_argument( "--reset", action='store_true',default=False,  help="Re calculate error metrics") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
-                help="log level") #fmt:on
+                help="log level") 
+parser.add_argument('--dstdir', default=None, help='directory to save results')
+# fmt:on
+
 args = parser.parse_args()
 
 if __name__ == "__main__":
