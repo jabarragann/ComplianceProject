@@ -12,7 +12,6 @@ import numpy
 from typing import List
 
 from psutil import cpu_count
-from kincalib.Motion.TrajectoryPlayer import Trajectory, TrajectoryPlayer
 
 # ros
 from sensor_msgs.msg import JointState
@@ -125,6 +124,9 @@ class WristJointsCalibrationRecorder:
 
 
 if __name__ == "__main__":
+
+    from kincalib.Motion.TrajectoryPlayer import Trajectory, TrajectoryPlayer
+
     # Test calibration motions
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
