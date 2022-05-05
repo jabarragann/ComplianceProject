@@ -62,13 +62,16 @@ class DataRecorder:
         marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
             self.expected_markers, t=200, sample_time=15
         )
-        if marker_pose is not None:  # Check if marker is visible
-            # Measure robot position and save it in the record
-            self.calibration_record.to_csv(safe_save=False)
-            # Measure
-            jp = self.replay_device.measured_jp()
-            jaw_jp = self.replay_device.jaw.measured_jp()[0]
-            self.calibration_record.create_new_entry(index, jp, jaw_jp)
+        # Measure
+        jp = self.replay_device.measured_jp()
+        jaw_jp = self.replay_device.jaw.measured_jp()[0]
+        # Check if marker is visible add sensor data
+        if marker_pose is not None:
+            self.calibration_record.create_new_sensor_entry(index, jp, jaw_jp)
+        # Always add robot data
+        self.calibration_record.create_new_robot_entry(index, jp, jaw_jp)
+
+        self.calibration_record.to_csv(safe_save=False)
 
 
 class OuterJointsCalibrationRecorder:

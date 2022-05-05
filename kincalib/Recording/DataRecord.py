@@ -27,13 +27,26 @@ class Record(ABC):
         pass
 
     def to_csv(self, safe_save=True):
+        """Save record data to a df.
+
+        TODO: Improve efficiency of save function
+        This function is not the most efficient way to save dataframes that are continuosly increasing in size.
+        Everytime you save the dataframe you will completely erase the file and re writed from scratch. As the
+        size of your dataframes increase this might become a performance bootle neck. Currently, it does not seem
+        to be very problematic.
+
+        Parameters
+        ----------
+        safe_save : bool, optional
+            _description_, by default True
+        """
         if not self.filename.parent.exists():
             log.warning(f"Parent directory not found. Creating path {self.filename.parent}")
             self.filename.parent.mkdir(parents=True)
         if safe_save:
             save_without_overwritting(self.df, self.filename)
         else:
-            self.df.to_csv(self.filename)
+            self.df.to_csv(self.filename, index=None)
 
 
 class CalibrationRecord(Record):
@@ -79,7 +92,7 @@ class CalibrationRecord(Record):
             jp_filename = self.test_files / ("robot_jp.txt")
 
         # Create records
-        self.cp_record = RobotSensorRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
+        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
         self.create_paths()
@@ -96,6 +109,13 @@ class CalibrationRecord(Record):
     def create_new_entry(self, idx, joints, q7):
         self.cp_record.create_new_entry(idx, joints, q7)
         self.jp_record.create_new_entry(idx)
+
+    def create_new_robot_entry(self, idx, joints, q7):
+        self.jp_record.create_new_entry(idx)
+        self.cp_record.create_new_robot_entry(idx, joints, q7)
+
+    def create_new_sensor_entry(self, idx, joints, q7):
+        self.cp_record.create_new_sensor_entry(idx, joints, q7)
 
     def to_csv(self, safe_save=True):
         self.cp_record.to_csv(safe_save)
@@ -121,7 +141,7 @@ class CartesianRecord:
     # fmt:on
 
 
-class RobotSensorRecord(Record):
+class RobotSensorCartesianRecord(Record):
     def __init__(self, robot_handler, ftk_handler, expected_markers, filename: Path) -> None:
         super().__init__(CartesianRecord.df_cols, filename)
         self.robot_record = RobotCartesianRecord(robot_handler, None)
@@ -129,6 +149,12 @@ class RobotSensorRecord(Record):
 
     def create_new_entry(self, idx, joints, q7):
         self.robot_record.create_new_entry(idx, joints, q7)
+        self.sensor_record.create_new_entry(idx, joints, q7)
+
+    def create_new_robot_entry(self, idx, joints, q7):
+        self.robot_record.create_new_entry(idx, joints, q7)
+
+    def create_new_sensor_entry(self, idx, joints, q7):
         self.sensor_record.create_new_entry(idx, joints, q7)
 
     def to_csv(self, safe_save=True):
@@ -220,9 +246,19 @@ class AtracsysCartesianRecord(Record):
 
 
 class JointRecord(Record):
+    """Header format
+
+    step: step in the trajectory
+    qi:   Joint value
+    ti:   Joint torque
+    si:   Joint position setpoint
+    """
+
     # fmt: off
     df_cols = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7",
-               "t1", "t2", "t3", "t4", "t5", "t6" ]
+                       "t1", "t2", "t3", "t4", "t5", "t6",
+                       "s1", "s2", "s3", "s4", "s5", "s6"]
+
     # fmt: on
     def __init__(self, robot_handler, filename: Path):
         super().__init__(JointRecord.df_cols, filename)
@@ -230,11 +266,15 @@ class JointRecord(Record):
 
     def create_new_entry(self, idx):
         js = self.robot_handler.measured_js()
-
+        jp_s = self.robot_handler.setpoint_js()[0]  # jp setpoints
         jp = js[0]  # joint pos
         jt = js[2]  # joint torque
         jaw_jp = self.robot_handler.jaw_jp()
-        jp = [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp] + [jt[0], jt[1], jt[2], jt[3], jt[4], jt[5]]
+        jp = (
+            [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
+            + [jt[0], jt[1], jt[2], jt[3], jt[4], jt[5]]
+            + [jp_s[0], jp_s[1], jp_s[2], jp_s[3], jp_s[4], jp_s[5]]
+        )
         jp = np.array(jp).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(jp, columns=self.df_cols)
 
