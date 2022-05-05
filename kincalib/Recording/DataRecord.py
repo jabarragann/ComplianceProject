@@ -35,6 +35,8 @@ class Record(ABC):
         size of your dataframes increase this might become a performance bootle neck. Currently, it does not seem
         to be very problematic.
 
+        https://datascienceparichay.com/article/pandas-append-dataframe-to-existing-csv/
+
         Parameters
         ----------
         safe_save : bool, optional
