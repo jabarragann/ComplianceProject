@@ -251,12 +251,12 @@ def main():
         T_PM = T_MP.inv()
         wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
-        if not (registration_data_path / "registration_data.txt").exists():
-            log.error("Missing registration data file")
+        # if not (registration_data_path / "registration_data.txt").exists():
+        #     log.error("Missing registration data file")
         # if not (registration_data_path / "robot2tracker_t.npy").exists():
         #     log.error("Missing robot tracker transformation")
 
-        reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
+        # reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
 
         # Calculate ground truth joints
         # Version1
@@ -277,7 +277,7 @@ def main():
     # ------------------------------------------------------------
 
     # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.001]["step"]  # Use the residual to get valid steps.
+    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  # Use the residual to get valid steps.
     robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     diff = robot_valid - tracker_valid

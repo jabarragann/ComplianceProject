@@ -48,7 +48,7 @@ def calculate_registration(df: pd.DataFrame, root: Path):
     # df = pd.read_csv(filename)
 
     # Choose entries were the area is lower is than 6mm
-    df = df.loc[df["area"] < 10]
+    df = df.loc[df["area"] < 0.5]
     robot_p = df[["rpx", "rpy", "rpz"]].to_numpy().T
     tracker_p = df[["tpx", "tpy", "tpz"]].to_numpy().T
     log.info(f"Points used for the registration {df.shape}")
@@ -66,6 +66,7 @@ def calculate_registration(df: pd.DataFrame, root: Path):
 
 
 def calculate_pitch_to_marker(registration_data, other_values_dict=None):
+    registration_data = registration_data.loc[registration_data["area"] < 0.5]
     # calculate pitch orig in marker
     pitch_orig = registration_data[["mox", "moy", "moz"]].to_numpy()
     pitch_orig_mean = pitch_orig.mean(axis=0)
