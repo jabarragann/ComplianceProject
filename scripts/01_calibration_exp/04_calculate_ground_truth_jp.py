@@ -31,175 +31,6 @@ from kincalib.Motion.DvrkKin import DvrkPsmKin
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
-def joints123_calculation(px, py, pz):
-    L1 = -0.4318
-    Ltool = 0.4162
-
-    tq1 = np.arctan2(px, -pz)
-    tq2 = np.arctan2(-py, np.sqrt(px ** 2 + pz ** 2))
-    tq3 = np.sqrt(px ** 2 + py ** 2 + pz ** 2) + L1 + Ltool
-    return tq1, tq2, tq3
-
-
-def joints456_calculation(px, py, pz):
-    return px, py, pz
-
-
-def obtain_true_joints(
-    reg_data: pd.DataFrame, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame, T_TR: Frame
-) -> pd.DataFrame:
-
-    T_RT = T_TR.inv()
-    cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
-    cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
-    df_robot = pd.DataFrame(columns=cols_robot)
-    df_tracker = pd.DataFrame(columns=cols_tracker)
-
-    # for idx in range(robot_jp.shape[0]):
-    for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
-        rq1, rq2, rq3, rq4, rq5, rq6 = robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
-        step = robot_jp.iloc[idx].loc["step"]
-        # Get pitch origin in tracker
-        pitch_orig_T = reg_data.loc[reg_data["step"] == step][["tpx", "tpy", "tpz"]].to_numpy()
-        pitch_orig_T = pitch_orig_T.squeeze()
-        if pitch_orig_T.shape[0] < 3:
-            log.warning(f"pitch_orig for step {step} not found")
-            continue
-        # Convert to R with registration T
-        pitch_orig_R = T_RT @ pitch_orig_T
-
-        # Calculate joints 1,2,3
-        tq1, tq2, tq3 = joints123_calculation(*pitch_orig_R.squeeze())
-
-        # Calculate joints 4,5,6
-        s_time = time.time()
-        df_temp = robot_cp[robot_cp["step"] == step]
-        marker_file = Path("./share/custom_marker_id_112.json")
-        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        e_time = time.time()
-        if wrist_fiducials.shape[0] == 3:
-            log.info(f"Step {step} exec q5,q6 time {e_time-s_time:0.04f}")
-            tq4, tq5, tq6 = joints456_calculation(*pitch_orig_R.squeeze())
-        else:
-            tq4, tq5, tq6 = None, None, None
-
-        # Save data
-        d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
-        new_pt = pd.DataFrame(d, columns=cols_robot)
-        df_robot = df_robot.append(new_pt)
-
-        d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
-        new_pt = pd.DataFrame(d, columns=cols_tracker)
-        df_tracker = df_tracker.append(new_pt)
-
-    return df_robot, df_tracker
-
-
-def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame) -> pd.DataFrame:
-
-    cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
-    cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
-    cols_opt = ["step", "q4res", "q56res"]
-
-    df_robot = pd.DataFrame(columns=cols_robot)
-    df_tracker = pd.DataFrame(columns=cols_tracker)
-    df_opt = pd.DataFrame(columns=cols_opt)
-
-    opt_error = []
-    # for idx in range(robot_jp.shape[0]):
-    for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
-        # Read robot joints
-        rq1, rq2, rq3, rq4, rq5, rq6 = robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
-        step = robot_jp.iloc[idx].loc["step"]
-
-        # Read tracker data
-        df_temp = robot_cp[robot_cp["step"] == step]
-        marker_file = Path("./share/custom_marker_id_112.json")
-        pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-        if len(pose_arr) == 0:
-            log.warning(f"Marker pose in {step} not found")
-            continue
-        if wrist_fiducials.shape[0] == 0:
-            log.warning(f"Wrist fiducial in {step} not found")
-            continue
-        assert len(pose_arr) == 1, "There should only be one marker pose at each step."
-        T_TM = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
-
-        # Calculate q1, q2 and q3
-        tq1, tq2, tq3 = estimator.estimate_q123(T_TM)
-
-        # Calculate joint 4
-        tq4, q4res = estimator.estimate_q4(tq1, tq2, tq3, T_TM.inv())
-
-        # Calculate joints 5,6
-        tq5, tq6, q56res = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
-
-        # Optimization residuals
-        d = np.array([step, q4res, q56res]).reshape(1, -1)
-        new_pt = pd.DataFrame(d, columns=cols_opt)
-        df_opt = df_opt.append(new_pt)
-        # opt_error.append(evaluation)
-
-        # Save data
-        d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
-        new_pt = pd.DataFrame(d, columns=cols_robot)
-        df_robot = df_robot.append(new_pt)
-
-        d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
-        new_pt = pd.DataFrame(d, columns=cols_tracker)
-        df_tracker = df_tracker.append(new_pt)
-
-        # if step > 40:
-        #     break
-
-    return df_robot, df_tracker, df_opt  # opt_error
-
-
-def plot_joints(robot_df, tracker_df):
-    fig, axes = plt.subplots(6, 1, sharex=True)
-    robot_df.reset_index(inplace=True)
-    tracker_df.reset_index(inplace=True)
-    for i in range(6):
-        # fmt:off
-        axes[i].set_title(f"joint {i+1}")
-        axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), color="blue")
-        axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), marker="*", linestyle="None", color="blue", label="robot")
-        axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
-        axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
-        # fmt:on
-    axes[0].legend()
-
-
-def create_histogram(data, axes, title=None, xlabel=None, max_val=None):
-    if max_val is not None:
-        max_val = min(max_val, max(data))
-        axes.hist(data, bins=30, range=(0, max_val), edgecolor="black", linewidth=1.2, density=False)
-    else:
-        axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
-    # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)
-    axes.grid()
-    axes.set_xlabel(xlabel)
-    axes.set_ylabel("Frequency")
-    axes.set_title(f"{title} (N={data.shape[0]:02d})")
-    # axes.set_xticks([i * 5 for i in range(110 // 5)])
-    # plt.show()
-
-
-def calculate_cartesian(joints: np.ndarray):
-    psm_model = DvrkPsmKin()
-    cartesian_pose = psm_model.fkine(joints)
-
-    # Analyse only the position accuracy of the robot
-    cols = ["X", "Y", "Z"]
-    cartesian_df = pd.DataFrame(columns=cols)
-    for p in cartesian_pose.data:
-        posi = p[:3, 3]
-        new_df = pd.DataFrame(posi.reshape(1, -1), columns=cols)
-        cartesian_df = cartesian_df.append(new_df)
-
-    return cartesian_df
-
-
 def main(testid: int):
     # ------------------------------------------------------------
     # Setup
@@ -215,10 +46,10 @@ def main(testid: int):
     else:
         robot_jp_p = root / "robot_mov" / "robot_jp.txt"
         robot_cp_p = root / "robot_mov" / "robot_cp.txt"
+
     # ------------------------------------------------------------
     # Calculate tracker joint values
     # ------------------------------------------------------------
-
     if args.dstdir is None:
         dst_p = robot_cp_p.parent
         dst_p = dst_p / "result"
@@ -255,19 +86,9 @@ def main(testid: int):
         T_PM = T_MP.inv()
         wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
-        # if not (registration_data_path / "registration_data.txt").exists():
-        #     log.error("Missing registration data file")
-        # if not (registration_data_path / "robot2tracker_t.npy").exists():
-        #     log.error("Missing robot tracker transformation")
-
-        # reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
-
         # Calculate ground truth joints
-        # Version1
-        # robot_df, tracker_df = obtain_true_joints(reg_data, robot_jp, robot_cp, T_TR)
-        # Version2
         j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-        robot_df, tracker_df, opt_df = obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
+        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
 
         # Save data
         if not dst_p.exists():
@@ -289,8 +110,8 @@ def main(testid: int):
     diff_std = diff.std(axis=0)
 
     # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
-    robot_cp = calculate_cartesian(robot_valid)
-    tracker_cp = calculate_cartesian(tracker_valid)
+    robot_cp = CalibrationUtils.calculate_cartesian(robot_valid)
+    tracker_cp = CalibrationUtils.calculate_cartesian(tracker_valid)
     cp_error = tracker_cp - robot_cp
     mean_error = cp_error.apply(np.linalg.norm, 1)
 
@@ -319,12 +140,12 @@ def main(testid: int):
 
     # plot
     if args.plot:
-        plot_joints(robot_df, tracker_df)
+        CalibrationUtils.plot_joints(robot_df, tracker_df)
         fig, ax = plt.subplots(2, 1)
-        create_histogram(
+        CalibrationUtils.create_histogram(
             opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
         )
-        create_histogram(
+        CalibrationUtils.create_histogram(
             opt_df["q56res"],
             axes=ax[1],
             title=f"Q56 Optimization error",

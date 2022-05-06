@@ -9,6 +9,9 @@ from collections import defaultdict
 import pandas as pd
 from pathlib import Path
 from numpy import arctan2
+from rich.progress import track
+import matplotlib.pyplot as plt
+import tf_conversions.posemath as pm
 
 # Robotics toolbox
 from roboticstoolbox import ETS as ET
@@ -359,3 +362,110 @@ class CalibrationUtils:
             fiducial_T.append(fid_T)
 
         return fiducial_Y, fiducial_T, pitch2yaw1
+
+    # ------------------------------------------------------------
+    # Joint estimation utils
+    # ------------------------------------------------------------
+
+    def obtain_true_joints_v2(
+        estimator: JointEstimator, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame
+    ) -> pd.DataFrame:
+
+        cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+        cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+        cols_opt = ["step", "q4res", "q56res"]
+
+        df_robot = pd.DataFrame(columns=cols_robot)
+        df_tracker = pd.DataFrame(columns=cols_tracker)
+        df_opt = pd.DataFrame(columns=cols_opt)
+
+        opt_error = []
+        # for idx in range(robot_jp.shape[0]):
+        for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
+            # Read robot joints
+            rq1, rq2, rq3, rq4, rq5, rq6 = robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
+            step = robot_jp.iloc[idx].loc["step"]
+
+            # Read tracker data
+            df_temp = robot_cp[robot_cp["step"] == step]
+            marker_file = Path("./share/custom_marker_id_112.json")
+            pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
+            if len(pose_arr) == 0:
+                log.warning(f"Marker pose in {step} not found")
+                continue
+            if wrist_fiducials.shape[0] == 0:
+                log.warning(f"Wrist fiducial in {step} not found")
+                continue
+            assert len(pose_arr) == 1, "There should only be one marker pose at each step."
+            T_TM = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
+
+            # Calculate q1, q2 and q3
+            tq1, tq2, tq3 = estimator.estimate_q123(T_TM)
+
+            # Calculate joint 4
+            tq4, q4res = estimator.estimate_q4(tq1, tq2, tq3, T_TM.inv())
+
+            # Calculate joints 5,6
+            tq5, tq6, q56res = estimator.estimate_q56(T_TM.inv(), wrist_fiducials.squeeze())
+
+            # Optimization residuals
+            d = np.array([step, q4res, q56res]).reshape(1, -1)
+            new_pt = pd.DataFrame(d, columns=cols_opt)
+            df_opt = df_opt.append(new_pt)
+            # opt_error.append(evaluation)
+
+            # Save data
+            d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
+            new_pt = pd.DataFrame(d, columns=cols_robot)
+            df_robot = df_robot.append(new_pt)
+
+            d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
+            new_pt = pd.DataFrame(d, columns=cols_tracker)
+            df_tracker = df_tracker.append(new_pt)
+
+            # if step > 40:
+            #     break
+
+        return df_robot, df_tracker, df_opt  # opt_error
+
+    def plot_joints(robot_df, tracker_df):
+        fig, axes = plt.subplots(6, 1, sharex=True)
+        robot_df.reset_index(inplace=True)
+        tracker_df.reset_index(inplace=True)
+        for i in range(6):
+            # fmt:off
+            axes[i].set_title(f"joint {i+1}")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), color="blue")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), marker="*", linestyle="None", color="blue", label="robot")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
+            # fmt:on
+        axes[0].legend()
+
+    def create_histogram(data, axes, title=None, xlabel=None, max_val=None):
+        if max_val is not None:
+            max_val = min(max_val, max(data))
+            axes.hist(data, bins=30, range=(0, max_val), edgecolor="black", linewidth=1.2, density=False)
+        else:
+            axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
+        # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)
+        axes.grid()
+        axes.set_xlabel(xlabel)
+        axes.set_ylabel("Frequency")
+        axes.set_title(f"{title} (N={data.shape[0]:02d})")
+        # axes.set_xticks([i * 5 for i in range(110 // 5)])
+        # plt.show()
+
+    def calculate_cartesian(joints: np.ndarray):
+        psm_model = DvrkPsmKin()
+        cartesian_pose = psm_model.fkine(joints)
+
+        # Analyse only the position accuracy of the robot
+        cols = ["X", "Y", "Z"]
+        cartesian_df = pd.DataFrame(columns=cols)
+        for p in cartesian_pose.data:
+            posi = p[:3, 3]
+            new_df = pd.DataFrame(posi.reshape(1, -1), columns=cols)
+            cartesian_df = cartesian_df.append(new_df)
+
+        return cartesian_df
