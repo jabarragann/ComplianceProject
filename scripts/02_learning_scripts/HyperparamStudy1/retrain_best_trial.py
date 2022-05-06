@@ -176,14 +176,16 @@ if __name__ == "__main__":
     error = valid_tracker_joints - valid_predicted_joints
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
-    log.info(f"Angle difference between predicted and ground-truth. Loss values: {loss_value:0.06f}")
+    log.info(f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}")
     print_angle_dif(error_means, error_std)
 
     loss_value = abs(valid_robot_state[:, :6] - valid_tracker_joints).mean(axis=0).mean()
     error = valid_tracker_joints - valid_robot_state[:, :6]
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
-    log.info(f"Angle difference between input and ground-truth. Loss values: {loss_value:0.06f}")
+    log.info(
+        f"Angle difference between robot measured joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}"
+    )
     print_angle_dif(error_means, error_std)
 
     # Training plots

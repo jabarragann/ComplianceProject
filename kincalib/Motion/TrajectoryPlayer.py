@@ -10,6 +10,7 @@ from black import out
 import numpy as np
 import numpy
 from typing import List
+from kincalib.Recording.DataRecorder import OuterJointsCalibrationRecorder
 
 # ros
 from sensor_msgs.msg import JointState
@@ -260,9 +261,9 @@ class RandomJointTrajectory(Trajectory):
 
 
 if __name__ == "__main__":
-    rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag")
+    rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
-    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=60)
+    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
     # trajectory = RandomJointTrajectory.generate_trajectory(2000)
 
     log.info(f"Initial pt {trajectory.setpoints[0].position}")
@@ -273,7 +274,13 @@ if __name__ == "__main__":
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
     arm.home_device()
 
-    trajectory_player = TrajectoryPlayer(arm, trajectory)
+    # callback example
+    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
+    #     replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
+    # )
+    # trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[outer_js_calib_cb])
+
+    trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[])
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":

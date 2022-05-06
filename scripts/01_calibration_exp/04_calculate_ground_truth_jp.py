@@ -149,8 +149,8 @@ def obtain_true_joints_v2(estimator: JointEstimator, robot_jp: pd.DataFrame, rob
         new_pt = pd.DataFrame(d, columns=cols_tracker)
         df_tracker = df_tracker.append(new_pt)
 
-        if step > 40:
-            break
+        # if step > 40:
+        #     break
 
     return df_robot, df_tracker, df_opt  # opt_error
 
@@ -170,8 +170,12 @@ def plot_joints(robot_df, tracker_df):
     axes[0].legend()
 
 
-def create_histogram(data, axes, title=None, xlabel=None):
-    axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
+def create_histogram(data, axes, title=None, xlabel=None, max_val=None):
+    if max_val is not None:
+        max_val = min(max_val, max(data))
+        axes.hist(data, bins=30, range=(0, max_val), edgecolor="black", linewidth=1.2, density=False)
+    else:
+        axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
     # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)
     axes.grid()
     axes.set_xlabel(xlabel)
@@ -196,7 +200,7 @@ def calculate_cartesian(joints: np.ndarray):
     return cartesian_df
 
 
-def main():
+def main(testid: int):
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
@@ -206,8 +210,8 @@ def main():
     marker_file = Path("./share/custom_marker_id_112.json")
 
     if args.test:
-        robot_jp_p = root / f"test_trajectories/{args.testid:02d}" / "robot_jp.txt"
-        robot_cp_p = root / f"test_trajectories/{args.testid:02d}" / "robot_cp.txt"
+        robot_jp_p = root / f"test_trajectories/{testid:02d}" / "robot_jp.txt"
+        robot_cp_p = root / f"test_trajectories/{testid:02d}" / "robot_cp.txt"
     else:
         robot_jp_p = root / "robot_mov" / "robot_jp.txt"
         robot_cp_p = root / "robot_mov" / "robot_cp.txt"
@@ -227,7 +231,7 @@ def main():
     log.info(f"Storing results in {dst_p}")
     log.info(f"Loading registration .json from {registration_data_path}")
     dst_p.mkdir(parents=True, exist_ok=True)
-    input("press enter to start ")
+    # input("press enter to start ")
 
     if (dst_p / "robot_joints.txt").exists() and not args.reset:
         # ------------------------------------------------------------
@@ -251,12 +255,12 @@ def main():
         T_PM = T_MP.inv()
         wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
-        if not (registration_data_path / "registration_data.txt").exists():
-            log.error("Missing registration data file")
+        # if not (registration_data_path / "registration_data.txt").exists():
+        #     log.error("Missing registration data file")
         # if not (registration_data_path / "robot2tracker_t.npy").exists():
         #     log.error("Missing robot tracker transformation")
 
-        reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
+        # reg_data = pd.read_csv(registration_data_path / "registration_data.txt")
 
         # Calculate ground truth joints
         # Version1
@@ -277,7 +281,7 @@ def main():
     # ------------------------------------------------------------
 
     # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.001]["step"]  # Use the residual to get valid steps.
+    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  # Use the residual to get valid steps.
     robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     diff = robot_valid - tracker_valid
@@ -290,6 +294,7 @@ def main():
     cp_error = tracker_cp - robot_cp
     mean_error = cp_error.apply(np.linalg.norm, 1)
 
+    log.info(f"Number of valid samples: {diff.shape[0]}")
     log.info(f"Cartesian results")
     log.info(f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}")
     log.info(f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}")
@@ -304,23 +309,30 @@ def main():
     log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
     log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
 
-    log.info(f"Results in rad")
-    log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
-    log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
-    log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
-    log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
-    log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+    # log.info(f"Results in rad")
+    # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
+    # log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
+    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
+    # log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
+    # log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
+    # log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
 
     # plot
-    plot_joints(robot_df, tracker_df)
-    fig, ax = plt.subplots(2, 1)
-    create_histogram(opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error")
-    create_histogram(
-        opt_df["q56res"], axes=ax[1], title=f"Q56 Optimization error", xlabel="Optimization residual error"
-    )
-    fig.set_tight_layout(True)
-    plt.show()
+    if args.plot:
+        plot_joints(robot_df, tracker_df)
+        fig, ax = plt.subplots(2, 1)
+        create_histogram(
+            opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
+        )
+        create_histogram(
+            opt_df["q56res"],
+            axes=ax[1],
+            title=f"Q56 Optimization error",
+            xlabel="Optimization residual error",
+            max_val=0.003,
+        )
+        fig.set_tight_layout(True)
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -329,14 +341,20 @@ if __name__ == "__main__":
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
                     help="root dir") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
-    parser.add_argument("--testid", type=int, help="The id of the test trajectory to use") 
-    parser.add_argument( "-l", "--log", type=str, default="DEBUG", help="log level") 
+    # parser.add_argument("--testid", type=int, help="The id of the test trajectory to use") 
+    parser.add_argument('--testid', nargs='*', help='test trajectories to generate', required=True, type=int)
+    parser.add_argument( '-l', '--log', type=str, default="DEBUG", help="log level") 
     parser.add_argument('--reset', action='store_true',help="Recalculate joint values")
     parser.add_argument('--dstdir', default=None, help='Directory to save results. This directory must ' \
-                            'contain a calibration .json file.')
+                            'contain a calibration .json file. If None, root dir is used a destination.')
+    parser.add_argument('-p','--plot', action='store_true',default=False \
+                        ,help="Plot optimization error and joints plots.")
     # fmt:on
     args = parser.parse_args()
     log_level = args.log
     log = Logger("pitch_exp_analize2", log_level=log_level).log
 
-    main()
+    log.info(f"Calculating the following test trajectories: {args.testid}")
+
+    for testid in args.testid:
+        main(testid)
