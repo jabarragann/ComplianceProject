@@ -70,7 +70,7 @@ def main():
         trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
     else:
         log.info(f"Creating random trajectory")
-        trajectory = RandomJointTrajectory.generate_trajectory(600)
+        trajectory = RandomJointTrajectory.generate_trajectory(1200)
 
     log.info(f"Trajectory size {len(trajectory)}")
 

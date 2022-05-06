@@ -124,7 +124,7 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     return Frame.init_from_matrix(pitch2marker_T)
 
 
-def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM1/local/query_cp") -> pd.DataFrame:
+def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM2/local/query_cp") -> pd.DataFrame:
     # ------------------------------------------------------------
     # Connect to DVRK fk service
     # ------------------------------------------------------------
