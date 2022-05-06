@@ -263,8 +263,8 @@ class RandomJointTrajectory(Trajectory):
 if __name__ == "__main__":
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
-    # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
-    trajectory = RandomJointTrajectory.generate_trajectory(2000)
+    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
+    # trajectory = RandomJointTrajectory.generate_trajectory(2000)
 
     log.info(f"Initial pt {trajectory.setpoints[0].position}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
@@ -275,12 +275,12 @@ if __name__ == "__main__":
     arm.home_device()
 
     # callback example
-    outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
-    )
-    trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[outer_js_calib_cb])
+    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
+    #     replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
+    # )
+    # trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[outer_js_calib_cb])
 
-    # trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_cb=[])
+    trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[])
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":

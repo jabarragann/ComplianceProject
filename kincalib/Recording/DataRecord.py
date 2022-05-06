@@ -93,6 +93,11 @@ class CalibrationRecord(Record):
             cp_filename = self.test_files / ("robot_cp.txt")
             jp_filename = self.test_files / ("robot_jp.txt")
 
+            if cp_filename.exists() or jp_filename.exists():
+                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
+                if not (n == "y" or n == "Y"):
+                    log.info("exiting the script")
+                    exit(0)
         # Create records
         self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
         self.jp_record = JointRecord(robot_handler, jp_filename)
