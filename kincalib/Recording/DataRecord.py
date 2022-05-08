@@ -286,3 +286,66 @@ class JointRecord(Record):
         new_pt = pd.DataFrame(jp, columns=self.df_cols)
 
         self.df = self.df.append(new_pt)
+
+
+class LearningRecord(Record):
+    """Header format
+    30 entries in total
+
+    step:    Step in the trajectory
+    root:    Data root directory where data is stored
+    testid:  Testid of sample
+    type:    Either random for random trajectories or recorded (recorded trajectories)
+    flag:    Either train, valid or test
+
+    rqi:     Robot joint value
+    rti:     Robot joint torque
+    rsi:     Robot joint position setpoint
+    tqi:     Tracker joints
+
+    opt:     Optimization error
+
+    rci:     where i=[x,y,z]. Robot Cartesian position. Position calculated with robot joints
+    tci:     where i=[x,y,z]. Tracker Cartesian position. Position calculated with tracker joints
+    cei:     where i=[x,y,z]. Cartesian error. cei = tci - rci
+    """
+
+    df_cols = (
+        ["step", "root", "testid", "type", "flag"]
+        + ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+        + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
+        + ["rs1", "rs2", "rs3", "rs4", "rs5", "rs6"]
+        + ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+        + ["opt"]
+        + ["rcx", "rcy", "rcz"]
+        + ["tcx", "tcy", "tcz"]
+        + ["cex", "cey", "cez"]
+    )
+
+    def __init__(self, filename: Path):
+        super().__init__(LearningRecord.df_cols, filename)
+
+    def create_new_entry(
+        self,
+        step: int = None,
+        root: str = None,
+        testid: int = None,
+        type: str = None,
+        flag: str = None,
+        rq: List[float] = None,
+        rt: List[float] = None,
+        rs: List[float] = None,
+        tq: List[float] = None,
+        opt: float = None,
+        rc: List[float] = None,
+        tc: List[float] = None,
+    ):
+        ce = (np.array(tc) + np.array(rc)).squeeze().tolist()
+        new_pt = [step, root, testid, type, flag] + rq + rt + rs + tq + [opt] + rc + tc + ce
+        new_pt = np.array(new_pt).reshape((1, self.cols_len))
+        new_pt = pd.DataFrame(new_pt, columns=self.df_cols)
+        self.df = self.df.append(new_pt)
+
+
+class LearningSummaryRecord(Record):
+    pass
