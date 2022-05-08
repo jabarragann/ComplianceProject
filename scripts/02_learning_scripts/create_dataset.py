@@ -29,6 +29,8 @@ log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 data_root = Path("/home/jbarrag3/research_juan/ComplianceProject/data/03_replay_trajectory")
+dst_filename = Path("data/deep_learning_data/random_dataset.txt")
+
 dataset_def = [
     {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
     {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
@@ -36,6 +38,7 @@ dataset_def = [
     {"path": data_root / "d04-rec-13-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
     {"path": data_root / "d04-rec-13-traj01", "testid": [6], "type": "random", "flag": "valid"},
     {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
+    {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
 ]
 
 # dataset_def = [{"path": data_root / "d04-rec-13-traj01", "testid": [4, 5, 6, 7, 8], "type": "random", "flag": "test"}]
@@ -51,7 +54,7 @@ def main():
     # ------------------------------------------------------------
     # Create dataset
     # -----------------------------------------------------------
-    dataset_record = LearningRecord(Path("./random_dataset.txt"))
+    dataset_record = LearningRecord(dst_filename)
     for d in dataset_def:
         p = d["path"] / "test_trajectories"
         type_ = d["type"]
