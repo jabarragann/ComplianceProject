@@ -10,7 +10,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 # Custom
-from kincalib.Learning.Dataset import JointsDataset, JointsRawDataset, Normalizer
+# from kincalib.Learning.Dataset import JointsDataset, JointsRawDataset, Normalizer
+from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
 from kincalib.Learning.HyperparameterTuner import OptuneStudyAbstract
 from kincalib.Learning.Trainer import TrainRegressionNet
 from kincalib.Learning.Models import MLP, CustomMLP
@@ -49,7 +50,7 @@ class RegressionStudy1(OptuneStudyAbstract):
         # model = MLP()
         model = model.cuda()
 
-        loss_name = trial.suggest_categorical("loss", ["L1Loss", "MSELoss"])
+        loss_name = "MSELoss"
         loss_metric = getattr(torch.nn, loss_name)()
 
         # Sample training parameters
@@ -63,13 +64,12 @@ class RegressionStudy1(OptuneStudyAbstract):
             valid_loader,
             net=model,
             optimizer=optimizer,
-            loss_metric=self.loss_metric,
+            loss_metric=loss_metric,
             epochs=self.epochs,
-            batch_size=batch_size,
             root=self.root / f"iter_{trial_id:04d}",
             gpu_boole=True,
             optimize_hyperparams=True,
-            save_checkpoint=False,
+            save=False,
         )
 
         # Train
@@ -81,7 +81,7 @@ class RegressionStudy1(OptuneStudyAbstract):
 if __name__ == "__main__":
     # setup
     study_name = "regression_study1.pkl"
-    root = Path(f"data/ModelsCheckpoints/Studies/TestStudy")
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2")
     data_dir = Path("data/03_replay_trajectory/d04-rec-10-traj01")
     train_batch_size = 64
     valid_batch_size = 64
@@ -89,11 +89,18 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Data loading and manipulation
     # ------------------------------------------------------------
-    train_data = JointsRawDataset(data_dir, mode="train")
-    valid_data = JointsRawDataset(data_dir, mode="valid")
-    normalizer = Normalizer(*train_data[:])
-    train_dataset = JointsDataset(*train_data[:], normalizer)
-    valid_dataset = JointsDataset(*valid_data[:], normalizer)
+    data_path = Path("data/deep_learning_data/random_dataset.txt")
+    train_dataset = JointsDataset1(data_path, mode="train")
+    normalizer = Normalizer(train_dataset.X)
+    train_dataset.normalizer = normalizer
+    valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
+    test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
+
+    # train_data = JointsRawDataset(data_dir, mode="train")
+    # valid_data = JointsRawDataset(data_dir, mode="valid")
+    # normalizer = Normalizer(*train_data[:])
+    # train_dataset = JointsDataset(*train_data[:], normalizer)
+    # valid_dataset = JointsDataset(*valid_data[:], normalizer)
 
     # ------------------------------------------------------------
     # Create hyperparameter study
@@ -105,7 +112,7 @@ if __name__ == "__main__":
         root,
         study_name=study_name,
         epochs=220,
-        loss_metric=loss_metric,
+        loss_metric=None,
     )
 
     # Start study

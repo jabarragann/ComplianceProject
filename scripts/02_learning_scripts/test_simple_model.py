@@ -12,12 +12,14 @@ import torch
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import torch.nn as nn
+from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
 from kincalib.utils.CmnUtils import mean_std_str
 
 # Custom
 from kincalib.utils.Logger import Logger
-from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
-from kincalib.Learning.Models import MLP
+
+# from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
+from kincalib.Learning.Models import MLP, BestMLP1
 from kincalib.Learning.Trainer import TrainRegressionNet, Trainer
 from kincalib.Learning.TrainingBoard import TrainingBoard
 from pytorchcheckpoint.checkpoint import CheckpointHandler
@@ -39,13 +41,23 @@ log = Logger("fashion").log
 gpu_boole = torch.cuda.is_available()
 
 
+# def print_angle_dif(error_means, error_std):
+#     log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
+#     log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
+#     log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
+#     log.info(f"Joint 4 mean difference (deg): {mean_std_str(error_means[3]*180/np.pi,error_std[3]*180/np.pi)}")
+#     log.info(f"Joint 5 mean difference (deg): {mean_std_str(error_means[4]*180/np.pi,error_std[4]*180/np.pi)}")
+#     log.info(f"Joint 6 mean difference (deg): {mean_std_str(error_means[5]*180/np.pi,error_std[5]*180/np.pi)}")
+#     log.info("")
+
+
 def print_angle_dif(error_means, error_std):
-    log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
-    log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
-    log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
-    log.info(f"Joint 4 mean difference (deg): {mean_std_str(error_means[3]*180/np.pi,error_std[3]*180/np.pi)}")
-    log.info(f"Joint 5 mean difference (deg): {mean_std_str(error_means[4]*180/np.pi,error_std[4]*180/np.pi)}")
-    log.info(f"Joint 6 mean difference (deg): {mean_std_str(error_means[5]*180/np.pi,error_std[5]*180/np.pi)}")
+    # log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
+    # log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
+    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
+    log.info(f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
+    log.info(f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
+    log.info(f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}")
     log.info("")
 
 
@@ -55,7 +67,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--round", type=int, help="Model training round", default=1)
+    parser.add_argument("-r", "--round", type=int, help="Model training round", default=2)
     args = parser.parse_args()
     training_round = args.round
 
@@ -73,11 +85,17 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Data loading and manipulation
     # ------------------------------------------------------------
-    train_data_raw = JointsRawDataset(data_dir, mode="train")
-    valid_data_raw = JointsRawDataset(data_dir, mode="valid")
-    normalizer = Normalizer(*train_data_raw[:])
-    train_dataset = JointsDataset(*train_data_raw[:], normalizer)
-    valid_dataset = JointsDataset(*valid_data_raw[:], normalizer)
+    data_path = Path("data/deep_learning_data/random_dataset.txt")
+    train_dataset = JointsDataset1(data_path, mode="train")
+    normalizer = Normalizer(train_dataset.X)
+    train_dataset.normalizer = normalizer
+    valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
+    test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
+    # train_data_raw = JointsRawDataset(data_dir, mode="train")
+    # valid_data_raw = JointsRawDataset(data_dir, mode="valid")
+    # normalizer = Normalizer(*train_data_raw[:])
+    # train_dataset = JointsDataset(*train_data_raw[:], normalizer)
+    # valid_dataset = JointsDataset(*valid_data_raw[:], normalizer)
 
     # Create Dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
@@ -87,7 +105,8 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
 
     # Create Network
-    model = MLP()
+    model = BestMLP1()
+    model.eval()
     # Initialize Optimizer and Learning Rate Scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
@@ -108,7 +127,6 @@ if __name__ == "__main__":
         optimizer,
         loss_metric,
         epochs=-1,
-        batch_size=train_batch_size,
         root=root,
         gpu_boole=True,
     )
@@ -138,10 +156,11 @@ if __name__ == "__main__":
 
     # Calculate angle difference
     valid_robot_state, valid_tracker_joints = valid_dataset[:]
-    valid_predicted_joints = net(torch.from_numpy(valid_robot_state).cuda())
+    valid_predicted_joints = net(valid_robot_state.cuda())
 
+    valid_tracker_joints = valid_tracker_joints.cpu().data.numpy()
     valid_predicted_joints = valid_predicted_joints.cpu().data.numpy()
-    valid_robot_state = normalizer.reverse(valid_robot_state)
+    valid_robot_state = normalizer.reverse(valid_robot_state).cpu().data.numpy()
 
     # ------------------------------------------------------------
     # Angle Differences
@@ -153,8 +172,8 @@ if __name__ == "__main__":
     log.info(f"Angle difference between predicted and ground-truth. Loss values: {loss_value:0.06f}")
     print_angle_dif(error_means, error_std)
 
-    loss_value = abs(valid_robot_state[:, :6] - valid_tracker_joints).mean(axis=0).mean()
-    error = valid_tracker_joints - valid_robot_state[:, :6]
+    loss_value = abs(valid_robot_state[:, 3:6] - valid_tracker_joints).mean(axis=0).mean()
+    error = valid_tracker_joints - valid_robot_state[:, 3:6]
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
     log.info(f"Angle difference between input and ground-truth. Loss values: {loss_value:0.06f}")

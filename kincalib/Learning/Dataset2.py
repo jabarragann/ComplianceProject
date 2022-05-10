@@ -43,6 +43,9 @@ class JointsDataset1(Dataset):
 
         input_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"] + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
         output_cols = ["tq4", "tq5", "tq6"]
+
+        # Filter outliers with the optimization error of q56 lower than 1.4mm
+        self.data_df = self.data_df.loc[self.data_df["opt"] < 1.4 / 1000]
         self.X = self.data_df[input_cols].to_numpy()
         self.Y = self.data_df[output_cols].to_numpy()
 
@@ -56,10 +59,25 @@ class JointsDataset1(Dataset):
         if self.normalizer is None:
             log.error("dataset normalizer is None.")
             exit(0)
-        x_norm = self.normalizer.transform(self.X[idx].reshape(-1, 12))
-        x_norm = x_norm.squeeze()
+        x_norm = self.normalizer(self.X[idx])
 
         return x_norm, self.Y[idx]
+
+
+@dataclass
+class Normalizer:
+    xdata: np.ndarray
+
+    def __post_init__(self):
+        """Calculate mean and std of data"""
+        self.mean = self.xdata.mean(axis=0)
+        self.std = self.xdata.std(axis=0)
+
+    def __call__(self, x):
+        return (x - self.mean) / self.std
+
+    def reverse(self, x):
+        return (x * self.std) + self.mean
 
 
 if __name__ == "__main__":
@@ -68,12 +86,13 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     data_path = Path("data/deep_learning_data/random_dataset.txt")
     train_data = JointsDataset1(data_path, mode="train")
-    scaler = StandardScaler()
-    scaler.fit(train_data.X)
-    train_data.normalizer = scaler
+    # normalizer = StandardScaler()
+    # normalizer.fit(train_data.X)
+    normalizer = Normalizer(train_data.X)
+    train_data.normalizer = normalizer
 
-    valid_data = JointsDataset1(data_path, mode="valid", normalizer=scaler)
-    test_data = JointsDataset1(data_path, mode="test", normalizer=scaler)
+    valid_data = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
+    test_data = JointsDataset1(data_path, mode="test", normalizer=normalizer)
 
     # ------------------------------------------------------------
     # Print dataset info

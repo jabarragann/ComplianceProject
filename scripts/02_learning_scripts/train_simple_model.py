@@ -12,11 +12,13 @@ import torch
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import torch.nn as nn
+from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
 
 # Custom
 from kincalib.utils.Logger import Logger
-from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
-from kincalib.Learning.Models import MLP
+
+# from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
+from kincalib.Learning.Models import MLP, BestMLP1
 from kincalib.Learning.Trainer import TrainRegressionNet
 from torchsuite.TrainingBoard import TrainingBoard
 
@@ -25,7 +27,7 @@ from torchsuite.TrainingBoard import TrainingBoard
 batch_size = 256
 num_workers = 3
 # Optimization
-learning_rate = 0.001
+learning_rate = 0.001907
 shuffle = True
 # Others
 random_seed = 0
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--round", type=int, help="Model training round", default=4)
+    parser.add_argument("-r", "--round", type=int, help="Model training round", default=2)
     parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
     parser.add_argument("-e", "--epochs", type=int, default=552, help="epochs")
     args = parser.parse_args()
@@ -63,11 +65,18 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Data loading and manipulation
     # ------------------------------------------------------------
-    train_data = JointsRawDataset(data_dir, mode="train")
-    valid_data = JointsRawDataset(data_dir, mode="valid")
-    normalizer = Normalizer(*train_data[:])
-    train_dataset = JointsDataset(*train_data[:], normalizer)
-    valid_dataset = JointsDataset(*valid_data[:], normalizer)
+    data_path = Path("data/deep_learning_data/random_dataset.txt")
+    train_dataset = JointsDataset1(data_path, mode="train")
+    normalizer = Normalizer(train_dataset.X)
+    train_dataset.normalizer = normalizer
+    valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
+    test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
+
+    # train_data = JointsRawDataset(data_dir, mode="train")
+    # valid_data = JointsRawDataset(data_dir, mode="valid")
+    # normalizer = Normalizer(*train_data[:])
+    # train_dataset = JointsDataset(*train_data[:], normalizer)
+    # valid_dataset = JointsDataset(*valid_data[:], normalizer)
 
     # Create Dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -81,7 +90,8 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
 
     # Create Network
-    model = MLP()
+    model = BestMLP1()
+    model.train()
     # Initialize Optimizer and Learning Rate Scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
