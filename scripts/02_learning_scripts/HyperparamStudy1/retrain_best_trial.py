@@ -50,10 +50,10 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-    epochs = 56
+    epochs = 260
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
-    root = study_root / "best_model3"
+    root = study_root / "best_model4"
     data_dir = Path("data/03_replay_trajectory/d04-rec-10-traj01")
     log = Logger("main").log
 
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     model = CustomMLP.define_model(best_trial)
     model = model.cuda()
-    model = model.eval()
+    model = model.train()
     # Loss
     loss_name = "MSELoss"  # best_trial.suggest_categorical("loss", ["L1Loss", "MSELoss"])
     loss_metric = getattr(torch.nn, loss_name)()
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Model Evaluation
     # ------------------------------------------------------------
-
+    model.eval()
     log.info("calculating accuracy after training...")
     train_acc = trainer_handler.calculate_acc(trainer_handler.train_loader)
     train_loss = trainer_handler.calculate_loss(trainer_handler.train_loader)
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     log.info(f"Average valid loss:     {valid_loss:0.06f}\n")
 
     # Calculate angle difference
-    valid_robot_state, valid_tracker_joints = test_dataset[:]
+    valid_robot_state, valid_tracker_joints = valid_dataset[:]
     valid_predicted_joints = model(valid_robot_state.cuda())
 
     valid_tracker_joints = valid_tracker_joints.cpu().data.numpy()

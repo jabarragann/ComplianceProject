@@ -18,16 +18,16 @@ from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
 from kincalib.utils.Logger import Logger
 
 # from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
-from kincalib.Learning.Models import MLP, BestMLP1
+from kincalib.Learning.Models import MLP, BestMLP1, BestMLP2
 from kincalib.Learning.Trainer import TrainRegressionNet
 from torchsuite.TrainingBoard import TrainingBoard
 
 ## Parameters
 # Dataloaders
-batch_size = 256
+batch_size = 127
 num_workers = 3
 # Optimization
-learning_rate = 0.001907
+learning_rate = 0.00094843454596563
 shuffle = True
 # Others
 random_seed = 0
@@ -42,9 +42,9 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--round", type=int, help="Model training round", default=2)
+    parser.add_argument("-r", "--round", type=int, help="Model training round", default=3)
     parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
-    parser.add_argument("-e", "--epochs", type=int, default=552, help="epochs")
+    parser.add_argument("-e", "--epochs", type=int, default=260, help="epochs")
     args = parser.parse_args()
     epochs = args.epochs
     training_round = args.round
@@ -90,15 +90,15 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
 
     # Create Network
-    model = BestMLP1()
+    model = BestMLP2()
     model.train()
     # Initialize Optimizer and Learning Rate Scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
     if gpu_boole:
         net = model.cuda()
     # Loss function
-    loss_metric = torch.nn.L1Loss()
+    loss_metric = torch.nn.MSELoss()
 
     # ------------------------------------------------------------
     # Train network
@@ -142,6 +142,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Results after training
     # ------------------------------------------------------------
+    model.eval()
     log.info("calculating accuracy after training...")
     train_acc = trainer_handler.calculate_acc(trainer_handler.train_loader)
     train_loss = trainer_handler.calculate_loss(trainer_handler.train_loader)

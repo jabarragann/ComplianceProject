@@ -19,9 +19,9 @@ from kincalib.utils.CmnUtils import mean_std_str
 from kincalib.utils.Logger import Logger
 
 # from kincalib.Learning.Dataset import Normalizer, JointsRawDataset, JointsDataset
-from kincalib.Learning.Models import MLP, BestMLP1
+from kincalib.Learning.Models import MLP, BestMLP1, BestMLP2
 from kincalib.Learning.Trainer import TrainRegressionNet, Trainer
-from kincalib.Learning.TrainingBoard import TrainingBoard
+from torchsuite.TrainingBoard import TrainingBoard
 from pytorchcheckpoint.checkpoint import CheckpointHandler
 
 ## Parameters
@@ -67,12 +67,13 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--round", type=int, help="Model training round", default=2)
+    parser.add_argument("-r", "--round", type=int, help="Model training round", default=3)
     args = parser.parse_args()
     training_round = args.round
 
     # datapaths
     root = Path(f"data/ModelsCheckpoints/T{training_round:02d}/")
+    log.info(f"load {root}")
     # root = Path(f"data/ModelsCheckpoints/Studies/TestStudy/best_model")
 
     # Setup
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
 
     # Create Network
-    model = BestMLP1()
+    model = BestMLP2()
     model.eval()
     # Initialize Optimizer and Learning Rate Scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     if gpu_boole:
         net = model.cuda()
     # Loss function
-    loss_metric = torch.nn.L1Loss()
+    loss_metric = torch.nn.MSELoss()
 
     # ------------------------------------------------------------
     # Load Checkpoint
@@ -130,7 +131,7 @@ if __name__ == "__main__":
         root=root,
         gpu_boole=True,
     )
-    trainer_handler.load_checkpoint(root / "best_checkpoint.pt")
+    trainer_handler.load_checkpoint(root / "final_checkpoint.pt")
 
     # Printing settings
     log.info(f"GPU available: {gpu_boole}")

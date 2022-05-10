@@ -37,6 +37,24 @@ class BestMLP1(nn.Module):
         return self.model(x)
 
 
+class BestMLP2(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        layers = []
+
+        in_features = 12
+
+        layers.append(nn.Linear(in_features, 140))
+        layers.append(nn.ReLU())
+        layers.append(nn.Dropout(0.00929993824427144))
+        layers.append(nn.Linear(140, 3))
+
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
+
+
 class CustomMLP(nn.Module):
     def __init__(self, trial) -> None:
         super().__init__()
