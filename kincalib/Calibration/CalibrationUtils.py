@@ -428,17 +428,20 @@ class CalibrationUtils:
 
         return df_robot, df_tracker, df_opt  # opt_error
 
-    def plot_joints(robot_df, tracker_df):
+    def plot_joints(robot_df, tracker_df, deg=False):
+        scale = 1.0 if not deg else 180 / np.pi
+        unit = "rad" if not deg else "deg"
+
         fig, axes = plt.subplots(6, 1, sharex=True)
         robot_df.reset_index(inplace=True)
         tracker_df.reset_index(inplace=True)
         for i in range(6):
             # fmt:off
-            axes[i].set_title(f"joint {i+1}")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), color="blue")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy(), marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].set_title(f"joint {i+1} ({unit})")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, color="blue")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, color="orange")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
             # fmt:on
         axes[0].legend()
 

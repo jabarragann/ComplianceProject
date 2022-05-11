@@ -30,6 +30,28 @@ from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
+def plot_hysteresis(selector:str, robot_df, tracker_df, deg=False):
+        assert selector in ["pitch","yaw","roll"]
+        if selector == "pitch":
+            idx = 5
+        elif selector == "yaw":
+            idx = 6
+        elif selector == "roll":
+            idx = 4
+        
+
+        scale = 1.0 if not deg else 180 / np.pi
+        unit = "rad" if not deg else "deg"
+        # import pdb; pdb.set_trace()
+        fig, axes = plt.subplots(1, 1, sharex=True)
+        robot_df = robot_df.reset_index()*scale
+        tracker_df = tracker_df.reset_index()*scale
+        # fmt:off
+        axes.set_title(f"{selector} ({unit})")
+        axes.plot(robot_df[f"rq{idx}"].to_numpy(), tracker_df[f"tq{idx}"].to_numpy(), color="blue",marker="*")
+        axes.set_xlabel("robot joint")
+        axes.set_ylabel("tracker joint")
+        # fmt:on
 
 def main(testid: int):
     # ------------------------------------------------------------
@@ -130,19 +152,20 @@ def main(testid: int):
 
         # plot
         if args.plot:
-            CalibrationUtils.plot_joints(robot_df, tracker_df)
-            fig, ax = plt.subplots(2, 1)
-            CalibrationUtils.create_histogram(
-                opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
-            )
-            CalibrationUtils.create_histogram(
-                opt_df["q56res"],
-                axes=ax[1],
-                title=f"Q56 Optimization error",
-                xlabel="Optimization residual error",
-                max_val=0.003,
-            )
-            fig.set_tight_layout(True)
+            plot_hysteresis(j,robot_df,tracker_df,deg=True)
+            CalibrationUtils.plot_joints(robot_df, tracker_df, deg=True)
+            # fig, ax = plt.subplots(2, 1)
+            # CalibrationUtils.create_histogram(
+            #     opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
+            # )
+            # CalibrationUtils.create_histogram(
+            #     opt_df["q56res"],
+            #     axes=ax[1],
+            #     title=f"Q56 Optimization error",
+            #     xlabel="Optimization residual error",
+            #     max_val=0.003,
+            # )
+            # fig.set_tight_layout(True)
             plt.show()
 
 
