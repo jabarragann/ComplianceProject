@@ -10,6 +10,7 @@ from black import out
 import numpy as np
 import numpy
 from typing import List
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 from kincalib.Recording.DataRecorder import OuterJointsCalibrationRecorder
 
 # ros
@@ -260,13 +261,59 @@ class RandomJointTrajectory(Trajectory):
         return RandomJointTrajectory(sampling_factor=1, setpoints=setpoints)
 
 
+@dataclass
+class SoftRandomJointTrajectory(RandomJointTrajectory):
+    """Sample two random joints positions, then create setpoint in betweeen the start and end goal.
+    The number of samples is proportional to the cartesian distance between start and end.
+    """
+
+    max_dist = 0.2632
+
+    def __post_init__(self) -> None:
+
+        return super().__post_init__()
+
+    @classmethod
+    def generate_trajectory(cls, samples: int):
+        setpoints = []
+
+        init_jp = RandomJointTrajectory.generate_random_joint()
+        count = 0
+
+        while count < samples:
+            new_jp = RandomJointTrajectory.generate_random_joint()
+
+            # Calculate distance between start and end point
+            joints = np.vstack((np.array(init_jp).reshape(1, 6), np.array(new_jp).reshape(1, 6)))
+            cp_positions = CalibrationUtils.calculate_cartesian(joints)[["X", "Y", "Z"]].to_numpy()
+            dist = np.linalg.norm(cp_positions[0, :] - cp_positions[1, :])
+
+            # Set number of samples proportional to the distance between start and end. At least use 2 samples
+            num = int((dist / SoftRandomJointTrajectory.max_dist) * 18)
+            num = max(2, num)
+            all_setpoints = np.linspace(init_jp, new_jp, num=num)
+
+            for idx in range(all_setpoints.shape[0]):
+                setpoint = JointState()
+                setpoint.name = ["q1", "q2", "q3", "q4", "q5", "q6"]
+                setpoint.position = all_setpoints[idx, :].tolist()
+                setpoints.append(setpoint)
+                count += 1
+
+            init_jp = setpoint.position
+
+        return SoftRandomJointTrajectory(sampling_factor=1, setpoints=setpoints[:samples])
+
+
 if __name__ == "__main__":
+
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
-    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
-    # trajectory = RandomJointTrajectory.generate_trajectory(2000)
+    # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
+    # trajectory = RandomJointTrajectory.generate_trajectory(200)
+    trajectory = SoftRandomJointTrajectory.generate_trajectory(200)
 
-    log.info(f"Initial pt {trajectory.setpoints[0].position}")
+    log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
     log.info(f"number of points {len(trajectory)}")
 
