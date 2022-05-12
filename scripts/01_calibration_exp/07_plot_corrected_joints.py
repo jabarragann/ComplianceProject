@@ -145,7 +145,7 @@ def main(testid: int):
     log.info(f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}")
     log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
 
-    log.info(f"Results in degrees")
+    log.info(f"Results in degrees (Robot-Tracker)")
     log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
     log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
     log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
@@ -153,13 +153,14 @@ def main(testid: int):
     log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
     log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
 
-    # log.info(f"Results in rad")
-    # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
-    # log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
-    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    # log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
-    # log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
-    # log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+    # Calculate cartesian errors calculate cartesian positions from robot_valid and prediction_valid
+    diff = pred_df[["q4","q5","q6"]].to_numpy()-robot_df[["q4","q5","q6"]]
+    diff_mean = diff.mean(axis=0)
+    diff_std = diff.std(axis=0)
+    log.info(f"Results in degrees (Robot-Predicted)")
+    log.info(f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
+    log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
+    log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[2]*180/np.pi,diff_std[2]*180/np.pi)}")
 
     # plot
     if args.plot:
