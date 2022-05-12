@@ -270,11 +270,10 @@ class SoftRandomJointTrajectory(RandomJointTrajectory):
     max_dist = 0.2632
 
     def __post_init__(self) -> None:
-
         return super().__post_init__()
 
     @classmethod
-    def generate_trajectory(cls, samples: int):
+    def generate_trajectory(cls, samples: int, samples_per_step=18):
         setpoints = []
 
         init_jp = RandomJointTrajectory.generate_random_joint()
@@ -289,7 +288,7 @@ class SoftRandomJointTrajectory(RandomJointTrajectory):
             dist = np.linalg.norm(cp_positions[0, :] - cp_positions[1, :])
 
             # Set number of samples proportional to the distance between start and end. At least use 2 samples
-            num = int((dist / SoftRandomJointTrajectory.max_dist) * 18)
+            num = int((dist / SoftRandomJointTrajectory.max_dist) * samples_per_step)
             num = max(2, num)
             all_setpoints = np.linspace(init_jp, new_jp, num=num)
 
@@ -311,7 +310,7 @@ if __name__ == "__main__":
     rosbag_handle = RosbagUtils(rosbag_path)
     # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
     # trajectory = RandomJointTrajectory.generate_trajectory(200)
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(200)
+    trajectory = SoftRandomJointTrajectory.generate_trajectory(100,samples_per_step=28)
 
     log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
