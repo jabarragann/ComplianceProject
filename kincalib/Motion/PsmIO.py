@@ -4,15 +4,17 @@ from sensor_msgs.msg import Joy
 
 
 class PsmIO:
-    def __init__(self, namespace, action) -> None:
+    def __init__(self, namespace, action_list=[], kwargs={}) -> None:
 
         # Function/callable object that will be executed when the suj clutch is pressed
-        self.action = action
+        self.action_list = action_list
         self._suj_clutch_sub = rospy.Subscriber(f"/{namespace}/io/suj_clutch", Joy, self.__suj_clutch_cb, queue_size=1)
+        self.kwargs = kwargs
 
     def __suj_clutch_cb(self, data):
         if data.buttons[0]:
-            self.action()
+            for action in self.action_list:
+                action(**self.kwargs)
 
 
 def action():
@@ -29,7 +31,6 @@ class Action2:
 
 if __name__ == "__main__":
     rospy.init_node("psm_io_test")
-    psm_io = PsmIO("PSM2", action=action)
-    psm_io2 = PsmIO("PSM2", action=Action2())
+    psm_io = PsmIO("PSM2", action_list=[action, Action2()])
 
     rospy.spin()
