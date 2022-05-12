@@ -21,7 +21,12 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.Motion.ReplayDevice import ReplayDevice
-from kincalib.Motion.TrajectoryPlayer import TrajectoryPlayer, Trajectory, RandomJointTrajectory
+from kincalib.Motion.TrajectoryPlayer import (
+    SoftRandomJointTrajectory,
+    TrajectoryPlayer,
+    Trajectory,
+    RandomJointTrajectory,
+)
 
 log = Logger("collection").log
 
@@ -64,13 +69,17 @@ def main():
     # ------------------------------------------------------------
     if args.rosbag is not None:
         rosbag_path = Path(args.rosbag)
+        if not rosbag_path.exists():
+            log.error("rosbag path does not exists")
+            exit(0)
         rosbag_handle = RosbagUtils(rosbag_path)
         rosbag_handle.print_topics_info()
         rosbag_handle.print_number_msg()
         trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
     else:
         log.info(f"Creating random trajectory")
-        trajectory = RandomJointTrajectory.generate_trajectory(1200)
+        # trajectory = RandomJointTrajectory.generate_trajectory(1200)
+        trajectory = SoftRandomJointTrajectory.generate_trajectory(500, samples_per_step=20)
 
     log.info(f"Trajectory size {len(trajectory)}")
 

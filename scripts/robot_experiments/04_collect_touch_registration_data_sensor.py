@@ -31,7 +31,7 @@ from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.Motion.ReplayDevice import ReplayDevice
-from kincalib.Motion.PsmIO import PsmIO
+from kincalib.Motion.PsmIO import PedalsIO, PsmIO
 
 log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
@@ -66,10 +66,10 @@ def main():
     marker_name = "custom_marker_112"
     mode = "test"
     test_id: int = args.testid
-    psm_io2 = PsmIO("PSM2")
+    io2 = PsmIO("PSM2") if args.selectio == "psm" else PedalsIO("camera")
     data_recorder_cb = DataRecorder(replay_device, expected_markers, root, marker_name, mode, test_id)
-    psm_info_cb = PsmInfo(replay_device, psm_io2)
-    psm_io2.action_list = [psm_info_cb, data_recorder_cb]
+    psm_info_cb = PsmInfo(replay_device, io2)
+    io2.action_list = [psm_info_cb, data_recorder_cb]
     time.sleep(0.2)
 
     print("Recording the kinematic information with IO ...")
@@ -82,8 +82,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt: off
     parser.add_argument("-t","--testid",type=int, help="testid required for test mode", default=0)
-    parser.add_argument( "-r", "--root", type=str, default="data/04_robot_measuring_experiments/registration_sensor_exp", 
+    # parser.add_argument( "-r", "--root", type=str, default="data/04_robot_measuring_experiments/registration_sensor_exp", 
+    #                         help="root dir to save the data.")                     
+    parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-16-trajsoft/registration_exp/registration_with_teleop", 
                             help="root dir to save the data.")                     
+    parser.add_argument( "-s", "--selectio", type=str, default="pedals", 
+                            help="Specifiy the IO to be used. pedals or psm")                     
     args = parser.parse_args()
     # fmt: on
     main()

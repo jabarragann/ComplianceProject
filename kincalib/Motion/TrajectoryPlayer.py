@@ -310,7 +310,7 @@ if __name__ == "__main__":
     rosbag_handle = RosbagUtils(rosbag_path)
     # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
     # trajectory = RandomJointTrajectory.generate_trajectory(200)
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(100,samples_per_step=28)
+    trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
 
     log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
