@@ -83,8 +83,8 @@ class DvrkPsmKin(DHRobot):
         for qi, L in zip(q, self.links):
             Tr *= L.A(qi)
 
-        if self._base is not None and not ignore_base:
-            Tr = self._base * Tr
+        if self.base_transform is not None and not ignore_base:
+            Tr = self.base_transform * Tr
         # Only add the base transformation if all the joint values are given.
         if q.shape[0] == len(self.links):
             Tr = Tr * self._tool
