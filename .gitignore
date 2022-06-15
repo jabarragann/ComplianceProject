@@ -1,5 +1,6 @@
 
 # Project especific
+/data2
 *.log
 cisstLog.txt
 documents
