@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import tf_conversions.posemath as pm
 
 # Robotics toolbox
-from roboticstoolbox import ETS as ET
+from roboticstoolbox import ET
 import roboticstoolbox as rtb
 from spatialmath import SE3
 from spatialmath.base import trnorm
@@ -59,13 +59,13 @@ log = Logger(__name__).log
 def fkins_v2(q5, q6):
     """Angles especified in rad"""
     E = (
-        ET.rx(-90, "deg")
-        * ET.rz((-90) * np.pi / 180 + q5)
+        ET.Rx(-90, "deg")
+        * ET.Rz((-90) * np.pi / 180 + q5)
         * ET.tx(DvrkPsmKin.lpitch2yaw)
-        * ET.rx(-90, "deg")
-        * ET.rz((-90) * np.pi / 180 + q6)
+        * ET.Rx(-90, "deg")
+        * ET.Rz((-90) * np.pi / 180 + q6)
     )
-    return E.eval().data[0]
+    return E.fkine([]).data[0]
 
 
 @dataclass
