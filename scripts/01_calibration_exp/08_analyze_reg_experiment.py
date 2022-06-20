@@ -11,28 +11,30 @@ import os
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 from kincalib.Motion.DvrkKin import DvrkPsmKin
-
+from kincalib.utils.IcpSolver import icp
 from kincalib.utils.Frame import Frame
 
 phantom_coord = {
-    "1": np.array([-12.7, 12.7, 0]),
-    "2": np.array([-12.7, 31.75, 0]),
-    "3": np.array([-58.42, 31.75, 0]),
-    "4": np.array([-53.34, 63.5, 0]),
-    "5": np.array([-12.7, 63.5, 0]),
-    "6": np.array([-12.7, 114.3, 0]),
-    "7": np.array([-139.7, 114.3, 0]),
-    "8": np.array([-139.7, 63.5, 0]),
-    "9": np.array([-139.7, 12.7, 0]),
-    "A": np.array([-193.675, 19.05, 25.4]),
-    "B": np.array([-193.675, 44.45, 50.8]),
-    "C": np.array([-193.675, 69.85, 76.2]),
-    "D": np.array([-193.675, 95.25, 101.6]),
+    "1": np.array([-12.7, 12.7, 0]) / 1000,
+    "2": np.array([-12.7, 31.75, 0]) / 1000,
+    "3": np.array([-58.42, 31.75, 0]) / 1000,
+    "4": np.array([-53.34, 63.5, 0]) / 1000,
+    "5": np.array([-12.7, 63.5, 0]) / 1000,
+    "6": np.array([-12.7, 114.3, 0]) / 1000,
+    "7": np.array([-139.7, 114.3, 0]) / 1000,
+    "8": np.array([-139.7, 63.5, 0]) / 1000,
+    "9": np.array([-139.7, 12.7, 0]) / 1000,
+    "A": np.array([-193.675, 19.05, 25.4]) / 1000,
+    "B": np.array([-193.675, 44.45, 50.8]) / 1000,
+    "C": np.array([-193.675, 69.85, 76.2]) / 1000,
+    "D": np.array([-193.675, 95.25, 101.6]) / 1000,
 }
 
 order_of_pt = ["1", "2", "3", "4", "5", "6", "8", "9", "A", "B", "C"]
+# order_of_pt = ["1", "2", "3", "4", "5", "6"]
 
 
 def extract_cartesian_xyz(cartesian_t: np.ndarray):
@@ -41,6 +43,25 @@ def extract_cartesian_xyz(cartesian_t: np.ndarray):
         position_list.append(cartesian_t[i][:3, 3])
 
     return np.array(position_list)
+
+
+def plot_point_cloud(xs, ys, zs, labels=None):
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection="3d")
+
+    if labels is None:
+        ax.scatter(xs, ys, zs, marker="o")
+    else:
+        for i in range(labels.shape[0]):
+            ax.scatter(xs[i], ys[i], zs[i], marker="o", color="b")
+            ax.text(xs[i], ys[i], zs[i], "%s" % (str(labels[i])), size=20, zorder=1, color="k")
+
+    ax.set_xlabel("X Label")
+    ax.set_ylabel("Y Label")
+    ax.set_zlabel("Z Label")
+
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -117,11 +138,25 @@ if __name__ == "__main__":
         # Calculate registration error
         A = final_df[["robot_x", "robot_y", "robot_z"]].to_numpy().T
         B = final_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = final_df["location_id"].to_numpy().T
 
-        est_T = Frame.find_transformation_direct(A, B)
-        reg_error = Frame.evaluation(A, B, est_T)
+        # Registration assuming point correspondances
+        Trig = Frame.find_transformation_direct(A, B)
+        reg_error1 = Frame.evaluation(A, B, Trig)
+
+        # Registration assuming unknow correspondances
+        T, d, i = icp(A.T, B.T)
+        Ticp = Frame.init_from_matrix(T)
+        reg_error2 = Frame.evaluation(A, B, Ticp)
+
         # print(final_df)
-        print(f"registration error: {reg_error:0.6f}")
+        print(f"Trig\n{Trig}")
+        print(f"registration error T1:      {reg_error1:0.6f}")
+        print(f"Ticp\n{T}")
+        print(f"registration error T2(ICP): {reg_error2:0.6f}")
+
+        # plot_point_cloud(B.T[:, 0], B.T[:, 1], B.T[:, 2], labels=labels)
+        plot_point_cloud(A.T[:, 0], A.T[:, 1], A.T[:, 2], labels=labels)
 
         #
         # Calculate tracker joints
