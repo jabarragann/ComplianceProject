@@ -1,6 +1,9 @@
 import logging
 from re import I
 from rich.logging import RichHandler
+import numpy as np
+
+np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
 class Logger:
