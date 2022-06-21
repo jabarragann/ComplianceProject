@@ -14,8 +14,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 from kincalib.Motion.DvrkKin import DvrkPsmKin
+from kincalib.utils.CmnUtils import mean_std_str
 from kincalib.utils.IcpSolver import icp
 from kincalib.utils.Frame import Frame
+from kincalib.utils.Logger import Logger
+
+log = Logger(__name__).log
 
 phantom_coord = {
     "1": np.array([-12.7, 12.7, 0]) / 1000,
@@ -102,31 +106,45 @@ if __name__ == "__main__":
     files_dict = {}
     for dir in data_dir.glob("*/robot_cp.txt"):
         test_id = dir.parent.name
-        print(dir.parent.name, dir.name)
+        log.info(f">>>>>> Processing >>>>>>")
+        log.info(f"{dir.parent.name} {dir.name}")
 
         robot_cp_df = pd.read_csv(dir.parent / "robot_cp.txt")
         robot_jp_df = pd.read_csv(dir.parent / "robot_jp.txt")
 
-        print(f"Number of rows in jp {robot_jp_df.shape[0]}")
-        print(f"Number of rows in cp {robot_cp_df.shape[0]}")
+        log.info(f"Number of rows in jp {robot_jp_df.shape[0]}")
 
-        # Calculate cartesian
+        # Calculate cartesian pose with robot joints
         cartesian_robot = psm_kin.fkine(
             robot_jp_df[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
         )
         cartesian_robot = extract_cartesian_xyz(cartesian_robot.data)
 
+        # Calculate cartesian pose with tracker estimated joints
+        j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
+        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
+            j_estimator, robot_jp_df, robot_cp_df
+        )
+        cartesian_tracker = psm_kin.fkine(
+            tracker_df[["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]].to_numpy()
+        )
+        cartesian_tracker = extract_cartesian_xyz(cartesian_tracker.data)
+        ## TODO: some positions can not be calculated because the shaft marker is not observed
+        ## TODO: account for that when creating the final df
+
         loc_df = []
         for idx, loc in enumerate(order_of_pt):
+            # Calculate tracker joints
+
             data_dict = dict(
                 test_id=[test_id],
                 location_id=[loc],
                 robot_x=[cartesian_robot[idx, 0]],
                 robot_y=[cartesian_robot[idx, 1]],
                 robot_z=[cartesian_robot[idx, 2]],
-                tracker_x=[0.0],
-                tracker_y=[0.0],
-                tracker_z=[0.0],
+                tracker_x=[cartesian_robot[idx, 0]],
+                tracker_y=[cartesian_robot[idx, 1]],
+                tracker_z=[cartesian_robot[idx, 2]],
                 phantom_x=[phantom_coord[loc][0]],
                 phantom_y=[phantom_coord[loc][1]],
                 phantom_z=[phantom_coord[loc][2]],
@@ -135,33 +153,26 @@ if __name__ == "__main__":
 
         final_df = pd.concat(loc_df, ignore_index=True)
 
-        # Calculate registration error
+        # Calculate registration error robot
         A = final_df[["robot_x", "robot_y", "robot_z"]].to_numpy().T
         B = final_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
         labels = final_df["location_id"].to_numpy().T
-
         # Registration assuming point correspondances
         Trig = Frame.find_transformation_direct(A, B)
-        reg_error1 = Frame.evaluation(A, B, Trig)
+        error, std = Frame.evaluation(A, B, Trig, return_std=True)
+        log.info(f"Registration error robot   (mm):   {mean_std_str(1000*error,1000*std)}")
+        # log.info(f"Trig\n{Trig}")
+        # print(f"final df\n{final_df.head()}")
 
-        # Registration assuming unknow correspondances
-        T, d, i = icp(A.T, B.T)
-        Ticp = Frame.init_from_matrix(T)
-        reg_error2 = Frame.evaluation(A, B, Ticp)
+        # Calculate registration error tracker
+        A = final_df[["tracker_x", "tracker_y", "tracker_z"]].to_numpy().T
+        B = final_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = final_df["location_id"].to_numpy().T
+        # Registration assuming point correspondances
+        Trig = Frame.find_transformation_direct(A, B)
+        error, std = Frame.evaluation(A, B, Trig, return_std=True)
+        log.info(f"Registration error tracker (mm):   {mean_std_str(1000*error,1000*std)}")
 
-        # print(final_df)
-        print(f"Trig\n{Trig}")
-        print(f"registration error T1:      {reg_error1:0.6f}")
-        print(f"Ticp\n{T}")
-        print(f"registration error T2(ICP): {reg_error2:0.6f}")
-
+        # Plot point clouds
         # plot_point_cloud(B.T[:, 0], B.T[:, 1], B.T[:, 2], labels=labels)
-        plot_point_cloud(A.T[:, 0], A.T[:, 1], A.T[:, 2], labels=labels)
-
-        #
-        # Calculate tracker joints
-        # j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-        # robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
-        #     j_estimator, robot_jp_df, robot_cp_df
-        # )
-        break
+        # plot_point_cloud(A.T[:, 0], A.T[:, 1], A.T[:, 2], labels=labels)
