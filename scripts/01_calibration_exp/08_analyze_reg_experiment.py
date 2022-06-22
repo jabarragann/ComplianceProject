@@ -9,6 +9,7 @@ Point 7-D were not collected. This give us a total of 10.
 import json
 import os
 from pathlib import Path
+from click import progressbar
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -122,29 +123,33 @@ if __name__ == "__main__":
 
         # Calculate cartesian pose with tracker estimated joints
         j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
-            j_estimator, robot_jp_df, robot_cp_df
-        )
-        cartesian_tracker = psm_kin.fkine(
-            tracker_df[["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]].to_numpy()
-        )
-        cartesian_tracker = extract_cartesian_xyz(cartesian_tracker.data)
+
         ## TODO: some positions can not be calculated because the shaft marker is not observed
         ## TODO: account for that when creating the final df
 
         loc_df = []
         for idx, loc in enumerate(order_of_pt):
             # Calculate tracker joints
-
+            robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
+                j_estimator,
+                robot_jp_df.iloc[idx].to_frame().T,
+                robot_cp_df.loc[robot_cp_df["step"] == idx + 1],  # Step start in 1
+                use_progress_bar=False,
+            )
+            cartesian_tracker = psm_kin.fkine(
+                tracker_df[["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]].to_numpy()
+            )
+            cartesian_tracker = extract_cartesian_xyz(cartesian_tracker.data)
+            ## Cartesian tracker is  single line!!
             data_dict = dict(
                 test_id=[test_id],
                 location_id=[loc],
                 robot_x=[cartesian_robot[idx, 0]],
                 robot_y=[cartesian_robot[idx, 1]],
                 robot_z=[cartesian_robot[idx, 2]],
-                tracker_x=[cartesian_robot[idx, 0]],
-                tracker_y=[cartesian_robot[idx, 1]],
-                tracker_z=[cartesian_robot[idx, 2]],
+                tracker_x=[cartesian_tracker[0, 0] if cartesian_tracker.shape[0] > 0 else np.nan],
+                tracker_y=[cartesian_tracker[0, 1] if cartesian_tracker.shape[0] > 0 else np.nan],
+                tracker_z=[cartesian_tracker[0, 2] if cartesian_tracker.shape[0] > 0 else np.nan],
                 phantom_x=[phantom_coord[loc][0]],
                 phantom_y=[phantom_coord[loc][1]],
                 phantom_z=[phantom_coord[loc][2]],
@@ -165,9 +170,10 @@ if __name__ == "__main__":
         # print(f"final df\n{final_df.head()}")
 
         # Calculate registration error tracker
-        A = final_df[["tracker_x", "tracker_y", "tracker_z"]].to_numpy().T
-        B = final_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
-        labels = final_df["location_id"].to_numpy().T
+        temp_df = final_df.dropna(axis=0)
+        A = temp_df[["tracker_x", "tracker_y", "tracker_z"]].to_numpy().T
+        B = temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = temp_df["location_id"].to_numpy().T
         # Registration assuming point correspondances
         Trig = Frame.find_transformation_direct(A, B)
         error, std = Frame.evaluation(A, B, Trig, return_std=True)
