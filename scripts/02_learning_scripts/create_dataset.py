@@ -14,7 +14,6 @@ from rich.logging import RichHandler
 from rich.progress import track
 
 # ROS and DVRK imports
-import dvrk
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 from kincalib.Recording.DataRecord import LearningRecord
 import rospy
