@@ -9,16 +9,22 @@ Point 7-D were not collected. This give us a total of 10.
 import json
 import os
 from pathlib import Path
+import pickle
 from click import progressbar
+import optuna
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
+import torch
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
+from kincalib.Learning.Models import CustomMLP
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
 from kincalib.utils.IcpSolver import icp
 from kincalib.utils.Frame import Frame
 from kincalib.utils.Logger import Logger
+from pytorchcheckpoint.checkpoint import CheckpointHandler
 
 log = Logger(__name__).log
 
@@ -88,6 +94,32 @@ if __name__ == "__main__":
         + "registration_exp/registration_sensor_exp/test_trajectories/"
     )
 
+    # load neural network
+    study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/regression_study1.pkl")
+    root = study_root.parent / "best_model5_temp"
+    log = Logger("main_retrain").log
+
+    if (study_root).exists():
+        log.info(f"Load: {study_root}")
+        study = pickle.load(open(study_root, "rb"))
+    else:
+        log.error("no study")
+
+    best_trial: optuna.Trial = study.best_trial
+    normalizer = pickle.load(open(root / "normalizer.pkl", "rb"))
+    model = CustomMLP.define_model(best_trial)
+    model = model.cuda()
+    model = model.eval()
+
+    # Check for checkpoints
+    checkpath = root / "final_checkpoint.pt"
+    if checkpath.exists():
+        checkpoint, model, _ = CheckpointHandler.load_checkpoint_with_model(
+            checkpath, model, None, map_location="cuda"
+        )
+    else:
+        log.error("no model")
+
     # Output df
     values_df_cols = [
         "test_id",
@@ -101,10 +133,14 @@ if __name__ == "__main__":
         "phantom_x",
         "phantom_y",
         "phantom_z",
+        "neuralnet_x",
+        "neuralnet_y",
+        "neuralnet_z",
     ]
     values_df = pd.DataFrame(columns=values_df_cols)
 
     files_dict = {}
+    all_experiment_df = []
     for dir in data_dir.glob("*/robot_cp.txt"):
         test_id = dir.parent.name
         log.info(f">>>>>> Processing >>>>>>")
@@ -124,11 +160,9 @@ if __name__ == "__main__":
         # Calculate cartesian pose with tracker estimated joints
         j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
 
-        ## TODO: some positions can not be calculated because the shaft marker is not observed
-        ## TODO: account for that when creating the final df
-
         loc_df = []
         for idx, loc in enumerate(order_of_pt):
+
             # Calculate tracker joints
             robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
                 j_estimator,
@@ -140,6 +174,20 @@ if __name__ == "__main__":
                 tracker_df[["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]].to_numpy()
             )
             cartesian_tracker = extract_cartesian_xyz(cartesian_tracker.data)
+
+            # Calculate neural network joints
+            #fmt:off 
+            input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"] + [
+                "t1", "t2", "t3", "t4", "t5", "t6", ]#fmt:on
+
+            robot_state = torch.Tensor(robot_jp_df.iloc[idx][input_cols].to_numpy())
+            robot_state = robot_state.reshape(1,12).cuda()
+            output = model(robot_state)
+            output = output.detach().cpu().numpy().squeeze()
+            corrected_jp = np.concatenate((robot_jp_df.iloc[idx][["q1","q2","q3"]].to_numpy(),output))
+            cartesian_network = psm_kin.fkine( corrected_jp )
+            cartesian_network= extract_cartesian_xyz(cartesian_network.data)
+
             ## Cartesian tracker is  single line!!
             data_dict = dict(
                 test_id=[test_id],
@@ -153,15 +201,19 @@ if __name__ == "__main__":
                 phantom_x=[phantom_coord[loc][0]],
                 phantom_y=[phantom_coord[loc][1]],
                 phantom_z=[phantom_coord[loc][2]],
+                neuralnet_x=[cartesian_network[0, 0]],
+                neuralnet_y=[cartesian_network[0, 1]],
+                neuralnet_z=[cartesian_network[0, 2]],
             )
             loc_df.append(pd.DataFrame(data_dict, columns=values_df_cols))
 
-        final_df = pd.concat(loc_df, ignore_index=True)
+        experiment_df = pd.concat(loc_df, ignore_index=True)
+        all_experiment_df.append(experiment_df)
 
         # Calculate registration error robot
-        A = final_df[["robot_x", "robot_y", "robot_z"]].to_numpy().T
-        B = final_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
-        labels = final_df["location_id"].to_numpy().T
+        A = experiment_df[["robot_x", "robot_y", "robot_z"]].to_numpy().T
+        B = experiment_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = experiment_df["location_id"].to_numpy().T
         # Registration assuming point correspondances
         Trig = Frame.find_transformation_direct(A, B)
         error, std = Frame.evaluation(A, B, Trig, return_std=True)
@@ -170,7 +222,7 @@ if __name__ == "__main__":
         # print(f"final df\n{final_df.head()}")
 
         # Calculate registration error tracker
-        temp_df = final_df.dropna(axis=0)
+        temp_df = experiment_df.dropna(axis=0)
         A = temp_df[["tracker_x", "tracker_y", "tracker_z"]].to_numpy().T
         B = temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
         labels = temp_df["location_id"].to_numpy().T
@@ -179,6 +231,19 @@ if __name__ == "__main__":
         error, std = Frame.evaluation(A, B, Trig, return_std=True)
         log.info(f"Registration error tracker (mm):   {mean_std_str(1000*error,1000*std)}")
 
+        # Calculate registration error model
+        temp_df = experiment_df.dropna(axis=0)
+        A = temp_df[["neuralnet_x", "neuralnet_y", "neuralnet_z"]].to_numpy().T
+        B = temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = temp_df["location_id"].to_numpy().T
+        # Registration assuming point correspondances
+        Trig = Frame.find_transformation_direct(A, B)
+        error, std = Frame.evaluation(A, B, Trig, return_std=True)
+        log.info(f"Registration error neural net (mm):   {mean_std_str(1000*error,1000*std)}")
+
         # Plot point clouds
         # plot_point_cloud(B.T[:, 0], B.T[:, 1], B.T[:, 2], labels=labels)
         # plot_point_cloud(A.T[:, 0], A.T[:, 1], A.T[:, 2], labels=labels)
+
+    all_experiment_df = pd.concat(all_experiment_df)
+    all_experiment_df.to_csv(registration_data_path / "registration_with_phantom.csv", index=None)
