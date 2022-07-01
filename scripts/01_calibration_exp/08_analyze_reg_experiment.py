@@ -236,6 +236,7 @@ if __name__ == "__main__":
         A = temp_df[["neuralnet_x", "neuralnet_y", "neuralnet_z"]].to_numpy().T
         B = temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
         labels = temp_df["location_id"].to_numpy().T
+
         # Registration assuming point correspondances
         Trig = Frame.find_transformation_direct(A, B)
         error, std = Frame.evaluation(A, B, Trig, return_std=True)
