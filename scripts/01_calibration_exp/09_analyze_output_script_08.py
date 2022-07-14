@@ -73,4 +73,5 @@ if __name__ == "__main__":
     ax.set_xlabel("Test id")
     ax.set_ylabel("Mean registration error (mm)")
     ax.set_title("Phantom registration experiment")
+    ax.grid()
     plt.show()
