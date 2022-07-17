@@ -8,10 +8,37 @@ The calibration procedure goal's is finding corrected joints values $\hat{q}$ th
 Robot-tracker registration requires knowing corresponding pair of points in both robot and tracker frame. To construct these point clouds, we decided to use the origin of the pitch frame as it can be easily calculated from both coordinate frames (TALK ABOUT HOW PREVIOUS WORK SHOWED THAT THE FIRST THREE JOINTS OF THE ROBOT ARE VERY PRECISE, SO REGISTRATION WILL NOT HAVE MUCH ERROR FROM ROBOT VALUES). The pitch origin in the robot frame can be calculated using the inverses kinematic formulas shown in the equations below. 
 
 $$
-x= y^2
+{ }_{5}^{0} \mathbf{p}=\left[\begin{array}{l}
+0 \\
+5 \\
+0 \\
+5 \\
+5 \\
+0 \\
+5
+\end{array}\right]=\left[\begin{array}{c}
+\cos \left(q_{\mathrm{p}, 2}\right) \cdot \sin \left(q_{\mathrm{p}, 1}\right) \cdot\left(L_{\mathrm{tool}}-L_{1}+q_{\mathrm{p}, 3}\right) \\
+-\sin \left(q_{\mathrm{p}, 2}\right) \cdot\left(L_{\mathrm{tool}}-L_{1}+q_{\mathrm{p}, 3}\right) \\
+-\cos \left(q_{\mathrm{p}, 1}\right) \cdot \cos \left(q_{\mathrm{p}, 2}\right) \cdot\left(L_{\mathrm{tool}}-L_{1}+q_{\mathrm{p}, 3}\right)
+\end{array}\right],
 $$
 
+which gives
+$$
+\left[\begin{array}{c}
+q_{\mathrm{p}, 1} \\
+q_{\mathrm{p}, 2} \\
+q_{\mathrm{p}, 3}
+\end{array}\right]=\left[\begin{array}{c}
+\arctan 2\left({ }_{5}^{0} x /-{ }_{5}^{0} z\right) \\
+\arctan 2\left(-{ }_{5}^{0} y / \sqrt{{ }_{5}^{0} x^{2}+{ }_{5}^{0} z^{2}}\right) \\
+\sqrt{{ }_{5}^{0} x^{2}+{ }_{5}^{0} y^{2}+{ }_{5}^{0} z^{2}}+L_{1}-L_{\mathrm{tool}}
+\end{array}\right],
+$$
+
+
 ## Joint calculation 
+
 
 <!-- ![calibration diagram](../figures/PSM_kinematics_v3.svg | width=500) -->
 
