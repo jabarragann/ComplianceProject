@@ -1,7 +1,10 @@
 
 # Calibration procedure
 
-The calibration procedure goal's is finding corrected joints values $\hat{q}$ that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks to automatically correct the joint values without the optical tracker. The calibration is divided into 2 main steps: The registration from the tracker to the robot ($T_{RT}$) and the calculation of the corrected joint values $\hat{q}$. To calculate $T_{RT}$, the robot is commanded to different locations and at each point the pitch frame's origin is recorded in the robot coordinate frame and the tracker coordinate frame. The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. The calculation of the corrected joints is also breaked down into three different calculations, one for $\hat{q_1}$,$\hat{q_2}$ and $\hat{q_2}$, another one for $\hat{q_3}$, and another for $\hat{q_5}$ and $\hat{q_6}$. 
+The calibration procedure goal's is finding corrected joints values $\hat{q}$ that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks to reduce the robot's kinematic error without the optical tracker. The calibration is divided into 2 main steps: The registration from the tracker to the robot ($T_{RT}$) and the calculation of the corrected joint values $\hat{q}$. To calculate $T_{RT}$, the robot is commanded to different locations and at each point the pitch frame's origin is recorded in the robot coordinate frame and the tracker coordinate frame. The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. The calculation of the corrected joints is also breaked down into three different calculations, one for $\hat{q_1}$,$\hat{q_2}$ and $\hat{q_2}$, another one for $\hat{q_3}$, and another for $\hat{q_5}$ and $\hat{q_6}$. 
+
+## Notation
+
 
 ## Pitch origin calculation & Robot-tracker registration 
 
@@ -13,9 +16,9 @@ x_{pi} \\
 y_{pi} \\
 z_{pi}
 \end{array}\right] = \left[ \begin{array}{c}
-\cos(q_2) \cdot \sin(q_1)  \cdot (L_{tool}-L_{1}+q_3) \\
+\cos(q_2) \cdot \sin(q_1)  \cdot (L_{tool}-L_{RCC}+q_3) \\
 -\sin(q_2) \cdot (L_{tool}-L_{1}+q_3) \\
--\cos(q_1) \cdot \cos(q_2) \cdot (L_{tool}-L_1+q_3)
+-\cos(q_1) \cdot \cos(q_2) \cdot (L_{tool}-L_{RCC}+q_3)
 \end{array}\right]
 $$
 
