@@ -85,3 +85,7 @@ https://nirpyresearch.com/detecting-outliers-using-mahalanobis-distance-pca-pyth
 https://www.statology.org/how-to-find-iqr-of-box-plot/
 
 ## Failure in rotation axis from Marker
+
+## Signed angle calculations
+* https://stackoverflow.com/questions/5188561/signed-angle-between-two-3d-vectors-with-same-origin-within-the-same-plane
+* https://www.weiy.city/2021/06/calculate-the-signed-angle-between-two-vectors/
