@@ -1,10 +1,26 @@
 
 # Calibration procedure
 
-The calibration procedure goal's is finding corrected joints values $\hat{q}$ that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks to reduce the robot's kinematic error without the optical tracker. The calibration is divided into 2 main steps: The registration from the tracker to the robot ($T_{RT}$) and the calculation of the corrected joint values $\hat{q}$. To calculate $T_{RT}$, the robot is commanded to different locations and at each point the pitch frame's origin is recorded in the robot coordinate frame and the tracker coordinate frame. The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. The calculation of the corrected joints is also breaked down into three different calculations, one for $\hat{q_1}$,$\hat{q_2}$ and $\hat{q_2}$, another one for $\hat{q_3}$, and another for $\hat{q_5}$ and $\hat{q_6}$. 
+The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks to reduce the robot's kinematic error without the optical tracker. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and then the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to rigidly register the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the Denavit-Hartenberg (DH) parameters of the robot's manipulator. 
 
 ## Notation
 
+Let $q_i$ be the ith measured joint value of the robot which can be obtained by reading the robot's encoders. Let $\hat{q_i}$ be the ith estimated joint value using the geometric information provided by the optical tracker. This value is assumed to be different from $q_i$ due to non-linearities introduced by the cable-driven mechanisms. In general, we will use the $\:\hat{}\:$ symbol to refer to quantities estimated using the geometric information of the tracker. To describe the relative position of coordinate $i$ with respect to $i-1$, we will use the notation ${}^{i-1}T_{i}$. Lastly, all the vectors will have a upper superscript indicating the frame to which they are referenced, e.g., $P^{\{i\}}. 
+
+## Robot kinematic model and important coordinate frames
+
+The robot's DH parameters and link coordinate frames can be observed in the figure below. The DVRK robot uses the modified DH parameter convention and therefore the transformation between two successives link frames is described by 
+
+$${}^{i-1}T_{i} = R_x(\alpha_{i-1}) \: T_x(a_{i-1}) \: T_z(\delta_i) \: R_z(\theta_i)$$
+
+where $R_x$ and $R_z$ are rotation matrices a about x and z axis and $T_x$ and $T_z$ are translation matrices along the x and z axis. [TALK ABOUT THE FRAMES THAT ARE FIXED THAT ARE IMPORTANT FOR THE CALIBRATION]
+
+($T_{RT}$)
+
+$\hat{q}$ 
+The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. 
+
+The calculation of the corrected joints is also breaked down into three different calculations, one for $\hat{q_1}$,$\hat{q_2}$ and $\hat{q_2}$, another one for $\hat{q_3}$, and another for $\hat{q_5}$ and $\hat{q_6}$. 
 
 ## Pitch origin calculation & Robot-tracker registration 
 
@@ -32,6 +48,11 @@ Finally, the registration matrix $T_{RT}$ can be obtained by moving the robot to
 
 ## Joint calculation 
 
+### Base and insertion joints estimation ($\hat{q}_1$, $\hat{q}_2$ and $\hat{q}_3$)
+
+### Shaft rotation estimation ($q_4$)
+
+### Wrist joints estimation ($q_5$ and $q_6$)
 
 Inverse kinematics for the first three joints
 
