@@ -1,26 +1,29 @@
 
 # Calibration procedure
 
-The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks to reduce the robot's kinematic error without the optical tracker. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and then the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to rigidly register the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the Denavit-Hartenberg (DH) parameters of the robot's manipulator. 
+The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks for intraoperative kinematic error reduction. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to rigidly register the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the robot's Denavit-Hartenberg (DH) kinematic parameters.  
 
 ## Notation
 
-Let $q_i$ be the ith measured joint value of the robot which can be obtained by reading the robot's encoders. Let $\hat{q_i}$ be the ith estimated joint value using the geometric information provided by the optical tracker. This value is assumed to be different from $q_i$ due to non-linearities introduced by the cable-driven mechanisms. In general, we will use the $\:\hat{}\:$ symbol to refer to quantities estimated using the geometric information of the tracker. To describe the relative position of coordinate $i$ with respect to $i-1$, we will use the notation ${}^{i-1}T_{i}$. Lastly, all the vectors will have a upper superscript indicating the frame to which they are referenced, e.g., $P^{\{i\}}. 
+Let $q_i$ be the ith measured joint value of the robot which can be obtained by reading the robot's encoders. Let $\hat{q_i}$ be the ith estimated joint value using the geometric information provided by the optical tracker. This value is assumed to be different from $q_i$ due to non-linearities introduced by the cable-driven mechanisms. In general, we will use the $\:\hat{}\:$ symbol to refer to quantities estimated using the geometric information of the tracker. To describe the relative position of coordinate $i$ with respect to $i-1$, we will use the notation ${}^{i-1}T_{i}$. Lastly, all the vectors will have a upper superscript indicating the frame to which they are referenced, e.g., $p^{\{i\}}$. 
 
-## Robot kinematic model and important coordinate frames
+## Robot kinematic model and optical markers locations 
 
 The robot's DH parameters and link coordinate frames can be observed in the figure below. The DVRK robot uses the modified DH parameter convention and therefore the transformation between two successives link frames is described by 
 
 $${}^{i-1}T_{i} = R_x(\alpha_{i-1}) \: T_x(a_{i-1}) \: T_z(\delta_i) \: R_z(\theta_i)$$
 
-where $R_x$ and $R_z$ are rotation matrices a about x and z axis and $T_x$ and $T_z$ are translation matrices along the x and z axis. [TALK ABOUT THE FRAMES THAT ARE FIXED THAT ARE IMPORTANT FOR THE CALIBRATION]
+where $R_x$ and $R_z$ are rotation matrices a about x and z axis and $T_x$ and $T_z$ are translation matrices along the x and z axis. Frames 0 to 7 represented the robot's link coordinate frame where frame $0$ represents the robot's base coordinate system and frame $7$ the end-effector system. To obtain the transformation ${}^{0}T_{i}$ we will be using the notation $f_{kins}(q_0,..,q_i)$ where $f_{kins}$ is the robot's forward kinematic function. 
+
+For calibration purposes, two sets of optical markers are attached to the robot. The first set is a single optical marker is attached to the robot's last link. The location of this marker in tracker coordinates frames will be $p_{wrist}^{\{T\}}$. The second set is a 3d printed part containing 3 markers that is attached to the robot shaft. The transformation the 3D printed part's origin relative to the tracker ${}^{T}T_{M}$. 
+
+are attached to the robot in the last link of the robot and around the shaft. The former will be refer to as the wrist marker [TALK ABOUT THE FRAMES THAT ARE FIXED THAT ARE IMPORTANT FOR THE CALIBRATION]
 
 ($T_{RT}$)
 
 $\hat{q}$ 
 The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. 
 
-The calculation of the corrected joints is also breaked down into three different calculations, one for $\hat{q_1}$,$\hat{q_2}$ and $\hat{q_2}$, another one for $\hat{q_3}$, and another for $\hat{q_5}$ and $\hat{q_6}$. 
 
 ## Pitch origin calculation & Robot-tracker registration 
 
@@ -69,7 +72,7 @@ q_{\mathrm{p}, 3}
 $$
 
 <!-- ![calibration diagram](../figures/PSM_kinematics_v3.svg | width=500) -->
-<img src="../figures/PSM_kinematics_v3.svg" width="500">
+<img src="../figures/PSM_kinematics_v4.svg" width="500">
 Figure 1
 
 # Supplemtary material 
