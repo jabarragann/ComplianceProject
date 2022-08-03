@@ -9,20 +9,14 @@ Let $q_i$ be the ith measured joint value of the robot which can be obtained by 
 
 ## Robot kinematic model and optical markers locations 
 
-The robot's DH parameters and link coordinate frames can be observed in the figure below. The DVRK robot uses the modified DH parameter convention and therefore the transformation between two successives link frames is described by 
+The DVRK robot utilices the modified denavit-Hartenberg parameters to describe the relative position of successives joint axis. With this convention the position of the link $i$ relative to link $i-1$ can be described with
 
 $${}^{i-1}T_{i} = R_x(\alpha_{i-1}) \: T_x(a_{i-1}) \: T_z(\delta_i) \: R_z(\theta_i)$$
 
-where $R_x$ and $R_z$ are rotation matrices a about x and z axis and $T_x$ and $T_z$ are translation matrices along the x and z axis. Frames 0 to 7 represented the robot's link coordinate frame where frame $0$ represents the robot's base coordinate system and frame $7$ the end-effector system. To obtain the transformation ${}^{0}T_{i}$ we will be using the notation $f_{kins}(q_0,..,q_i)$ where $f_{kins}$ is the robot's forward kinematic function. 
+where $R_x$ and $R_z$ are rotation matrices a about x and z axis, and $T_x$ and $T_z$ are translation matrices along the x and z axis. Figure XX shows the different frames describing the robot's kinematic chain. Frames 1 to 6 represented the robot's actuated joints while the coordinate frame $0$ and $1$ represent the robot's base and end-effector system, respectively. The notation $f_{kins}(q_0,..,q_i)$ will be used to describe robot's forward kinematic function. This function will describe the transformation ${}^{0}T_{i}$. 
 
-For calibration purposes, two sets of optical markers are attached to the robot. The first set is a single optical marker is attached to the robot's last link. The location of this marker in tracker coordinates frames will be $p_{wrist}^{\{T\}}$. The second set is a 3d printed part containing 3 markers that is attached to the robot shaft. The transformation the 3D printed part's origin relative to the tracker ${}^{T}T_{M}$. 
+For the calibration procedure, two optically tracked object are attached to the robot. The first object is a single marker which is attached to the last link of the robot. We will refer to this marker's location tracker coordinates as $p_{wrist}^{\{T\}}$. This marker is attached such that its position is constant from the robots $6$th frame. The second object is a 3D printed part containing 3 optical markers. This part is attached to the robot's shaft such that the transformation ${}^{4}T_{M}$ is constant. Lastly, the position of this part with respect to the tracker is defined as ${}^{T}T_{M}$ and can be measured using the tracker. 
 
-are attached to the robot in the last link of the robot and around the shaft. The former will be refer to as the wrist marker [TALK ABOUT THE FRAMES THAT ARE FIXED THAT ARE IMPORTANT FOR THE CALIBRATION]
-
-($T_{RT}$)
-
-$\hat{q}$ 
-The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. 
 
 
 ## Pitch origin calculation & Robot-tracker registration 
@@ -88,3 +82,12 @@ Figure 1
 Although these formulas require measured joint values from the robot, previous work  showed that most of the kinematic error in the DVRK robot is mostly due to the the wrist joints. In this regard, the first three joints can be used to calculated the registration between the robot and the tracker without introducing too much error. 
 
 The pitch origin's position in tracker space ($T_{pi}^{T}$) we model the roll and pitch axis as a pair of skew lines (In an ideal robot these two axes would intersect each other at a point) can be calculated as the midpoint of a the perpendicular segmented to both the roll and pitch axis in tracker space. In the robot kinematic models these two axis  
+
+$\hat{q}$ 
+The resulting points clouds can then be rigidly registered to obtain $T_{RT}$. 
+
+The robot's DH parameters and link coordinate frames can be observed in the figure [XX]. Given the parameters the parameters of the link containing axis $i-1$ and $i$, The DVRK robot uses the modified DH parameter convention and therefore the transformation between two successives link frames is described by 
+
+To obtain the transformation ${}^{0}T_{i}$ we will be using the notation $f_{kins}(q_0,..,q_i)$ where $f_{kins}$ is the robot's forward kinematic function. 
+
+For calibration purposes, two sets of optical markers are attached to the robot. The first set is a single marker is attached to the robot's last link. The location of this marker in tracker coordinates frames will be $p_{wrist}^{\{T\}}$. The second set is a 3d printed part containing 3 markers that is attached to the robot shaft. The transformation the 3D printed part's origin relative to the tracker ${}^{T}T_{M}$. 
