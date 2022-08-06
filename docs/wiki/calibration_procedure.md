@@ -1,7 +1,7 @@
 
 # Calibration procedure
 
-The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks for intraoperative kinematic error reduction. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to rigidly register the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the robot's Denavit-Hartenberg (DH) kinematic parameters.  
+The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks for intraoperative kinematic error reduction. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to calculate the spatial transformation between rigidly register the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the robot's Denavit-Hartenberg (DH) kinematic parameters.  
 
 ## Notation
 
@@ -21,7 +21,7 @@ For the calibration procedure, two optically tracked object are attached to the 
 
 ## Robot-tracker registration 
 
-Robot-tracker registration was achieved by moving the robot to multiple locations and tracking the wrist pitch axis origin $\left(p_{O5}\right)$ in both robot and tracker coordinates. ${}^{R}T_{T}$ was calculated by aligning the two resulting point clouds of this procedure with an algorithm based in SVD. $P_{O5}^{\{0\}}$ was calculated using the robot's  forward kinematic formulation shown in the equation [XX]. [NOT SURE ABOUT THE FOLLOWING - This formula will require the first three measured joint values from the robot, however, previous work [HWANG] have shown that these joints have negligeble error compared to the wrist joints. In this regard, it will be admisible to use this joint values to find the registration between the robot and tracker.]
+Robot-tracker registration was achieved by calculating the wrist pitch axis origin $\left(p_{O5}\right)$ using the robot's kinematic equations and the optically tracked objects. These measurements were performed at multiple random joint configuration while the robot was completely still to avoid synchronization issues. After collecting N different configurations, the spatial transformation ${}^{0}T_{T}$ was found then by  minimizing the distance between all corresponding pair of points using SVD solution. $P_{O5}^{\{0\}}$ was calculated using the robot's forward kinematic formulation shown in the equation [XX]. [NOT SURE ABOUT THE FOLLOWING - This formula will require the first three measured joint values from the robot, however, previous work [HWANG] have shown that these joints have negligeble error compared to the wrist joints. In this regard, it will be admisible to use this joint values to find the registration between the robot and tracker.]
 
 $$
 \mathbf{p_{O5}^{\{0\}}} = \left[\begin{array}{l}
@@ -36,9 +36,6 @@ z_{O5}
 $$
 
 Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the intersection point between the roll and pitch axis (see figure [REF]). In reality, these two axis will rarely intersect and are more appropriately model as a pair of skew lines. In this case, $P_{O5}$ can be defined as the midpoint of the unique mutual perpendicular segmented to both axis (SEE FIGURE: MAYBE SHOWING THE TWO AXIS AND THE MIDPOINT). Using this observation $P_{O5}^{\{T\}}$ can be calculated by obtaining the line equations defining the roll and pitch axis in tracker frame and then finding the midpoint of the perpendicular segment. To obtain the line equation of each rotation axis, the corresponding joint was moved in small increments while keeping the rest of the joints still. As the tracked markers were rigidly attached to the robot, the movement of a single joint produced a point cloud following a circular trajectory. The line equation of the desired axis of rotation was then obtained with the center and perpendicular vector of 3D circle fitted to this point cloud. 
-
-
-Finally, the registration matrix $T_{RT}$ can be obtained by moving the robot to multiple locations and calculating $p_{pi}^{\{r\}}$ and $p_{pi}^{\{T\}}$ at each step. After collecting enough points, $T_{RT}$ was calculated using a point-cloud to point-cloud registration method based on SVD decomposition.
 
 [DOES USING TWO DIFFERENT PITCH AXIS FOR THE CALCULATION OF THE PITCH ORIGIN IS REALLY HELPING? INVESTIGATE WHETHER USING TWO PITCH AXIS IMPROVES THE REGISTRATION ERROR]
 
@@ -100,3 +97,13 @@ Robot-tracker registration requires knowing corresponding pair of points in both
 $P_{O5}^{\{T\}}$ was calculated using the fact that the wrist pitch origin's $\left(P_{O5}\right)$ lies in the intersection between the roll and pitch axis in the robot's kinematic model (
 
 With these observation in mind, we can obtain ($T_{O5}^{T}$) by first  calculating the line equations defining the roll and pitch axis in tracker frame and secondly by finding the midpoint of the perpendicular segment. 
+
+ROBOT REGISTRATION IDEAS
+
+Robot-tracker registration was achieved by calculating the wrist pitch axis origin $\left(p_{O5}\right)$ using the optically tracked objects while the robot was moving through random joint configurations. This procedure produced a point-cloud that was aligned to the values reported by the robot to find ${}^{0}T_{T}$. This spatial transformation was found by solving a least-squares problem using SVD. $P_{O5}^{\{0\}}$ was calculated using the robot's  forward kinematic formulation shown in the equation [XX]. [NOT SURE ABOUT THE FOLLOWING - This formula will require the first three measured joint values from the robot, however, previous work [HWANG] have shown that these joints have negligeble error compared to the wrist joints. In this regard, it will be admisible to use this joint values to find the registration between the robot and tracker.]
+
+The robot was moved along a random  trajectory while making joint configuration and then stop completely before making the measurements.The robot followed a random was commanded to a random joint configuration and only after stopping completely  
+
+solving a least-squares problem using SVD to minimize the distance between all the corresponding points. 
+
+Finally, the registration matrix $T_{RT}$ can be obtained by moving the robot to multiple locations and calculating $p_{pi}^{\{r\}}$ and $p_{pi}^{\{T\}}$ at each step. After collecting enough points, $T_{RT}$ was calculated using a point-cloud to point-cloud registration method based on SVD decomposition.
