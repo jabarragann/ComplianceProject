@@ -5,7 +5,7 @@ The calibration procedure goal's is finding corrected joints values that more ac
 
 ## Notation
 
-Let $q_i$ be the ith measured joint value of the robot which can be obtained by reading the robot's encoders. Let $\hat{q_i}$ be the ith estimated joint value using the geometric information provided by the optical tracker. This value is assumed to be different from $q_i$ due to non-linearities introduced by the cable-driven mechanisms. In general, we will use the $\:\hat{}\:$ symbol to refer to quantities estimated using the geometric information of the tracker. To describe the relative position of coordinate $i$ with respect to $i-1$, we will use the notation ${}^{i-1}T_{i}$. Lastly, all the vectors will have a upper superscript indicating the frame to which they are referenced, e.g., $p^{\{i\}}$. 
+Let $q_i$ be the ith measured joint value of the robot which can be obtained by reading the robot's encoders. Let $\hat{q_i}$ be the ith estimated joint value using the geometric information provided by the optical tracker. This value is assumed to be different from $q_i$ due to non-linearities introduced by the cable-driven mechanisms. In general, we will use the $\:\hat{}\:$ symbol to refer to quantities estimated using the geometric information of the tracker. To describe the relative position of coordinate $i$ with respect to $i-1$, we will use the notation ${}^{i-1}T_{i}$, where $T$ is an $4\times4$ homogenous transformation matrix. Lastly, all the vectors will have a upper superscript indicating the frame to which they are referenced, e.g., $p^{\{i\}}$. 
 
 ## Robot kinematic model and optical markers locations 
 
@@ -21,7 +21,7 @@ For the calibration procedure, two optically tracked object are attached to the 
 
 ## Robot-tracker registration 
 
-Robot-tracker registration was achieved by calculating the wrist pitch axis origin $\left(p_{O5}\right)$ using the robot's kinematic equations and the optically tracked objects. These measurements were performed at multiple random joint configuration while the robot was completely still to avoid synchronization issues. After collecting N different configurations, the spatial transformation ${}^{0}T_{T}$ was found then by  minimizing the distance between all corresponding pair of points using SVD solution. $P_{O5}^{\{0\}}$ was calculated using the robot's forward kinematic formulation shown in the equation [XX]. This formula will require the first three measured joint values from the robot, however, previous work [HWANG] have shown that these joints have negligeble error compared to the wrist joints and therefore can be used for the registration process. 
+Robot-tracker registration was achieved by calculating the wrist pitch axis origin $\left(p_{O5}\right)$ in the robot and tracker's coordinate frame. The former calculated using the robot's kinematic equations and the later using the optically tracked objects. These measurements were performed at multiple random joint configuration while the robot was completely still to avoid synchronization issues between robot and tracker information. After collecting N different configurations, the spatial transformation ${}^{0}T_{T}$ was found then by  minimizing the distance between all corresponding pair of points. This least-squares solution was obtained using an SVD based aproach. $P_{O5}^{\{0\}}$ was calculated using the robot's forward kinematic formulation shown in the equation [XX]. Although this formula will require the first three measured joint values from the robot, previous work [HWANG] showed that these joints have negligeble error compared to the wrist joints and therefore can be used for the registration process.
 
 $$
 \mathbf{p_{O5}^{\{0\}}} = \left[\begin{array}{l}
@@ -35,33 +35,44 @@ z_{O5}
 \end{array}\right]
 $$
 
-Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the intersection point between the roll and pitch axis (see figure [REF]). In reality, these two axis will rarely intersect and are more appropriately model as a pair of skew lines. In this case, $P_{O5}$ can be defined as the midpoint of the unique mutual perpendicular segmented to both axis (SEE FIGURE: MAYBE SHOWING THE TWO AXIS AND THE MIDPOINT). Using this observation $P_{O5}^{\{T\}}$ can be calculated by obtaining the line equations defining the roll and pitch axis in tracker frame and then finding the midpoint of the perpendicular segment. To obtain the line equation of each rotation axis, the corresponding joint was moved in small increments while keeping the rest of the joints still. As the tracked markers were rigidly attached to the robot, the movement of a single joint produced a point cloud following a circular trajectory. The line equation of the desired axis of rotation was then obtained with the center and perpendicular vector of 3D circle fitted to this point cloud. 
+Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the intersection point between the roll and pitch axis (see figure [REF]). In reality, these two axis will rarely intersect and are more appropriately model as a pair of skew lines. In this case, $P_{O5}$ can be defined as the midpoint of the unique mutual perpendicular segmented to both axis (SEE FIGURE: MAYBE SHOWING THE TWO AXIS AND THE MIDPOINT). Using this observation $P_{O5}^{\{T\}}$ can be calculated by obtaining the line equations defining the roll and pitch axis in tracker frame and then finding the midpoint of the perpendicular segment. The line equation of each rotation axis was obtained by moving the corresponding joint in small increments while keeping the rest of the joints still. As the tracked markers were rigidly attached to the robot, the movement of a single joint produced a point cloud along a circular trajectory. The line equation of the desired axis of rotation was then obtained with the center and perpendicular vector of 3D circle fitted to this point cloud. The rotation axis's direction was additionally used to compute the constant transformation ${}^{M}T_{4}$. This transformation was later used for the joint calculations.
 
+Some
 [DOES USING TWO DIFFERENT PITCH AXIS FOR THE CALCULATION OF THE PITCH ORIGIN IS REALLY HELPING? INVESTIGATE WHETHER USING TWO PITCH AXIS IMPROVES THE REGISTRATION ERROR]
 
 [MIDPOINT OF SHORTEST SEGMENT]
 
 ## Joint calculation 
 
-### Base and insertion joints estimation ($\hat{q}_1$, $\hat{q}_2$ and $\hat{q}_3$)
+After registration the corrected joint values can be obtained by measuring ${}^{T}T_{M}$ and $P_{wrist}^{\{T\}}$ with the optical tracker. Based on these values, three algorithms are proposed to calculate the corrected joint values. 
+
+### Base and insertion joints estimation ($\hat{q}_ 1$, $\hat{q}_ 2$ and $\hat{q}_ 3$)
+
+The base and insertion joint estimation starts by calculating a corrected value of the wrist pitch frame's origin $\hat{P}_ {O5}^{\{0\}}$ using tracker measurements. This value was calculated by transforming $P_{O5}^{\{M\}}$ (known from calibration) to the robot coordinate frame using the following equation 
+
+$$ \hat{P}_ {O5}^{\{0\}} = {}^{0}T_{T} {}^{T}T_{M} P_{O5}^{\{M\}}$$
+
+Then, the inverse kinematics formula are applied to $\hat{P}_ {O5}^{0}$ to find the corrected joint values. 
+
+$$
+\left[\begin{array}{c}
+\hat{q}_ {1} \\
+\hat{q}_ {2}  \\
+\hat{q}_ {3} 
+\end{array}\right]= f_{inv\_kin} \left( \hat{P}_ {O5}^{\{0\}} \right) = \left[\begin{array}{c} 
+\arctan 2\left(x/- z\right) \\
+\arctan 2\left(- y / \sqrt{x^{2}+z^{2}}\right) \\
+\sqrt{ x^{2}+ y^{2}+ z^{2}}+L_{RCC}-L_{\mathrm{tool}}
+\end{array}\right],
+$$
 
 ### Shaft rotation estimation ($q_4$)
+
 
 ### Wrist joints estimation ($q_5$ and $q_6$)
 
 Inverse kinematics for the first three joints
 
-$$
-\left[\begin{array}{c}
-q_{\mathrm{p}, 1} \\
-q_{\mathrm{p}, 2} \\
-q_{\mathrm{p}, 3}
-\end{array}\right]=\left[\begin{array}{c}
-\arctan 2\left({ }_{5}^{0} x /-{ }_{5}^{0} z\right) \\
-\arctan 2\left(-{ }_{5}^{0} y / \sqrt{{ }_{5}^{0} x^{2}+{ }_{5}^{0} z^{2}}\right) \\
-\sqrt{{ }_{5}^{0} x^{2}+{ }_{5}^{0} y^{2}+{ }_{5}^{0} z^{2}}+L_{1}-L_{\mathrm{tool}}
-\end{array}\right],
-$$
 
 <!-- ![calibration diagram](../figures/PSM_kinematics_v3.svg | width=500) -->
 <img src="../figures/PSM_kinematics_v4.svg" width="500">
