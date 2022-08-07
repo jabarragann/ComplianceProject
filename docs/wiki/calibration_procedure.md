@@ -37,7 +37,6 @@ $$
 
 Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the intersection point between the roll and pitch axis (see figure [REF]). In reality, these two axis will rarely intersect and are more appropriately model as a pair of skew lines. In this case, $P_{O5}$ can be defined as the midpoint of the unique mutual perpendicular segmented to both axis (SEE FIGURE: MAYBE SHOWING THE TWO AXIS AND THE MIDPOINT). Using this observation $P_{O5}^{\{T\}}$ can be calculated by obtaining the line equations defining the roll and pitch axis in tracker frame and then finding the midpoint of the perpendicular segment. The line equation of each rotation axis was obtained by moving the corresponding joint in small increments while keeping the rest of the joints still. As the tracked markers were rigidly attached to the robot, the movement of a single joint produced a point cloud along a circular trajectory. The line equation of the desired axis of rotation was then obtained with the center and perpendicular vector of 3D circle fitted to this point cloud. The rotation axis's direction was additionally used to compute the constant transformation ${}^{M}T_{4}$. This transformation was later used for the joint calculations.
 
-Some
 [DOES USING TWO DIFFERENT PITCH AXIS FOR THE CALCULATION OF THE PITCH ORIGIN IS REALLY HELPING? INVESTIGATE WHETHER USING TWO PITCH AXIS IMPROVES THE REGISTRATION ERROR]
 
 [MIDPOINT OF SHORTEST SEGMENT]
@@ -46,7 +45,7 @@ Some
 
 After registration the corrected joint values can be obtained by measuring ${}^{T}T_{M}$ and $P_{wrist}^{\{T\}}$ with the optical tracker. Based on these values, three algorithms are proposed to calculate the corrected joint values. 
 
-### Base and insertion joints estimation ($\hat{q}_ 1$, $\hat{q}_ 2$ and $\hat{q}_ 3$)
+### Base and insertion joints estimation ($\hat{q}_ 1$, $\hat{q}_ 2$, and $\hat{q}_ 3$)
 
 The base and insertion joint estimation starts by calculating a corrected value of the wrist pitch frame's origin $\hat{P}_ {O5}^{\{0\}}$ using tracker measurements. This value was calculated by transforming $P_{O5}^{\{M\}}$ (known from calibration) to the robot coordinate frame using the following equation 
 
@@ -66,17 +65,65 @@ $$
 \end{array}\right],
 $$
 
-### Shaft rotation estimation ($q_4$)
+### Shaft rotation estimation ($\hat{q}_ 4$)
 
+The joint variable $\hat{q}_ 4$ is defined in the DH parameter convention as the rotation angle from $x_3$ to $x_4$ about the mutually perpendicular vector $z_3$. Following this definition, $\hat{q}_ 4$ can be calculated by computing the corrected values, $\hat{x}_ 3$, $\hat{x}_ 4$ and $\hat{z}_ 3$ and then applying equation XX to computed the signed angle between $\hat{x}_ 3$ and $\hat{x}_ 4$.
 
-### Wrist joints estimation ($q_5$ and $q_6$)
+$$
+\hat{q}_ 4 = arctan2((\hat{x}_ 3 \times \hat{x}_ 4) \cdot \hat{z}_ 3,\; \hat{x}_ 3 \cdot \hat{x}_ 4 )
+$$ 
 
-Inverse kinematics for the first three joints
+The axis $\hat{x}_ 3$ and $\hat{x}_ 4$ were obtained from the rotation matrix of ${}^{0}\hat{T}_ {3}$. This transformation was calculated with the forward kinematic as shown in equation XX. 
+
+$$
+{}^{0}\hat{T}_ {3} = f_{kins}\left(\hat{q}_ 1, \hat{q}_ 2, \hat{q}_ 3 \right)
+$$
+
+The axis $\hat{x}_ 4$ was obtained from the rotation matrix of ${}^{0}\hat{T}_ {4}$. This transform was calculated with equation XX. 
+
+$$
+{}^{0}\hat{T}_ {4} = {}^{0}T_ {T} {}^{T}T_ {M} {}^{M}T_ {4}
+$$
+
+### Wrist joints estimation ($\hat{q}_ 5$ and $\hat{q}_ 6$)
+
+The last corrected joint values were obtained by analysing the wrist joints as a 2 DoF robot whose base is the PSM's frame $\{4\}$. Given that $P_{wrist}^{6}$ is known in this subsystem from registration, the location of the wrist's marker in tracker frame can be estimated using the following equation  
+
+$$
+\begin{equation}
+\begin{aligned}
+\hat{P}_ {wrist} ^ {T}  &=   {}^{T}T_ {M} {}^{M}T_ {4} {}^{4}T_ {5}( \hat{\theta}_ 5) {}^{5}T_ {6}( \hat{\theta}_ 6) \;  P_{wrist}^{6} \\
+							&=  {}^{T}T_ {6} ( \hat{\theta}_5 ,\: \hat{\theta}_6 ) \; P_{wrist}^{6} 
+\end{aligned}
+\end{equation}
+$$
+
+where $\hat{q}_ 5$ and $\hat{q}_ 6$ are the desired joint variables. Additionally, $P_{wrist}$ can be measured with the tracker, therefore it is possible to set up the optimization problem shown below  
+
+$$
+\begin{equation} 
+\begin{aligned}
+& \underset{  \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 }{\text{minimize}}
+& & \mathrm{e}( \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 ) \\
+& \text{subject to}
+& & -\pi <\hat{\theta}_ 5 ,\: \hat{\theta}_ 6 < \pi
+\end{aligned}
+\end{equation}
+$$
+
+where the cost function is the difference between the estimate and measured $P_{wrist}$ vectors. 
+
+$$
+e = {}^{T}T_ {6} ( \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 ) \; P_{wrist}^{6} \; - \; P_{wrist}^{T} 
+$$
+
+To solve the optimization problem ...
 
 
 <!-- ![calibration diagram](../figures/PSM_kinematics_v3.svg | width=500) -->
+
+**Figure 1**   
 <img src="../figures/PSM_kinematics_v4.svg" width="500">
-Figure 1
 
 # Supplemtary material 
 
