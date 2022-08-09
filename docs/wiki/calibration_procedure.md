@@ -87,18 +87,30 @@ $$
 
 ### Wrist joints estimation ($\hat{q}_ 5$ and $\hat{q}_ 6$)
 
-The last corrected joint values were obtained by analysing the wrist joints as a 2 DoF robot whose base is the PSM's frame $\{4\}$. Given that $P_{wrist}^{6}$ is known in this subsystem from registration, the location of the wrist's marker in tracker frame can be estimated using the following equation  
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by solving the inverse kinematic problem of the 2 Dof robot made up of the pitch and yaw joints.Using this model, an optimization problem was formulated to find the desired joint values. If $\hat{q}_ 5$ and $\hat{q}_ 6$ were known, the vector $P_{wrist}^{T}$  using the value $P_{wrist}^{6}$ known from registration, $P_{wrist}^{T}$ was estimated using the equation  
+
+by analyzing the robot's wrist as a 2 DoF robot and solving its inverse kinematic finding a . 
+by solving an inverse kinematic problem on the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved numerically by minimizing the distance between  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$   
+
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by formulating an inverse kinematic problem for the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved by minimizing the distance between a estimated location for the wrist's marker,  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$,  and the actual location of the marker, $P_{wrist}^{T}$.
+
+Using the attached marker in the wrist, the optimization problem BLAH was for 
+Using the known vector XX from registration and the measured marker location XX
+
+Using the wrist marker measured location, $P_{wrist}^{T}$,
+
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by setting up a minimization problem using $P_{wrist}^{T}$. The intuition for this algorithm is that the robot's wrist can be analyzed as a 2 DoF robot and that the desired angles are the solution to its inverse kinematic problem. 
 
 $$
 \begin{equation}
 \begin{aligned}
-\hat{P}_ {wrist} ^ {T}  &=   {}^{T}T_ {M} {}^{M}T_ {4} {}^{4}T_ {5}( \hat{\theta}_ 5) {}^{5}T_ {6}( \hat{\theta}_ 6) \;  P_{wrist}^{6} \\
-							&=  {}^{T}T_ {6} ( \hat{\theta}_5 ,\: \hat{\theta}_6 ) \; P_{wrist}^{6} 
+\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6) &=   {}^{T}T_ {M} {}^{M}T_ {4} {}^{4}T_ {5}( \hat{\theta}_ 5) {}^{5}T_ {6}( \hat{\theta}_ 6) \;  P_{wrist}^{6} \\
+							&=  {}^{T}T_ {6} ( \hat{\theta}_5 ,\: \hat{\theta}_6 ) \; P_{wrist}^{6}.
 \end{aligned}
 \end{equation}
 $$
 
-where $\hat{q}_ 5$ and $\hat{q}_ 6$ are the desired joint variables. Additionally, $P_{wrist}$ can be measured with the tracker, therefore it is possible to set up the optimization problem shown below  
+Additionally, $P_{wrist}$ can be measured with the tracker, therefore it is possible to set up the optimization problem shown below  
 
 $$
 \begin{equation} 
