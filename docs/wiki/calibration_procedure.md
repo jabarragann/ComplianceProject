@@ -87,19 +87,20 @@ $$
 
 ### Wrist joints estimation ($\hat{q}_ 5$ and $\hat{q}_ 6$)
 
-The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by solving the inverse kinematic problem of the 2 Dof robot made up of the pitch and yaw joints.Using this model, an optimization problem was formulated to find the desired joint values. If $\hat{q}_ 5$ and $\hat{q}_ 6$ were known, the vector $P_{wrist}^{T}$  using the value $P_{wrist}^{6}$ known from registration, $P_{wrist}^{T}$ was estimated using the equation  
+The joint values $\hat{q}_ 5$ and $\hat{q}_ 6$ were estimated by thinking about the robot's wrist as a 2 DoF mechanism whose base is frame {4} and end-effector is the marker attached to the wrist. Using this model, $\hat{q}_ 5$ and $\hat{q}_ 6$ are obtained by adjusting the joint values of this 2 DoF kinematic chain to match a desired target. If $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$ is the output of the wrists model forward kinematics and $P_{wrist}^{T}$ the desired target. Then, $\hat{q}_ 5$ and $\hat{q}_ 6$ can be estimated by solving the optimization problem 
 
-by analyzing the robot's wrist as a 2 DoF robot and solving its inverse kinematic finding a . 
-by solving an inverse kinematic problem on the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved numerically by minimizing the distance between  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$   
+$$
+\begin{equation} 
+\begin{aligned}
+& \underset{  \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 }{\text{minimize}}
+& & \hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6) \; - \; P_{wrist}^{T}\\
+& \text{subject to}
+& & -\pi <\hat{\theta}_ 5 ,\: \hat{\theta}_ 6 < \pi
+\end{aligned}
+\end{equation}
+$$
 
-The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by formulating an inverse kinematic problem for the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved by minimizing the distance between a estimated location for the wrist's marker,  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$,  and the actual location of the marker, $P_{wrist}^{T}$.
-
-Using the attached marker in the wrist, the optimization problem BLAH was for 
-Using the known vector XX from registration and the measured marker location XX
-
-Using the wrist marker measured location, $P_{wrist}^{T}$,
-
-The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by setting up a minimization problem using $P_{wrist}^{T}$. The intuition for this algorithm is that the robot's wrist can be analyzed as a 2 DoF robot and that the desired angles are the solution to its inverse kinematic problem. 
+To construct the cost function $P_{wrist}^{T}$ was obtained from the tracker while $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$ is defined with
 
 $$
 \begin{equation}
@@ -110,26 +111,7 @@ $$
 \end{equation}
 $$
 
-Additionally, $P_{wrist}$ can be measured with the tracker, therefore it is possible to set up the optimization problem shown below  
-
-$$
-\begin{equation} 
-\begin{aligned}
-& \underset{  \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 }{\text{minimize}}
-& & \mathrm{e}( \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 ) \\
-& \text{subject to}
-& & -\pi <\hat{\theta}_ 5 ,\: \hat{\theta}_ 6 < \pi
-\end{aligned}
-\end{equation}
-$$
-
-where the cost function is the difference between the estimate and measured $P_{wrist}$ vectors. 
-
-$$
-e = {}^{T}T_ {6} ( \hat{\theta}_ 5 ,\: \hat{\theta}_ 6 ) \; P_{wrist}^{6} \; - \; P_{wrist}^{T} 
-$$
-
-To solve the optimization problem ...
+The optimization problem was solved using the Dual Annealing numerical solver.
 
 
 <!-- ![calibration diagram](../figures/PSM_kinematics_v3.svg | width=500) -->
@@ -177,3 +159,21 @@ The robot was moved along a random  trajectory while making joint configuration 
 solving a least-squares problem using SVD to minimize the distance between all the corresponding points. 
 
 Finally, the registration matrix $T_{RT}$ can be obtained by moving the robot to multiple locations and calculating $p_{pi}^{\{r\}}$ and $p_{pi}^{\{T\}}$ at each step. After collecting enough points, $T_{RT}$ was calculated using a point-cloud to point-cloud registration method based on SVD decomposition.
+
+Q5 AND Q6 IDEAS
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by solving the inverse kinematic problem of the 2 Dof robot made up of the pitch and yaw joints.Using this model, an optimization problem was formulated to find the desired joint values. If $\hat{q}_ 5$ and $\hat{q}_ 6$ were known, the vector $P_{wrist}^{T}$  using the value $P_{wrist}^{6}$ known from registration, $P_{wrist}^{T}$ was estimated using the equation  
+
+by analyzing the robot's wrist as a 2 DoF robot and solving its inverse kinematic finding a . 
+by solving an inverse kinematic problem on the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved numerically by minimizing the distance between  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$   
+
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by formulating an inverse kinematic problem for the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved by minimizing the distance between a estimated location for the wrist's marker,  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$,  and the actual location of the marker, $P_{wrist}^{T}$.
+
+Using the attached marker in the wrist, the optimization problem BLAH was for 
+Using the known vector XX from registration and the measured marker location XX
+
+Using the wrist marker measured location, $P_{wrist}^{T}$,
+
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, were obtained by setting up a minimization problem using $P_{wrist}^{T}$. The intuition for this algorithm is that the robot's wrist can be analyzed as a 2 DoF robot and that the desired angles are the solution to its inverse kinematic problem. 
+
+
+The wrist joint values, $\hat{q}_ 5$ and $\hat{q}_ 6$, the solution of the inverse kinematic problem for the 2 DoF robot made up of the wrist pitch and yaw joints. This problem was solved by minimizing the distance between a estimated location for the wrist's marker,  $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$,  and the actual location of the marker, $P_{wrist}^{T}$.
