@@ -1,7 +1,7 @@
 
 # Calibration procedure
 
-The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks for intraoperative kinematic error reduction. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to calculate the spatial transformation between rigidly register the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the robot's Denavit-Hartenberg (DH) kinematic parameters.  
+The calibration procedure goal's is finding corrected joints values that more accurately describe the robot's end-effector position. These corrected joint values can later be used to train deep learning networks for intraoperative kinematic error reduction. The calibration is divided into 2 steps: the registration of the tracker and robot's coordinate frames and the calculation of the corrected joint values. The first step is achieved by commanding the robot to different locations and by recording the wrist pitch frame's origin in both robot and tracker coordinates. This procedure generates two point clouds that can be used to calculate the spatial transformation between the tracker and the robot. After registration, the corrected joint values are calculated using geometric algorithms based on the robot's Denavit-Hartenberg (DH) kinematic parameters.  
 
 ## Notation
 
@@ -13,15 +13,15 @@ The DVRK robot utilices the modified denavit-Hartenberg parameters to describe t
 
 $${}^{i-1}T_{i} = R_x(\alpha_{i-1}) \: T_x(a_{i-1}) \: T_z(\delta_i) \: R_z(\theta_i)$$
 
-where $R_x$ and $R_z$ are rotation matrices a about x and z axis, and $T_x$ and $T_z$ are translation matrices along the x and z axis. Figure XX shows the different frames describing the robot's kinematic chain. Frames 1 to 6 represented the robot's actuated joints while the coordinate frame $0$ and $1$ represent the robot's base and end-effector system, respectively. The notation $f_{kins}(q_0,..,q_i)$ will be used to describe robot's forward kinematic function. This function will describe the transformation ${}^{0}T_{i}$. 
+where $R_x$ and $R_z$ are rotation matrices about x and z axis, and $T_x$ and $T_z$ are translation matrices along the x and z axis. Figure XX shows the different frames describing the robot's kinematic chain. Frames 1 to 6 represented the robot's actuated joints while the coordinate frame $\{0\}$ and $\{7\}$ represent the robot's base and end-effector system, respectively. The notation $f_{kins}(q_0,..,q_i)$ will be used to describe robot's forward kinematic function. This function will describe the transformation ${}^{0}T_{i}$. 
 
-For the calibration procedure, two optically tracked object are attached to the robot. The first object is a single marker which is attached to the last link of the robot. We will refer to this marker's location as $p_{wrist}$. This marker is attached such that its position is constant from the robot's $6$th frame. The second tracked object is a 3D printed part containing 3 optical markers. This part is attached to the robot's shaft such that the transformation ${}^{4}T_{M}$ is constant. Both ${}^{T}T_{M}$ and $p_{wrist}^{\{T\}}$ can be obtained using the tracker API.
+For the calibration procedure, two optically tracked object are attached to the robot. The first object is a single optical marker which is attached to the last link of the robot. We will refer to this marker's location as $P_{wrist}$. This marker is located such that its position is constant from the robot's $6$th frame. The second tracked object is a 3D printed part containing 3 optical markers. This part is secured to the robot's shaft such that the transformation ${}^{4}T_{M}$ is constant. Both the transformation between 3d printed part and the tracker, ${}^{T}T_{M}$, and the wrist's marker location in tracker frame, $P_{wrist}^{T}$, can be obtained using the tracker API.
 
 
 
 ## Robot-tracker registration 
 
-Robot-tracker registration was achieved by calculating the wrist pitch axis origin $\left(p_{O5}\right)$ in the robot and tracker's coordinate frame. The former calculated using the robot's kinematic equations and the later using the optically tracked objects. These measurements were performed at multiple random joint configuration while the robot was completely still to avoid synchronization issues between robot and tracker information. After collecting N different configurations, the spatial transformation ${}^{0}T_{T}$ was found then by  minimizing the distance between all corresponding pair of points. This least-squares solution was obtained using an SVD based aproach. $P_{O5}^{\{0\}}$ was calculated using the robot's forward kinematic formulation shown in the equation [XX]. Although this formula will require the first three measured joint values from the robot, previous work [HWANG] showed that these joints have negligeble error compared to the wrist joints and therefore can be used for the registration process.
+Robot-tracker registration was achieved by calculating the wrist pitch axis origin, $P_{O5}$, in the robot and tracker's coordinate frame. The former calculated using the robot's kinematic equations and the later using the optically tracked objects. These measurements were performed at multiple random joint configuration while the robot was completely still to avoid synchronization issues between robot and tracker. After collecting N different configurations, the spatial transformation ${}^{0}T_{T}$ was found then by  minimizing the distance between all corresponding pair of points. This least-squares solution was obtained using an SVD based aproach. The wrist pitch origin in robot frame, $P_{O5}^{\{0\}}$, was calculated using the robot's forward kinematic formulation shown in the equation [XX]. Although this formula will require the first three measured joint values from the robot, previous work [HWANG] showed that these joints have negligeble error compared to the wrist joints and therefore can be used for the registration process.
 
 $$
 \mathbf{p_{O5}^{\{0\}}} = \left[\begin{array}{l}
@@ -35,7 +35,9 @@ z_{O5}
 \end{array}\right]
 $$
 
-Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the intersection point between the roll and pitch axis (see figure [REF]). In reality, these two axis will rarely intersect and are more appropriately model as a pair of skew lines. In this case, $P_{O5}$ can be defined as the midpoint of the unique mutual perpendicular segmented to both axis (SEE FIGURE: MAYBE SHOWING THE TWO AXIS AND THE MIDPOINT). Using this observation $P_{O5}^{\{T\}}$ can be calculated by obtaining the line equations defining the roll and pitch axis in tracker frame and then finding the midpoint of the perpendicular segment. The line equation of each rotation axis was obtained by moving the corresponding joint in small increments while keeping the rest of the joints still. As the tracked markers were rigidly attached to the robot, the movement of a single joint produced a point cloud along a circular trajectory. The line equation of the desired axis of rotation was then obtained with the center and perpendicular vector of 3D circle fitted to this point cloud. The rotation axis's direction was additionally used to compute the constant transformation ${}^{M}T_{4}$. This transformation was later used for the joint calculations.
+Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the intersection point between the roll and pitch axis (see figure [REF]). In reality, these two axis will rarely intersect and are more appropriately model as a pair of skew lines. In this case, $P_{O5}$ can be defined as the midpoint of the unique mutual perpendicular segmented to both axis (SEE FIGURE: MAYBE SHOWING THE TWO AXIS AND THE MIDPOINT). Using this observation, the pitch's origin in tracker frame, $P_{O5}^{\{T\}}$, can be calculated by obtaining the line equations defining the roll and pitch axis in tracker frame and then finding the midpoint of the perpendicular segment. The line equation of each rotation axis was obtained by moving the corresponding joint in small increments while keeping the rest of the joints still. As the tracked markers were rigidly attached to the robot, the movement of a single joint produced a point cloud along a circular trajectory. The line equation of the desired axis of rotation was then obtained with the center and perpendicular vector of 3D circle fitted to this point cloud. The rotation axis's direction was additionally used to compute the constant transformation ${}^{M}T_{4}$. This transformation was later used for the joint calculations.
+
+[MIGHT NEED TO WRITE AN PSEUDO ALGORITHM EXPLAINING THE ROBOT MOTION AT EACH POINT]
 
 [DOES USING TWO DIFFERENT PITCH AXIS FOR THE CALCULATION OF THE PITCH ORIGIN IS REALLY HELPING? INVESTIGATE WHETHER USING TWO PITCH AXIS IMPROVES THE REGISTRATION ERROR]
 
@@ -43,7 +45,7 @@ Using the robot's kinematic model, $P_{O5}$ can be alternatively defined as the 
 
 ## Joint calculation 
 
-After registration the corrected joint values can be obtained by measuring ${}^{T}T_{M}$ and $P_{wrist}^{\{T\}}$ with the optical tracker. Based on these values, three algorithms are proposed to calculate the corrected joint values. 
+After registration the corrected joint values can be obtained by measuring ${}^{T}T_{M}$ and $P_{wrist}^{T}$ with the optical tracker. Based on these values, three algorithms are proposed to calculate the corrected joint values. 
 
 ### Base and insertion joints estimation ($\hat{q}_ 1$, $\hat{q}_ 2$, and $\hat{q}_ 3$)
 
@@ -51,7 +53,7 @@ The base and insertion joint estimation starts by calculating a corrected value 
 
 $$ \hat{P}_ {O5}^{\{0\}} = {}^{0}T_{T} {}^{T}T_{M} P_{O5}^{\{M\}}$$
 
-Then, the inverse kinematics formula are applied to $\hat{P}_ {O5}^{0}$ to find the corrected joint values. 
+Then, the inverse kinematics formula shown below are applied to $\hat{P}_ {O5}^{0}$ to find the corrected joint values. 
 
 $$
 \left[\begin{array}{c}
@@ -67,27 +69,27 @@ $$
 
 ### Shaft rotation estimation ($\hat{q}_ 4$)
 
-The joint variable $\hat{q}_ 4$ is defined in the DH parameter convention as the rotation angle from $x_3$ to $x_4$ about the mutually perpendicular vector $z_3$. Following this definition, $\hat{q}_ 4$ can be calculated by computing the corrected values, $\hat{x}_ 3$, $\hat{x}_ 4$ and $\hat{z}_ 3$ and then applying equation XX to computed the signed angle between $\hat{x}_ 3$ and $\hat{x}_ 4$.
+The joint variable $\hat{q}_ 4$ is defined in the DH parameter convention as the rotation angle from $x_3$ to $x_4$ about the mutually perpendicular vector $z_3$. Following this definition, $\hat{q}_ 4$ can be calculated by estimating  $\hat{x}_ 3$, $\hat{x}_ 4$ and $\hat{z}_ 3$ using the tracker information and then applying equation 
 
 $$
 \hat{q}_ 4 = arctan2((\hat{x}_ 3 \times \hat{x}_ 4) \cdot \hat{z}_ 3,\; \hat{x}_ 3 \cdot \hat{x}_ 4 )
 $$ 
 
-The axis $\hat{x}_ 3$ and $\hat{x}_ 4$ were obtained from the rotation matrix of ${}^{0}\hat{T}_ {3}$. This transformation was calculated with the forward kinematic as shown in equation XX. 
+to computed the signed angle between $\hat{x}_ 3$ and $\hat{x}_ 4$. The axis $\hat{x}_ 3$ and $\hat{z}_ 3$ were obtained from the columns of the rotation matrix of ${}^{0}\hat{T}_ {3}$. This transformation was calculated with the forward kinematic equation 
 
 $$
-{}^{0}\hat{T}_ {3} = f_{kins}\left(\hat{q}_ 1, \hat{q}_ 2, \hat{q}_ 3 \right)
+{}^{0}\hat{T}_ {3} = f_{kins}\left(\hat{q}_ 1, \hat{q}_ 2, \hat{q}_ 3 \right).
 $$
 
-The axis $\hat{x}_ 4$ was obtained from the rotation matrix of ${}^{0}\hat{T}_ {4}$. This transform was calculated with equation XX. 
+The axis $\hat{x}_ 4$ was obtained from the rotation matrix of ${}^{0}\hat{T}_ {4}$ which was calculated with  
 
 $$
-{}^{0}\hat{T}_ {4} = {}^{0}T_ {T} {}^{T}T_ {M} {}^{M}T_ {4}
+{}^{0}\hat{T}_ {4} = {}^{0}T_ {T} {}^{T}T_ {M} {}^{M}T_ {4}.
 $$
 
 ### Wrist joints estimation ($\hat{q}_ 5$ and $\hat{q}_ 6$)
 
-The joint values $\hat{q}_ 5$ and $\hat{q}_ 6$ were estimated by thinking about the robot's wrist as a 2 DoF mechanism whose base is frame {4} and end-effector is the marker attached to the wrist. Using this model, $\hat{q}_ 5$ and $\hat{q}_ 6$ are obtained by adjusting the joint values of this 2 DoF kinematic chain to match a desired target. If $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$ is the output of the wrists model forward kinematics and $P_{wrist}^{T}$ the desired target. Then, $\hat{q}_ 5$ and $\hat{q}_ 6$ can be estimated by solving the optimization problem 
+The joint values $\hat{q}_ 5$ and $\hat{q}_ 6$ were estimated by thinking about the robot's wrist as a 2 DoF mechanism whose base is frame $\{4\}$ and end-effector is the marker attached to the wrist. Using this model, $\hat{q}_ 5$ and $\hat{q}_ 6$ are obtained by adjusting the joint values of this 2 DoF kinematic chain to match a desired target. If $\hat{P}_ {wrist} ^ {T}   (\hat{\theta}_ 5,\: \hat{\theta}_ 6)$ is the output of the wrists model forward kinematics and $P_{wrist}^{T}$ the desired target. Then, $\hat{q}_ 5$ and $\hat{q}_ 6$ can be estimated by solving the optimization problem 
 
 $$
 \begin{equation} 
