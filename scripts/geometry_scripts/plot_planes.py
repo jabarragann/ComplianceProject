@@ -1,6 +1,6 @@
-from re import I
 from kincalib.Geometry.geometry import Plane3D
 from kincalib.Geometry.Plotter import Plotter3D
+
 import numpy as np
 import matplotlib.pyplot as plt
 

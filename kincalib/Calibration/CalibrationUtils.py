@@ -21,7 +21,7 @@ from spatialmath.base import trnorm
 from roboticstoolbox import DHRobot, RevoluteMDH
 
 # My modules
-from kincalib.geometry import Circle3D, Line3D, dist_circle3_plane
+from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
     load_registration_data,

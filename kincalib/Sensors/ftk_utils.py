@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from kincalib.utils.Logger import Logger
-from kincalib.geometry import Triangle3D
+from kincalib.Geometry.geometry import Triangle3D
 import json
 from typing import List
 from itertools import combinations

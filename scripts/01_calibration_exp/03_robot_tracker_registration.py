@@ -28,7 +28,7 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
-from kincalib.geometry import Line3D, Circle3D, Triangle3D
+from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 
@@ -276,7 +276,9 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     return df_results, df_pitch_axes
 
 
-def calculate_axes_in_marker(pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax):
+def calculate_axes_in_marker(
+    pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax
+):
     """Calculate roll axis and pitch axis and pitch origin in the marker frame
 
     Parameters
