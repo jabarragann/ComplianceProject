@@ -251,7 +251,7 @@ class Plane3D:
         self.normal = normal / np.linalg.norm(normal)
         self.d = d
 
-    def generate_pts(self, N, l1_lim=(-50, 50), l2_lim=(-50, 50)):
+    def generate_pts(self, N, l1_lim=(-50, 50), l2_lim=(-50, 50), noise_std=0):
         """Generate point cloud of shape (N,3) from the plane parameters
 
         Parameters
@@ -262,6 +262,8 @@ class Plane3D:
             _description_, by default (-50, 50)
         l2_lim : tuple, optional
             _description_, by default (-50, 50)
+        noise_std: float
+            Introduce std of gaussian noise to the point cloud in the normal direction.
 
         Returns
         -------
@@ -271,15 +273,30 @@ class Plane3D:
         l1 = np.random.default_rng().uniform(l1_lim[0], l1_lim[1], size=(N, 1))
         l2 = np.random.default_rng().uniform(l2_lim[0], l2_lim[1], size=(N, 1))
 
+        # Calculate 2 base vectors on the plane
         temp = self.normal + np.array([0.0, 0.0, 0.5])
+        d1 = np.cross(self.normal, temp)
+        d1_l = np.linalg.norm(d1)
+        if np.isclose(d1_l, 0.0):
+            temp = self.normal + np.array([0.0, 0.5, 0.0])
+            d1 = np.cross(self.normal, temp)
+            d1_l = np.linalg.norm(d1)
+            if np.isclose(d1_l, 0.0):
+                temp = self.normal + np.array([0.5, 0.0, 0.0])
+                d1 = np.cross(self.normal, temp)
+                d1_l = np.linalg.norm(d1)
+
         d1 = np.cross(self.normal, temp)
         d1 = d1 / np.linalg.norm(d1)
         angle = 45 * np.pi / 180
-
         d2 = self.rotate_around_normal(d1, angle)
+
         orig2plane = self.dist2point(np.array([0.0, 0.0, 0.0]))
-        orig = orig2plane * self.normal
+        orig = -orig2plane * self.normal
         points = orig + l1 * d1 + l2 * d2
+
+        noise = np.random.default_rng().normal(0, noise_std, size=(N, 1))
+        points = points + noise * self.normal
 
         return points
 
@@ -306,6 +323,24 @@ class Plane3D:
         """
 
         return (np.dot(self.normal, x0) + self.d) / np.linalg.norm(self.normal)
+
+    def point_cloud_dist(self, pt_cloud: np.ndarray) -> np.ndarray:
+        """Calculate the distance to the plane for each point in the point cloud
+
+        Parameters
+        ----------
+        pt_cloud : np.ndarray
+            numpy array of size (N,3)
+
+        Returns
+        -------
+        np.ndarray
+            numpy array of size (N,)
+        """
+        dist_vect = []
+        for i in range(pt_cloud.shape[0]):
+            dist_vect.append(abs(self.dist2point(pt_cloud[i, :])))
+        return np.array(dist_vect)
 
     def __str__(self):
         return f"normal {self.normal} " + f"d      {self.d}"
