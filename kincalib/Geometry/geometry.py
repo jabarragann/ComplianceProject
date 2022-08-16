@@ -491,7 +491,7 @@ class Line3D:
 
 
 if __name__ == "__main__":
-    from kincalib.Geometry.geometry.Plotter import Plotter3D
+    from kincalib.Geometry.Plotter import Plotter3D
 
     log = Logger("utils_log").log
     # ------------------------------------------------------------
