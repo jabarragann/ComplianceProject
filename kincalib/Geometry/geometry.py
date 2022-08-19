@@ -254,6 +254,9 @@ class Plane3D:
     def generate_pts(self, N, l1_lim=(-50, 50), l2_lim=(-50, 50), noise_std=0):
         """Generate point cloud of shape (N,3) from the plane parameters
 
+        Algorithm taken from
+        https://stackoverflow.com/questions/29350965/generate-a-random-point-in-a-specific-plane-in-c
+
         Parameters
         ----------
         N : _type_
