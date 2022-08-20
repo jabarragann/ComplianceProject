@@ -373,6 +373,33 @@ class CalibrationUtils:
         robot_cp: pd.DataFrame,
         use_progress_bar: bool = True,
     ) -> pd.DataFrame:
+        """Calculates joints based on tracker information.
+
+        Notes:
+        * This will return an empty df_tracker dataframe in case the required tracker values
+        are not available. You can check this with `df_tracker.shape[0]>0`
+
+        Parameters
+        ----------
+        estimator : JointEstimator
+            _description_
+        robot_jp : pd.DataFrame
+            _description_
+        robot_cp : pd.DataFrame
+            _description_
+        use_progress_bar : bool, optional
+            _description_, by default True
+
+        Returns
+        -------
+        df_robot: pd.DataFrame
+            _description_
+        df_tracker: pd.DataFrame
+            _description_
+        df_opt: pd.DataFrame
+            _description_
+
+        """
 
         cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
         cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
