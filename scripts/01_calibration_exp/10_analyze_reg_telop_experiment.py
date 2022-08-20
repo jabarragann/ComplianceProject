@@ -7,6 +7,8 @@ Experiment description:
 
 import json
 from pathlib import Path
+import pickle
+from re import I
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -26,6 +28,9 @@ from kincalib.utils.IcpSolver import icp
 from kincalib.utils.Frame import Frame
 from kincalib.utils.Logger import Logger
 from pytorchcheckpoint.checkpoint import CheckpointHandler
+import optuna 
+import pickle
+import torch
 
 log = Logger(__name__).log
 
@@ -45,6 +50,25 @@ def plot_joints_torque(robot_jp_df: pd.DataFrame):
         sns.swarmplot(data=robot_jp_df, x=f"t{i+1}", ax=ax, color="black")
     plt.show()
 
+def load_neural_net():
+    # load neural network
+    study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/regression_study1.pkl")
+    root = study_root.parent / "best_model5_temp"
+    log = Logger("main_retrain").log
+
+    if (study_root).exists():
+        log.info(f"Load: {study_root}")
+        study = pickle.load(open(study_root, "rb"))
+    else:
+        log.error("no study")
+
+    best_trial: optuna.Trial = study.best_trial
+    normalizer = pickle.load(open(root / "normalizer.pkl", "rb"))
+    model = CustomMLP.define_model(best_trial)
+    model = model.cuda()
+    model = model.eval()
+    return model, normalizer
+
 def calculate_cartesian_df(robot_cp_df,robot_jp_df)->pd.DataFrame:
 
     # Output df
@@ -53,6 +77,7 @@ def calculate_cartesian_df(robot_cp_df,robot_jp_df)->pd.DataFrame:
                         "tracker_x", "tracker_y", "tracker_z",
                         "net_x", "net_y", "net_z" ]#fmt:on
 
+    model, normalizer = load_neural_net()
     psm_kin = DvrkPsmKin()  # Forward kinematic model
 
     # Load calibration values
@@ -93,11 +118,27 @@ def calculate_cartesian_df(robot_cp_df,robot_jp_df)->pd.DataFrame:
             tracker_values_list.append(np.array([np.nan,np.nan,np.nan]))
 
         # Calculate neural network joints
+        #fmt:off 
+        input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"] + [
+            "t1", "t2", "t3", "t4", "t5", "t6", ]#fmt:on
+
+        robot_state = torch.Tensor(robot_jp_df.iloc[idx][input_cols].to_numpy())
+        robot_state = robot_state.reshape(1,12)
+        norm_robot_state = normalizer(robot_state)
+        output = model(norm_robot_state.cuda())
+        output = output.detach().cpu().numpy().squeeze()
+        corrected_jp = np.concatenate((robot_jp_df.iloc[idx][["q1","q2","q3"]].to_numpy(),output))
+        cartesian_network = psm_kin.fkine( corrected_jp )
+        cartesian_network= extract_cartesian_xyz(cartesian_network.data)
+        net_values_list.append(cartesian_network)
+
     cartesian_tracker = np.vstack(tracker_values_list)
+    cartesian_network= np.vstack(net_values_list)
 
     #fmt:off
-    cols = ["robot_x", "robot_y", "robot_z", "tracker_x", "tracker_y", "tracker_z"] #fmt:on
-    data = np.hstack((cartesian_robot,cartesian_tracker))
+    cols = ["robot_x", "robot_y", "robot_z", "tracker_x", "tracker_y", "tracker_z",
+            "network_x", "network_y", "network_z"] #fmt:on
+    data = np.hstack((cartesian_robot,cartesian_tracker,cartesian_network))
 
     cartesian_results = pd.DataFrame(data, columns=cols)
 

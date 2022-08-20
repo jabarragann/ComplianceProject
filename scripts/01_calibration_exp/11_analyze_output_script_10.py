@@ -27,20 +27,16 @@ if __name__ == "__main__":
         cartesian_results = temp_df.dropna()
         cartesian_robot = cartesian_results[["robot_x", "robot_y", "robot_z"]].to_numpy()
         cartesian_tracker = cartesian_results[["tracker_x", "tracker_y", "tracker_z"]].to_numpy()
+        cartesian_network = cartesian_results[["network_x", "network_y", "network_z"]].to_numpy()
 
-        p1_est = Plane3D.from_data(cartesian_robot)
-        dist_vect_p1 = p1_est.point_cloud_dist(cartesian_robot)
-        dist_vect_p1 *= 1000
-        error_df["dist"].extend(dist_vect_p1.tolist())
-        error_df["type"].extend(["robot"] * dist_vect_p1.shape[0])
-        error_df["test_id"].extend([idx] * dist_vect_p1.shape[0])
-
-        p2_est = Plane3D.from_data(cartesian_tracker)
-        dist_vect_p2 = p2_est.point_cloud_dist(cartesian_tracker)
-        dist_vect_p2 *= 1000
-        error_df["dist"].extend(dist_vect_p2.tolist())
-        error_df["type"].extend(["cartesian"] * dist_vect_p2.shape[0])
-        error_df["test_id"].extend([idx] * dist_vect_p2.shape[0])
+        exp_dict = dict(robot=cartesian_robot, tracker=cartesian_tracker, network=cartesian_network)
+        for k, v in exp_dict.items():
+            p1_est = Plane3D.from_data(v)
+            dist_vect_p1 = p1_est.point_cloud_dist(v)
+            dist_vect_p1 *= 1000
+            error_df["dist"].extend(dist_vect_p1.tolist())
+            error_df["type"].extend([k] * dist_vect_p1.shape[0])
+            error_df["test_id"].extend([idx] * dist_vect_p1.shape[0])
 
     error_df = pd.DataFrame(error_df)
     error_df = error_df.loc[error_df["dist"] < 20]  # remove outliers
@@ -50,22 +46,25 @@ if __name__ == "__main__":
     for idx in test_id:
         log.info(f"Test id {idx}")
         temp = error_df.loc[error_df["test_id"] == idx]
-        dist_vect_p1 = temp.loc[temp["type"] == "robot"]["dist"].to_numpy()
-        dist_vect_p2 = temp.loc[temp["type"] == "cartesian"]["dist"].to_numpy()
-
-        log.info(f"N1: {dist_vect_p1.shape} N2: {dist_vect_p2.shape}")
-        log.info(
-            f"Distance to plane (with robot joints):   "
-            + f"{mean_std_str(dist_vect_p1.mean(),dist_vect_p1.std())} "
-        )
-        log.info(
-            f"Distance to plane (with tracker joints): "
-            + f"{mean_std_str(dist_vect_p2.mean(),dist_vect_p2.std())} "
-        )
+        for type in ("robot", "tracker", "network"):
+            dist_vect_p1 = temp.loc[temp["type"] == type]["dist"].to_numpy()
+            log.info(
+                f"Distance to plane (with robot joints) [N={dist_vect_p1.shape[0]}]:   "
+                + f"{mean_std_str(dist_vect_p1.mean(),dist_vect_p1.std())} "
+            )
 
     # Plot results
-    ax = sns.boxplot(data=error_df, x="test_id", y="dist", hue="type")
-    sns.stripplot(
-        data=error_df, x="test_id", y="dist", hue="type", dodge=True, ax=ax, color="black"
-    )
+    fig, ax = plt.subplots(2, 1, figsize=(8, 8))
+    sns.barplot(x="test_id", y="dist", hue="type", ci="sd", data=error_df, capsize=0.2, ax=ax[0])
+    ax[0].set_xlabel("Test id")
+    ax[0].set_ylabel("Mean distance to plane (mm)")
+    ax[0].set_title("Registration experiment with external force")
+
+    sns.boxplot(data=error_df, x="test_id", y="dist", hue="type", ax=ax[1])
+    # fmt:off
+    sns.stripplot( data=error_df, x="test_id", y="dist", hue="type", dodge=True,
+        ax=ax[1], color="black", size=3,) #fmt:on
+    ax[1].set_xlabel("Test id")
+    ax[1].set_ylabel("Distance to plane (mm)")
+
     plt.show()
