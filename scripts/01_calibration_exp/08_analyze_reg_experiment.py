@@ -181,8 +181,9 @@ if __name__ == "__main__":
                 "t1", "t2", "t3", "t4", "t5", "t6", ]#fmt:on
 
             robot_state = torch.Tensor(robot_jp_df.iloc[idx][input_cols].to_numpy())
-            robot_state = robot_state.reshape(1,12).cuda()
-            output = model(robot_state)
+            robot_state = robot_state.reshape(1,12)
+            norm_robot_state = normalizer(robot_state)
+            output = model(norm_robot_state.cuda())
             output = output.detach().cpu().numpy().squeeze()
             corrected_jp = np.concatenate((robot_jp_df.iloc[idx][["q1","q2","q3"]].to_numpy(),output))
             cartesian_network = psm_kin.fkine( corrected_jp )
