@@ -15,7 +15,6 @@ from rich.progress import track
 import torch
 
 # ROS and DVRK imports
-import dvrk
 from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
 from kincalib.Learning.Models import BestMLP2
 import rospy
