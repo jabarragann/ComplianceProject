@@ -13,7 +13,7 @@ class ResultsTable:
             "",
             "q1 (deg)",
             "q2 (deg)",
-            "q3 (m)",
+            "q3 (mm)",
             "q4 (deg)",
             "q5 (deg)",
             "q6 (deg)",

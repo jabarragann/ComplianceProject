@@ -31,6 +31,8 @@ from kincalib.utils.CmnUtils import *
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from pytorchcheckpoint.checkpoint import CheckpointHandler
 
+from kincalib.utils.TableGenerator import ResultsTable
+
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 def plot_joints(robot_df, tracker_df, pred_df):
@@ -72,10 +74,13 @@ def main(testid: int):
     # ------------------------------------------------------------
     # Calculate tracker joint values
     # ------------------------------------------------------------
-    if args.dstdir is None:
+    ## TODO: fix dstdir option. currently not working
+    #if args.dstdir is None:
+    if True:
         dst_p = robot_cp_p.parent
         dst_p = dst_p / "result"
         registration_data_path = root / "registration_results"
+    ## TODO: fix dstdir option. currently not working
     else:
         dst_p = Path(args.dstdir)
         registration_data_path = dst_p / root.name / "registration_results"
@@ -86,7 +91,9 @@ def main(testid: int):
     dst_p.mkdir(parents=True, exist_ok=True)
     # input("press enter to start ")
 
-    if (dst_p / "robot_joints.txt").exists() and not args.reset:
+    #TODO This needs to improve. robot_joints.txt needs to exist in the dst_p dir.
+    #TODO  It should exists in the root dir only.
+    if (dst_p / "robot_joints.txt").exists():
         # ------------------------------------------------------------
         # Read calculated joint values
         # ------------------------------------------------------------
@@ -94,13 +101,14 @@ def main(testid: int):
         tracker_df = pd.read_csv(dst_p / "tracker_joints.txt", index_col=None)
         opt_df = pd.read_csv(dst_p / "opt_error.txt", index_col=None)
     else:
-        log.info(f"No files found in {dst_p}")
+        log.info(f"robot_joints.txt file not found in {dst_p}")
         exit()
 
     # ------------------------------------------------------------
     # Evaluate results
     # ------------------------------------------------------------
 
+    # TODO: Instead of loading the dataset again. I should be uploading the normalizer state_dict 
     #Calculate model predictions
     data_path = Path("data/deep_learning_data/random_dataset.txt")
     train_dataset = JointsDataset1(data_path, mode="train")
@@ -120,45 +128,64 @@ def main(testid: int):
     pred = np.hstack((robot_df["step"].to_numpy().reshape(-1,1),pred))
     pred_df = pd.DataFrame(pred,columns=["step", "q4", "q5", "q6"])
 
-    # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  # Use the residual to get valid steps.
-    # import pdb
+    # Calculate results 
 
-    # pdb.set_trace()
+    # Use the residual to get valid tracker points.
+    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  
+
     robot_valid = robot_df.loc[robot_df["step"].isin(valid_steps)].iloc[:, 1:7].to_numpy()
     tracker_valid = tracker_df.loc[tracker_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
-    diff = robot_valid - tracker_valid
-    diff_mean = diff.mean(axis=0)
-    diff_std = diff.std(axis=0)
+    robot_error = robot_valid - tracker_valid
+    robot_mean = robot_error.mean(axis=0)
+    robot_std = robot_error.std(axis=0)
+
+    # Network error
+    network_valid = pred_df.loc[pred_df["step"].isin(valid_steps)][[ "q4", "q5", "q6"]].to_numpy()
+    network_error = network_valid - tracker_valid[:,3:]
+    network_mean = network_error.mean(axis=0)
+    network_std = network_error.std(axis=0)
 
     # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
     robot_cp = CalibrationUtils.calculate_cartesian(robot_valid)
     tracker_cp = CalibrationUtils.calculate_cartesian(tracker_valid)
-    cp_error = tracker_cp - robot_cp
-    mean_error = cp_error.apply(np.linalg.norm, 1)
 
-    log.info(f"Number of valid samples: {diff.shape[0]}")
-    log.info(f"Cartesian results")
-    log.info(f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}")
-    log.info(f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}")
-    log.info(f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}")
-    log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
+    # Add the first three joints from the robot
+    network_valid =np.hstack((robot_valid[:,:3],network_valid))
+    network_cp = CalibrationUtils.calculate_cartesian(network_valid)
 
-    log.info(f"Results in degrees")
-    log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
-    log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
-    log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    log.info(f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}")
-    log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
-    log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
+    robot_cp_error = tracker_cp - robot_cp
+    robot_mean_error = robot_cp_error.apply(np.linalg.norm, 1)
 
-    # log.info(f"Results in rad")
-    # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
-    # log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
-    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    # log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
-    # log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
-    # log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+    net_cp_error = tracker_cp - network_cp 
+    net_mean_error = net_cp_error.apply(np.linalg.norm, 1)
+
+    # Create results table
+    table = ResultsTable()
+    table.add_data(
+        dict(
+            type="robot", 
+            q1=mean_std_str(robot_mean[0]*180/np.pi, robot_std[0]*180/np.pi),
+            q2=mean_std_str(robot_mean[1]*180/np.pi, robot_std[1]*180/np.pi),
+            q3=mean_std_str(robot_mean[2]*180/np.pi, robot_std[2]*180/np.pi),
+            q4=mean_std_str(robot_mean[3]*180/np.pi, robot_std[3]*180/np.pi),
+            q5=mean_std_str(robot_mean[4]*180/np.pi, robot_std[4]*180/np.pi),
+            q6=mean_std_str(robot_mean[5]*180/np.pi, robot_std[5]*180/np.pi),
+            cartesian=mean_std_str(robot_mean_error.mean()*1000, robot_mean_error.std()*1000),
+        )
+    )
+    table.add_data(
+        dict(
+            type="network", 
+            q4=mean_std_str(network_mean[0]*180/np.pi, network_std[0]*180/np.pi),
+            q5=mean_std_str(network_mean[1]*180/np.pi, network_std[1]*180/np.pi),
+            q6=mean_std_str(network_mean[2]*180/np.pi, network_std[2]*180/np.pi),
+            cartesian=mean_std_str(net_mean_error.mean()*1000, net_mean_error.std()*1000),
+        )
+    )
+
+    log.info(f"Difference from ground truth (Tracker values) (N={robot_error.shape[0]})")
+    print(f"\n{table.get_full_table()}")
+
 
     # plot
     if args.plot:
@@ -178,18 +205,48 @@ def main(testid: int):
         plt.show()
 
 
+    #OLD PRINTING
+    # log.info(f"Number of valid samples: {diff.shape[0]}")
+    # log.info(f"Cartesian results")
+    # log.info(f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}")
+    # log.info(f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}")
+    # log.info(f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}")
+    # log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
+
+    # log.info(f"Results in degrees")
+    # log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
+    # log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
+    # log.info(f"Joint 3 mean difference (mm):  {mean_std_str(diff_mean[2]*1000,diff_std[2]*1000)}")
+    # log.info(f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}")
+    # log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
+    # log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
+
+    # log.info(f"Results in rad")
+    # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
+    # log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
+    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
+    # log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
+    # log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
+    # log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+
 if __name__ == "__main__":
+    ##TODO: Indicate that you need to use script 04 first to generate the tracker joints and then use this 
+    ##TODO: to plot the corrected joints.
+
+    ## TODO: dstdir param is very confusing!!! check the logic. the root dir name will be added to dstdir
+    ## TODO: and it will start looking for the tracker computed joints
+    ## I THINK DSTDIR IS NOT WORKING WITH THIS SCRIPT
+
     parser = argparse.ArgumentParser()
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
-                    help="root dir") 
+                    help="This directory must a registration_results subdir contain a calibration .json file.") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
     # parser.add_argument("--testid", type=int, help="The id of the test trajectory to use") 
     parser.add_argument('--testid', nargs='*', help='test trajectories to generate', required=True, type=int)
     parser.add_argument( '-l', '--log', type=str, default="DEBUG", help="log level") 
-    parser.add_argument('--reset', action='store_true',help="Recalculate joint values")
-    parser.add_argument('--dstdir', default=None, help='Directory to save results. This directory must ' \
-                            'contain a calibration .json file. If None, root dir is used a destination.')
+    # parser.add_argument('--reset', action='store_true',help="Recalculate joint values")
+    # parser.add_argument('--dstdir', default=None, help='Directory to save results.  If None, root dir is used a destination.')
     parser.add_argument('-p','--plot', action='store_true',default=False \
                         ,help="Plot optimization error and joints plots.")
     # fmt:on
