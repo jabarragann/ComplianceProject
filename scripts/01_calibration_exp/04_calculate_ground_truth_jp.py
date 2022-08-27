@@ -1,3 +1,4 @@
+import tf_conversions.posemath as pm
 # Python imports
 import json
 from pathlib import Path
@@ -14,9 +15,7 @@ from rich.logging import RichHandler
 from rich.progress import track
 
 # ROS and DVRK imports
-import dvrk
 import rospy
-import tf_conversions.posemath as pm
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger

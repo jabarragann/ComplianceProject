@@ -27,7 +27,8 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial 
 from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.geometry import Plotter3D, Circle3D, Line3D
+from kincalib.Geometry.geometry import Circle3D, Line3D
+from kincalib.Geometry.Plotter import Plotter3D
 from kincalib.Atracsys.ftk_500_api import ftk_500 
 
 

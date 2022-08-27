@@ -14,14 +14,14 @@ import matplotlib.pyplot as plt
 import tf_conversions.posemath as pm
 
 # Robotics toolbox
-from roboticstoolbox import ETS as ET
+from roboticstoolbox import ET
 import roboticstoolbox as rtb
 from spatialmath import SE3
 from spatialmath.base import trnorm
 from roboticstoolbox import DHRobot, RevoluteMDH
 
 # My modules
-from kincalib.geometry import Circle3D, Line3D, dist_circle3_plane
+from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
     load_registration_data,
@@ -59,13 +59,13 @@ log = Logger(__name__).log
 def fkins_v2(q5, q6):
     """Angles especified in rad"""
     E = (
-        ET.rx(-90, "deg")
-        * ET.rz((-90) * np.pi / 180 + q5)
+        ET.Rx(-90, "deg")
+        * ET.Rz((-90) * np.pi / 180 + q5)
         * ET.tx(DvrkPsmKin.lpitch2yaw)
-        * ET.rx(-90, "deg")
-        * ET.rz((-90) * np.pi / 180 + q6)
+        * ET.Rx(-90, "deg")
+        * ET.Rz((-90) * np.pi / 180 + q6)
     )
-    return E.eval().data[0]
+    return E.fkine([]).data[0]
 
 
 @dataclass
@@ -211,8 +211,8 @@ class JointEstimator:
         Ltool = 0.4162  # Check DVRK outer roll DH parameters
 
         tq1 = np.arctan2(px, -pz)
-        tq2 = np.arctan2(-py, np.sqrt(px ** 2 + pz ** 2))
-        tq3 = np.sqrt(px ** 2 + py ** 2 + pz ** 2) + L1 - Ltool  ##+ 0.03
+        tq2 = np.arctan2(-py, np.sqrt(px**2 + pz**2))
+        tq3 = np.sqrt(px**2 + py**2 + pz**2) + L1 - Ltool  ##+ 0.03
         return tq1, tq2, tq3
 
     # @staticmethod
@@ -368,8 +368,38 @@ class CalibrationUtils:
     # ------------------------------------------------------------
 
     def obtain_true_joints_v2(
-        estimator: JointEstimator, robot_jp: pd.DataFrame, robot_cp: pd.DataFrame
+        estimator: JointEstimator,
+        robot_jp: pd.DataFrame,
+        robot_cp: pd.DataFrame,
+        use_progress_bar: bool = True,
     ) -> pd.DataFrame:
+        """Calculates joints based on tracker information.
+
+        Notes:
+        * This will return an empty df_tracker dataframe in case the required tracker values
+        are not available. You can check this with `df_tracker.shape[0]>0`
+
+        Parameters
+        ----------
+        estimator : JointEstimator
+            _description_
+        robot_jp : pd.DataFrame
+            _description_
+        robot_cp : pd.DataFrame
+            _description_
+        use_progress_bar : bool, optional
+            _description_, by default True
+
+        Returns
+        -------
+        df_robot: pd.DataFrame
+            _description_
+        df_tracker: pd.DataFrame
+            _description_
+        df_opt: pd.DataFrame
+            _description_
+
+        """
 
         cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
         cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
@@ -380,10 +410,16 @@ class CalibrationUtils:
         df_opt = pd.DataFrame(columns=cols_opt)
 
         opt_error = []
+        if use_progress_bar:
+            iter_item = track(range(robot_jp.shape[0]), "ground truth calculation")
+        else:
+            iter_item = range(robot_jp.shape[0])
         # for idx in range(robot_jp.shape[0]):
-        for idx in track(range(robot_jp.shape[0]), "ground truth calculation"):
+        for idx in iter_item:
             # Read robot joints
-            rq1, rq2, rq3, rq4, rq5, rq6 = robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
+            rq1, rq2, rq3, rq4, rq5, rq6 = (
+                robot_jp.iloc[idx].loc[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
+            )
             step = robot_jp.iloc[idx].loc["step"]
 
             # Read tracker data
@@ -448,7 +484,9 @@ class CalibrationUtils:
     def create_histogram(data, axes, title=None, xlabel=None, max_val=None):
         if max_val is not None:
             max_val = min(max_val, max(data))
-            axes.hist(data, bins=30, range=(0, max_val), edgecolor="black", linewidth=1.2, density=False)
+            axes.hist(
+                data, bins=30, range=(0, max_val), edgecolor="black", linewidth=1.2, density=False
+            )
         else:
             axes.hist(data, bins=30, edgecolor="black", linewidth=1.2, density=False)
         # axes.hist(data, bins=50, range=(0, 100), edgecolor="black", linewidth=1.2, density=False)

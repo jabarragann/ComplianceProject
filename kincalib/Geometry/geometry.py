@@ -51,37 +51,6 @@ def dist_circle3_plane(circle: Circle3D, plane: Plane3D) -> np.ndarray:
         return solutions_pts[idx], solutions[idx]
 
 
-class Plotter3D:
-    def __init__(self, title: str = None) -> None:
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(projection="3d")
-        self.ax.set_xlabel("X Label")
-        self.ax.set_ylabel("Y Label")
-        self.ax.set_zlabel("Z Label")
-        if title is not None:
-            self.ax.set_title(title)
-
-    def scatter_3d(self, points: np.ndarray, marker="^", color=None, marker_size=20, label=None, title=None) -> None:
-        """[summary]
-
-        Args:
-            points (np.ndarray): Size (3,N)
-            marker (str, optional): [description]. Defaults to "^".
-            color ([type], optional): [description]. Defaults to None.
-        """
-        # Reshape for single points vectors
-        if len(points.shape) == 1:
-            points = points.reshape(-1, 1)
-
-        self.ax.scatter(points[0, :], points[1, :], points[2, :], marker=marker, c=color, s=marker_size, label=label)
-        self.ax.legend()
-        if title is not None:
-            self.ax.set_title(title)
-
-    def plot():
-        plt.show()
-
-
 def rodrigues_rot(P, n0, n1):
 
     # If P is only 1d array (coords of single point), fix it to be matrix
@@ -98,7 +67,9 @@ def rodrigues_rot(P, n0, n1):
     # Compute rotated points
     P_rot = np.zeros((len(P), 3))
     for i in range(len(P)):
-        P_rot[i] = P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
+        P_rot[i] = (
+            P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
+        )
 
     return P_rot
 
@@ -257,7 +228,7 @@ class Circle3D:
     @staticmethod
     def fit_circle_2d(x, y, w=[]):
         A = np.array([x, y, np.ones(len(x))]).T
-        b = x ** 2 + y ** 2
+        b = x**2 + y**2
 
         # Modify A,b for weighted least squares
         if len(w) == len(x):
@@ -271,14 +242,111 @@ class Circle3D:
         # Get circle parameters from solution c
         xc = c[0] / 2
         yc = c[1] / 2
-        r = np.sqrt(c[2] + xc ** 2 + yc ** 2)
+        r = np.sqrt(c[2] + xc**2 + yc**2)
         return xc, yc, r
 
 
 class Plane3D:
     def __init__(self, normal, d):
-        self.normal = normal
+        self.normal = normal / np.linalg.norm(normal)
         self.d = d
+
+    def generate_pts(self, N, l1_lim=(-50, 50), l2_lim=(-50, 50), noise_std=0):
+        """Generate point cloud of shape (N,3) from the plane parameters
+
+        Algorithm taken from
+        https://stackoverflow.com/questions/29350965/generate-a-random-point-in-a-specific-plane-in-c
+
+        Parameters
+        ----------
+        N : _type_
+            _description_
+        l1_lim : tuple, optional
+            _description_, by default (-50, 50)
+        l2_lim : tuple, optional
+            _description_, by default (-50, 50)
+        noise_std: float
+            Introduce std of gaussian noise to the point cloud in the normal direction.
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        l1 = np.random.default_rng().uniform(l1_lim[0], l1_lim[1], size=(N, 1))
+        l2 = np.random.default_rng().uniform(l2_lim[0], l2_lim[1], size=(N, 1))
+
+        # Calculate 2 base vectors on the plane
+        temp = self.normal + np.array([0.0, 0.0, 0.5])
+        d1 = np.cross(self.normal, temp)
+        d1_l = np.linalg.norm(d1)
+        if np.isclose(d1_l, 0.0):
+            temp = self.normal + np.array([0.0, 0.5, 0.0])
+            d1 = np.cross(self.normal, temp)
+            d1_l = np.linalg.norm(d1)
+            if np.isclose(d1_l, 0.0):
+                temp = self.normal + np.array([0.5, 0.0, 0.0])
+                d1 = np.cross(self.normal, temp)
+                d1_l = np.linalg.norm(d1)
+
+        d1 = np.cross(self.normal, temp)
+        d1 = d1 / np.linalg.norm(d1)
+        angle = 45 * np.pi / 180
+        d2 = self.rotate_around_normal(d1, angle)
+
+        orig2plane = self.dist2point(np.array([0.0, 0.0, 0.0]))
+        orig = -orig2plane * self.normal
+        points = orig + l1 * d1 + l2 * d2
+
+        noise = np.random.default_rng().normal(0, noise_std, size=(N, 1))
+        points = points + noise * self.normal
+
+        return points
+
+    def rotate_around_normal(self, d1: np.ndarray, angle: float) -> np.ndarray:
+        d2 = (
+            d1 * np.cos(angle)
+            + np.cross(self.normal, d1) * np.sin(angle)
+            + self.normal * np.dot(self.normal, d1) * (1 - np.cos(angle))
+        )
+        return d2
+
+    def dist2point(self, x0: np.ndarray) -> float:
+        """_summary_
+
+        Parameters
+        ----------
+        x0 : np.ndarray
+            numpy array of shape (3,)
+
+        Returns
+        -------
+        float
+            distance from point to plane
+        """
+
+        return (np.dot(self.normal, x0) + self.d) / np.linalg.norm(self.normal)
+
+    def point_cloud_dist(self, pt_cloud: np.ndarray) -> np.ndarray:
+        """Calculate the distance to the plane for each point in the point cloud
+
+        Parameters
+        ----------
+        pt_cloud : np.ndarray
+            numpy array of size (N,3)
+
+        Returns
+        -------
+        np.ndarray
+            numpy array of size (N,)
+        """
+        dist_vect = []
+        for i in range(pt_cloud.shape[0]):
+            dist_vect.append(abs(self.dist2point(pt_cloud[i, :])))
+        return np.array(dist_vect)
+
+    def __str__(self):
+        return f"normal {self.normal} " + f"d      {self.d}"
 
     @classmethod
     def from_data(cls, samples: np.ndarray) -> Plane3D:
@@ -461,6 +529,7 @@ class Line3D:
 
 
 if __name__ == "__main__":
+    from kincalib.Geometry.Plotter import Plotter3D
 
     log = Logger("utils_log").log
     # ------------------------------------------------------------

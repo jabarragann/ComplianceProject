@@ -18,7 +18,6 @@ from torch.utils.data import DataLoader
 from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
 from kincalib.Learning.Models import MLP, CustomMLP
 from kincalib.Learning.Trainer import TrainRegressionNet
-
 from torchsuite.HyperparameterTuner import OptuneStudyAbstract
 from torchsuite.TrainingBoard import TrainingBoard
 
@@ -40,9 +39,15 @@ def print_angle_dif(error_means, error_std):
     # log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
     # log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
     # log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
-    log.info(f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
-    log.info(f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
-    log.info(f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}")
+    log.info(
+        f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}"
+    )
     log.info("")
 
 
@@ -53,16 +58,18 @@ if __name__ == "__main__":
     epochs = 260
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
-    root = study_root / "best_model4"
+    root = study_root / "best_model5_temp"
     data_dir = Path("data/03_replay_trajectory/d04-rec-10-traj01")
-    log = Logger("main").log
+    log = Logger("main_retrain").log
 
     if not root.exists():
         root.mkdir(parents=True)
 
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
+    parser.add_argument(
+        "-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint"
+    )
     args = parser.parse_args()
 
     # ------------------------------------------------------------
@@ -85,6 +92,7 @@ if __name__ == "__main__":
     train_dataset = JointsDataset1(data_path, mode="train")
     normalizer = Normalizer(train_dataset.X)
     train_dataset.normalizer = normalizer
+    pickle.dump(normalizer, open(root / "normalizer.pkl", "wb"))
     valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
     test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
 
@@ -94,8 +102,12 @@ if __name__ == "__main__":
     # train_dataset = JointsDataset(*train_data[:], normalizer)
     # valid_dataset = JointsDataset(*valid_data[:], normalizer)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=best_trial.params["batch_size"], shuffle=True)
-    validation_dataloader = DataLoader(valid_dataset, batch_size=best_trial.params["batch_size"], shuffle=False)
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=best_trial.params["batch_size"], shuffle=True
+    )
+    validation_dataloader = DataLoader(
+        valid_dataset, batch_size=best_trial.params["batch_size"], shuffle=False
+    )
 
     # ------------------------------------------------------------
     # Network & optimizer
@@ -170,11 +182,12 @@ if __name__ == "__main__":
     # Model Evaluation
     # ------------------------------------------------------------
     model.eval()
-    log.info("calculating accuracy after training...")
+    log.info("calculating accuracy after training... (With model in eval mode)")
     train_acc = trainer_handler.calculate_acc(trainer_handler.train_loader)
     train_loss = trainer_handler.calculate_loss(trainer_handler.train_loader)
     valid_acc = trainer_handler.calculate_acc(validation_dataloader)
     valid_loss = trainer_handler.calculate_loss(validation_dataloader)
+
     log.info(f"Average training results")
     log.info(f"Average training acc:   {train_acc:0.06f}")
     log.info(f"Average training loss:  {train_loss:0.06f}")
@@ -197,7 +210,9 @@ if __name__ == "__main__":
     error = valid_tracker_joints - valid_predicted_joints
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
-    log.info(f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}")
+    log.info(
+        f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}"
+    )
     print_angle_dif(error_means, error_std)
 
     loss_value = abs(valid_robot_state[:, 3:6] - valid_tracker_joints).mean(axis=0).mean()
@@ -211,5 +226,10 @@ if __name__ == "__main__":
 
     # Training plots
     training_board = TrainingBoard(trainer_handler.checkpoint_handler, root=root)
-    training_board.training_plots()
+    fig = training_board.training_plots()
+
+    image_format = "svg"
+    image_name = root / "training_plots.svg"
+    fig.savefig(image_name, format=image_format, dpi=1200)
+
     plt.show()

@@ -12,7 +12,6 @@ from rich.logging import RichHandler
 from rich.progress import track
 
 # ROS and DVRK imports
-import dvrk
 import rospy
 import PyKDL
 import tf_conversions.posemath as pm
@@ -36,10 +35,12 @@ def mean_std_str_vect(mean_vect, std_vect):
     return str[:-1] + "]"
 
 
-def mean_std_str(mean, std):
+def mean_std_str(mean, std, precision=2):
     str = ""
     plus_minus_sign = "\u00B1"
-    str += f"{mean:+0.04f}{plus_minus_sign}{std:0.04f},"
+    float_fmt1 = f"+0.0{precision}f"
+    float_fmt2 = f".0{precision}f"
+    str += f"{mean:{float_fmt1}}{plus_minus_sign}{std:{float_fmt2}},"
     return str[:-1]
 
 
@@ -78,7 +79,9 @@ def calculate_mean_frame(
         log.warning(f"Position std {position_std}")
         log.warning(f"Orientation std {orientation_std}")
 
-    mean_frame = PyKDL.Frame(PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean))
+    mean_frame = PyKDL.Frame(
+        PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
+    )
     return mean_frame, position_std, orientation_std
 
 

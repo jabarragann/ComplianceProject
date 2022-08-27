@@ -20,7 +20,9 @@ class Frame:
 
         if not self.is_rotation(r):
             if normalization_warning:
-                log.warning(f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}")
+                log.warning(
+                    f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
+                )
                 log.warning(f"Renormalizing to a proper rotation matrix")
             self.r = self.closest_to_rotation(r)
 
@@ -142,25 +144,60 @@ class Frame:
             raise Exception("estimation algorithm failed")
 
     @classmethod
-    def evaluation(cls: Type[Frame], A: np.ndarray, B: np.ndarray, frame: Frame) -> float:
+    def evaluation(
+        cls: Type[Frame],
+        A: np.ndarray,
+        B: np.ndarray,
+        frame: Frame,
+        error_type: str = "mae",
+        return_std: bool = False,
+    ) -> float:
+        """[Class function] Calculate error for every corresponding pair of
+        points (A[:,i],B[:,i])
+
+        B_est = rot_mat @ A + p
+
+        error = (B_est-B)^2
+
+        B_est = frame.r @ A + frame.p.reshape((3, 1))
+
+        Parameters
+        ----------
+        A : np.ndarray
+            B.shape => (3,n)
+        B : np.ndarray
+            A.shape => (3,n)
+        frame : Frame
+            Rigid transformation from A to B
+        error_type : str, optional
+            type of error either squared error (mse) or absolute error (mae), by default "mae"
+        return_std: bool, optional
+            return_std, only for mae error
+
+        Returns
+        -------
+        error: float
+           mean error
+        error_std: float
+            error std. Only for mae
         """
-        Calculate mean square error for every corresponding pair of points (A[:,i],B[:,i])
-        * B_est = rot_mat @ A + p
-        * error = (B_est-B)^2
-        ## Parameters:
-        * B.shape => (3,n)
-        * A.shape => (3,n)
-        ## Return:
-        * error: MSE error
-        """
-        # B_est = frame.r @ A + frame.p.reshape((3, 1))
+        assert error_type in ["mse", "mae"], "wrong error type"
+
         B_est = frame @ A
         error_mat = B_est - B
 
-        mean_square_error = error_mat * error_mat
-        mean_square_error = mean_square_error.sum() / A.shape[1]
+        if error_type == "mse":
+            mean_square_error = error_mat * error_mat
+        elif error_type == "mae":
+            mean_square_error = np.linalg.norm(error_mat, axis=0)
 
-        return mean_square_error
+        mean_error = mean_square_error.sum() / A.shape[1]
+
+        if error_type == "mae" and return_std:
+            std_error = mean_square_error.std()
+            return mean_error, std_error
+
+        return mean_error
 
     @classmethod
     def identity(cls: Type[Frame]) -> Type[Frame]:
@@ -188,6 +225,8 @@ class Frame:
         new_matrix = u @ vh
 
         ## Todo - What happens if the algorithm returns a reflection matrix?
-        assert np.isclose(np.linalg.det(new_matrix), 1.0), "Normalization procedure failed...Implement what is missing"
+        assert np.isclose(
+            np.linalg.det(new_matrix), 1.0
+        ), "Normalization procedure failed...Implement what is missing"
 
         return new_matrix

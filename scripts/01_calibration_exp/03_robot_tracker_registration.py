@@ -1,3 +1,5 @@
+import tf_conversions.posemath as pm
+
 # Python imports
 from pathlib import Path
 import time
@@ -5,7 +7,6 @@ import argparse
 import sys
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import List, Tuple, Set
 from rich.logging import RichHandler
@@ -15,11 +16,11 @@ import re
 import json
 
 # ROS and DVRK imports
-import dvrk
+from kincalib.Motion.DvrkKin import DvrkPsmKin
 import rospy
-from cisst_msgs.srv import QueryForwardKinematics
 from sensor_msgs.msg import JointState
-import tf_conversions.posemath as pm
+
+import matplotlib.pyplot as plt
 
 # kincalib module imports
 from kincalib.utils.Frame import Frame
@@ -27,7 +28,7 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
-from kincalib.geometry import Line3D, Circle3D, Triangle3D
+from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 
@@ -124,30 +125,53 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     return Frame.init_from_matrix(pitch2marker_T)
 
 
-def pitch_orig_in_robot(robot_df: pd.DataFrame, service_name: str = "/PSM2/local/query_cp") -> pd.DataFrame:
-    # ------------------------------------------------------------
-    # Connect to DVRK fk service
-    # ------------------------------------------------------------
-    rospy.wait_for_service(service_name, timeout=1)
-    kinematics_service = rospy.ServiceProxy(service_name, QueryForwardKinematics)
-    log.info("connected to {:} ...".format(service_name))
-
+def pitch_orig_in_robot(robot_df: pd.DataFrame) -> pd.DataFrame:
     # ------------------------------------------------------------
     # Itereate over date and calculate pitch origin in robot coordinates
     # ------------------------------------------------------------
+    psm_fkins = DvrkPsmKin()
     cols = ["step", "rpx", "rpy", "rpz"]
     df_results = pd.DataFrame(columns=cols)
     for idx in range(robot_df.shape[0]):
-        joints = JointState()
-        joints.position = robot_df.iloc[idx][["q1", "q2", "q3", "q4"]].to_list()
-        msg = kinematics_service(joints)
-        msg = pm.fromMsg(msg.cp.pose).p
-        data = [robot_df.iloc[idx]["step"]] + list(msg)
+        joints = robot_df.iloc[idx][["q1", "q2", "q3", "q4"]].to_list()
+        frame = psm_fkins.fkine_chain(joints)
+        pos = frame[:3, 3].squeeze().tolist()
+        data = [robot_df.iloc[idx]["step"]] + pos
         data = np.array(data).reshape((1, -1))
         new_df = pd.DataFrame(data, columns=cols)
         df_results = df_results.append(new_df)
 
     return df_results
+
+
+# def pitch_orig_in_robot_with_service(
+#     robot_df: pd.DataFrame, service_name: str = "/PSM1/local/query_cp"
+# ) -> pd.DataFrame:
+#     import dvrk
+#     from cisst_msgs.srv import QueryForwardKinematics
+#     # ------------------------------------------------------------
+#     # Connect to DVRK fk service
+#     # ------------------------------------------------------------
+#     rospy.wait_for_service(service_name, timeout=1)
+#     kinematics_service = rospy.ServiceProxy(service_name, QueryForwardKinematics)
+#     log.info("connected to {:} ...".format(service_name))
+
+#     # ------------------------------------------------------------
+#     # Itereate over date and calculate pitch origin in robot coordinates
+#     # ------------------------------------------------------------
+#     cols = ["step", "rpx", "rpy", "rpz"]
+#     df_results = pd.DataFrame(columns=cols)
+#     for idx in range(robot_df.shape[0]):
+#         joints = JointState()
+#         joints.position = robot_df.iloc[idx][["q1", "q2", "q3", "q4"]].to_list()
+#         msg = kinematics_service(joints)
+#         msg = pm.fromMsg(msg.cp.pose).p
+#         data = [robot_df.iloc[idx]["step"]] + list(msg)
+#         data = np.array(data).reshape((1, -1))
+#         new_df = pd.DataFrame(data, columns=cols)
+#         df_results = df_results.append(new_df)
+
+#     return df_results
 
 
 def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -252,7 +276,9 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     return df_results, df_pitch_axes
 
 
-def calculate_axes_in_marker(pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax):
+def calculate_axes_in_marker(
+    pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax
+):
     """Calculate roll axis and pitch axis and pitch origin in the marker frame
 
     Parameters

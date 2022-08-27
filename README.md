@@ -54,6 +54,8 @@ python3 scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r data/03_re
 * Rename the pitch frame to the roll frame. See the frame that is calculated in the registration script.
 * Todo: make the circle least square estimation robust to outliers
 * Todo: Inspect data for data points that seem very odd.   
+* Pandas is deprecating the append method in version 1.4.0. You will need to adapt the code to Pandas.concat instead.
+* Take a look to the following warning "Failed to load Python extension for LZ4 support." It started appearing when changing to the rospy simple packages.
 
 # Failure cases that I need to revise
 
