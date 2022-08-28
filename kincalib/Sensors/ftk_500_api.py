@@ -74,7 +74,7 @@ class ftk_500:
         Output dict keys:
         * "fiducials": recorded,
         * "fiducials_dropped": records_removed,
-        * "marker": marker_pose_arr,
+        * "markers": marker_pose_arr,
         * "markers_dropped": markers_dropped,
 
         Args:
