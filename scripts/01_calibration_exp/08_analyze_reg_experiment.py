@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 
 import torch
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
+from kincalib.Learning.InferencePipeline import InferencePipeline
 from kincalib.Learning.Models import CustomMLP
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
@@ -44,7 +45,8 @@ phantom_coord = {
     "D": np.array([-193.675, 95.25, 101.6]) / 1000,
 }
 
-order_of_pt = ["1", "2", "3", "4", "5", "6", "8", "9", "A", "B", "C"]
+# order_of_pt = ["1", "2", "3", "4", "5", "6", "8", "9", "A", "B", "C"]
+order_of_pt = ["1", "2", "3", "4", "5", "6","7", "8", "9", "A", "B", "C"]
 # order_of_pt = ["1", "2", "3", "4", "5", "6"]
 
 
@@ -80,7 +82,7 @@ if __name__ == "__main__":
     psm_kin = DvrkPsmKin()  # Forward kinematic model
 
     # Load calibration values
-    registration_data_path = Path("./data2/d04-rec-15-trajsoft/registration_results")
+    registration_data_path = Path("./data/03_replay_trajectory/d04-rec-18-trajsoft/registration_results")
     registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
     T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
     T_RT = T_TR.inv()
@@ -90,35 +92,38 @@ if __name__ == "__main__":
 
     # Load experimental data
     data_dir = Path(
-        "./data/03_replay_trajectory/d04-rec-16-trajsoft/"
+        "./data/03_replay_trajectory/d04-rec-18-trajsoft/"
         + "registration_exp/registration_sensor_exp/test_trajectories/"
     )
 
-    # load neural network
-    study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/regression_study1.pkl")
-    root = study_root.parent / "best_model5_temp"
-    log = Logger("main_retrain").log
+    # # load neural network
+    # study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/regression_study1.pkl")
+    # root = study_root.parent / "best_model5_temp"
+    # log = Logger("main_retrain").log
 
-    if (study_root).exists():
-        log.info(f"Load: {study_root}")
-        study = pickle.load(open(study_root, "rb"))
-    else:
-        log.error("no study")
+    # if (study_root).exists():
+    #     log.info(f"Load: {study_root}")
+    #     study = pickle.load(open(study_root, "rb"))
+    # else:
+    #     log.error("no study")
 
-    best_trial: optuna.Trial = study.best_trial
-    normalizer = pickle.load(open(root / "normalizer.pkl", "rb"))
-    model = CustomMLP.define_model(best_trial)
-    model = model.cuda()
-    model = model.eval()
+    # best_trial: optuna.Trial = study.best_trial
+    # normalizer = pickle.load(open(root / "normalizer.pkl", "rb"))
+    # model = CustomMLP.define_model(best_trial)
+    # model = model.cuda()
+    # model = model.eval()
 
-    # Check for checkpoints
-    checkpath = root / "final_checkpoint.pt"
-    if checkpath.exists():
-        checkpoint, model, _ = CheckpointHandler.load_checkpoint_with_model(
-            checkpath, model, None, map_location="cuda"
-        )
-    else:
-        log.error("no model")
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    inference_pipeline = InferencePipeline(root)
+
+    # # Check for checkpoints
+    # checkpath = root / "final_checkpoint.pt"
+    # if checkpath.exists():
+    #     checkpoint, model, _ = CheckpointHandler.load_checkpoint_with_model(
+    #         checkpath, model, None, map_location="cuda"
+    #     )
+    # else:
+    #     log.error("no model")
 
     # Output df
     values_df_cols = [
@@ -180,11 +185,15 @@ if __name__ == "__main__":
             input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"] + [
                 "t1", "t2", "t3", "t4", "t5", "t6", ]#fmt:on
 
-            robot_state = torch.Tensor(robot_jp_df.iloc[idx][input_cols].to_numpy())
+            # robot_state = torch.Tensor(robot_jp_df.iloc[idx][input_cols].to_numpy())
+            robot_state = robot_jp_df.iloc[idx][input_cols].to_numpy()
             robot_state = robot_state.reshape(1,12)
-            norm_robot_state = normalizer(robot_state)
-            output = model(norm_robot_state.cuda())
-            output = output.detach().cpu().numpy().squeeze()
+            # norm_robot_state = normalizer(robot_state)
+            # output = model(norm_robot_state.cuda())
+            # output = output.detach().cpu().numpy().squeeze()
+            output = inference_pipeline.predict(robot_state)
+
+            output = output.squeeze()
             corrected_jp = np.concatenate((robot_jp_df.iloc[idx][["q1","q2","q3"]].to_numpy(),output))
             cartesian_network = psm_kin.fkine( corrected_jp )
             cartesian_network= extract_cartesian_xyz(cartesian_network.data)

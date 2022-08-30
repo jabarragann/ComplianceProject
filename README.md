@@ -39,7 +39,12 @@ python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "calib" -b
 
 Collecting test trajectories
 ```
-python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "test" -b data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag -r data/03_replay_trajectory/d04-rec-07-traj01 -f test_traj02
+python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m "test" -b data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag -r data/03_replay_trajectory/d04-rec-07-traj01 -t 02
+```
+
+Calculate robot-tracker registration
+```
+python3 scripts/01_calibration_exp/03_robot_tracker_registration.py -r data/03_replay_trajectory/d04-rec-18-trajsoft 
 ```
 
 Calculating ground-truth joint values
@@ -47,6 +52,10 @@ Calculating ground-truth joint values
 python3 scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r data/03_replay_trajectory/d04-rec-07-traj01 -t --trajid 1 --reset
 ```
 
+Collect touch registration data
+```
+python3 scripts/robot_experiments/04_collect_touch_registration_data_sensor.py  -r data/03_replay_trajectory/d04-rec-16-trajsoft/registration_exp/registration_with_teleop -s pedals
+```
 # To do 
 
 * Multiple marker problem solutions. 
