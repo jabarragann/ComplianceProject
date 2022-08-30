@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 # Custom
 # from kincalib.Learning.Dataset import JointsDataset, JointsRawDataset, Normalizer
 from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
-from kincalib.Learning.Models import MLP, CustomMLP
+from kincalib.Learning.Models import MLP, CustomMLP, JointCorrectionNet
 from kincalib.Learning.Trainer import TrainRegressionNet
 from torchsuite.HyperparameterTuner import OptuneStudyAbstract
 from torchsuite.TrainingBoard import TrainingBoard
@@ -39,15 +39,9 @@ def print_angle_dif(error_means, error_std):
     # log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
     # log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
     # log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
-    log.info(
-        f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}"
-    )
-    log.info(
-        f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}"
-    )
-    log.info(
-        f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}"
-    )
+    log.info(f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
+    log.info(f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
+    log.info(f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}")
     log.info("")
 
 
@@ -67,9 +61,7 @@ if __name__ == "__main__":
 
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint"
-    )
+    parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
     args = parser.parse_args()
 
     # ------------------------------------------------------------
@@ -82,8 +74,11 @@ if __name__ == "__main__":
     best_trial: optuna.Trial = study.best_trial
     log.info(f"Total number of trials {len(study.trials)}")
     log.info(f"Best acc: {best_trial.value}")
+
+    params_dict = {}
     for key, value in best_trial.params.items():
         log.info("{:20s}: {}".format(key, value))
+        params_dict[key] = value
 
     # ------------------------------------------------------------
     # Data loading and manipulation
@@ -91,6 +86,7 @@ if __name__ == "__main__":
     data_path = Path("data/deep_learning_data/random_dataset.txt")
     train_dataset = JointsDataset1(data_path, mode="train")
     normalizer = Normalizer(train_dataset.X)
+    normalizer.to_json(root / "normalizer.json")
     train_dataset.normalizer = normalizer
     pickle.dump(normalizer, open(root / "normalizer.pkl", "wb"))
     valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
@@ -102,17 +98,15 @@ if __name__ == "__main__":
     # train_dataset = JointsDataset(*train_data[:], normalizer)
     # valid_dataset = JointsDataset(*valid_data[:], normalizer)
 
-    train_dataloader = DataLoader(
-        train_dataset, batch_size=best_trial.params["batch_size"], shuffle=True
-    )
-    validation_dataloader = DataLoader(
-        valid_dataset, batch_size=best_trial.params["batch_size"], shuffle=False
-    )
+    train_dataloader = DataLoader(train_dataset, batch_size=best_trial.params["batch_size"], shuffle=True)
+    validation_dataloader = DataLoader(valid_dataset, batch_size=best_trial.params["batch_size"], shuffle=False)
 
     # ------------------------------------------------------------
     # Network & optimizer
     # ------------------------------------------------------------
-    model = CustomMLP.define_model(best_trial)
+    # model = CustomMLP.define_model(best_trial)
+    model = JointCorrectionNet(model_def=params_dict)
+    model.model_def_to_json(root)
     model = model.cuda()
     model = model.train()
     # Loss
@@ -210,9 +204,7 @@ if __name__ == "__main__":
     error = valid_tracker_joints - valid_predicted_joints
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
-    log.info(
-        f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}"
-    )
+    log.info(f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}")
     print_angle_dif(error_means, error_std)
 
     loss_value = abs(valid_robot_state[:, 3:6] - valid_tracker_joints).mean(axis=0).mean()

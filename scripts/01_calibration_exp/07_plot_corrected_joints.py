@@ -16,6 +16,7 @@ import torch
 
 # ROS and DVRK imports
 from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
+from kincalib.Learning.InferencePipeline import InferencePipeline
 from kincalib.Learning.Models import BestMLP2
 import rospy
 import tf_conversions.posemath as pm
@@ -110,21 +111,27 @@ def main(testid: int):
 
     # TODO: Instead of loading the dataset again. I should be uploading the normalizer state_dict 
     #Calculate model predictions
-    data_path = Path("data/deep_learning_data/random_dataset.txt")
-    train_dataset = JointsDataset1(data_path, mode="train")
-    normalizer = Normalizer(train_dataset.X.cpu().numpy())
+    # root = Path(f"data/ModelsCheckpoints/T{3:02d}/") / "final_checkpoint.pt"
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    inference_pipeline = InferencePipeline(root)
+
     cols= ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
     valstopred = robot_df[cols].to_numpy().astype(np.float32)
-    valstopred = normalizer(valstopred) 
-    valstopred = torch.from_numpy(valstopred).cuda()
-    root = Path(f"data/ModelsCheckpoints/T{3:02d}/") / "final_checkpoint.pt"
-    model = BestMLP2()
-    model.eval()
-    checkpoint = torch.load(root, map_location="cpu")
-    model.load_state_dict(checkpoint.model_state_dict)
-    model = model.cuda()
-    pred = model(valstopred).cpu().detach().numpy()
 
+    # data_path = Path("data/deep_learning_data/random_dataset.txt")
+    # train_dataset = JointsDataset1(data_path, mode="train")
+    # normalizer = Normalizer(train_dataset.X.cpu().numpy())
+    # valstopred = normalizer(valstopred) 
+    # valstopred = torch.from_numpy(valstopred).cuda()
+
+    # model = BestMLP2()
+    # model.eval()
+    # checkpoint = torch.load(root/"final_checkpoint.pt", map_location="cpu")
+    # model.load_state_dict(checkpoint.model_state_dict)
+    # model = model.cuda()
+    # pred = model(valstopred).cpu().detach().numpy()
+
+    pred =  inference_pipeline.predict(valstopred)
     pred = np.hstack((robot_df["step"].to_numpy().reshape(-1,1),pred))
     pred_df = pd.DataFrame(pred,columns=["step", "q4", "q5", "q6"])
 

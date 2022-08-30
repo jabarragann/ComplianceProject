@@ -67,17 +67,37 @@ class JointsDataset1(Dataset):
 @dataclass
 class Normalizer:
     xdata: np.ndarray
+    state_dict: dict = None
 
     def __post_init__(self):
         """Calculate mean and std of data"""
-        self.mean = self.xdata.mean(axis=0)
-        self.std = self.xdata.std(axis=0)
+        if self.xdata is not None:
+            self.mean = self.xdata.mean(axis=0)
+            self.std = self.xdata.std(axis=0)
+        elif self.state_dict is not None:
+            self.load_state_dict(self.state_dict)
+        else:
+            # log.info("state_dict and xdata cannot be None at the same time")
+            raise ValueError("state_dict and xdata cannot be None at the same time")
 
     def __call__(self, x):
         return (x - self.mean) / self.std
 
     def reverse(self, x):
         return (x * self.std) + self.mean
+
+    def get_state_dict(self):
+        return {"mean": self.mean.tolist(), "std": self.std.tolist()}
+
+    def load_state_dict(self, scale_values_dict):
+        self.mean = np.array(scale_values_dict["mean"], dtype=np.float32)
+        self.std = np.array(scale_values_dict["std"], dtype=np.float32)
+
+    def to_json(self, path: Path):
+        state_dict = self.get_state_dict()
+        json_str = json.dumps(state_dict, indent=2)
+        with open(path, "w") as f:
+            f.write(json_str)
 
 
 if __name__ == "__main__":
