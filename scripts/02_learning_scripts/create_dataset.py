@@ -1,10 +1,5 @@
 # Python imports
 from pathlib import Path
-from re import I
-import time
-import argparse
-import sys
-from venv import create
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +11,6 @@ from rich.progress import track
 # ROS and DVRK imports
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 from kincalib.Recording.DataRecord import LearningRecord
-import rospy
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
@@ -27,10 +21,11 @@ from kincalib.utils.Logger import Logger
 log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
-data_root = Path("/home/jbarrag3/research_juan/ComplianceProject/data/03_replay_trajectory")
-dst_filename = Path("data/deep_learning_data/random_dataset.txt")
+data_root = Path("data/03_replay_trajectory")
+dst_filename = Path("data/deep_learning_data/psm2_dataset_silly_idea.txt")
 
-dataset_def = [
+# PSM1
+dataset_def1 = [
     {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
     {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
     {"path": data_root / "d04-rec-12-traj01", "testid": [6], "type": "random", "flag": "valid"},
@@ -39,6 +34,20 @@ dataset_def = [
     {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
     {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
 ]
+
+# PSM2
+dataset_def2 = [
+    {"path": data_root / "d04-rec-18-trajsoft", "testid": [4], "type": "random", "flag": "train"},
+    {"path": data_root / "d04-rec-18-trajsoft", "testid": [5], "type": "random", "flag": "valid"},
+]
+
+
+# dataset_def3 = [
+#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [4], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [5], "type": "random", "flag": "valid"},
+#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [20], "type": "random", "flag": "train"},
+# ]
+
 
 # dataset_def = [{"path": data_root / "d04-rec-13-traj01", "testid": [4, 5, 6, 7, 8], "type": "random", "flag": "test"}]
 
@@ -49,12 +58,13 @@ def create_nan_list():
     return a.tolist()
 
 
+# TODO: I am not filtering the bad tracker points!
 def main():
     # ------------------------------------------------------------
     # Create dataset
     # -----------------------------------------------------------
     dataset_record = LearningRecord(dst_filename)
-    for d in dataset_def:
+    for d in dataset_def2:
         p = d["path"] / "test_trajectories"
         type_ = d["type"]
         flag = d["flag"]
@@ -87,22 +97,30 @@ def main():
                 # Some dataset don't have robot torque and setpoints
                 if "s1" in robot_data:
                     rs = (
-                        robot_data.loc[robot_data["step"] == step][["s1", "s2", "s3", "s4", "s5", "s6"]]
+                        robot_data.loc[robot_data["step"] == step][
+                            ["s1", "s2", "s3", "s4", "s5", "s6"]
+                        ]
                         .to_numpy()
                         .tolist()[0]
                     )
                 else:
                     rs = create_nan_list()
                 tq = (
-                    tracker_data.loc[tracker_data["step"] == step][["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]]
+                    tracker_data.loc[tracker_data["step"] == step][
+                        ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+                    ]
                     .to_numpy()
                     .tolist()[0]
                 )
                 opt = opt_data.loc[opt_data["step"] == step]["q56res"].item()
 
                 # calculate cartesian positions
-                robot_cp = CalibrationUtils.calculate_cartesian(np.array(rq).reshape(1, 6)).to_numpy()
-                tracker_cp = CalibrationUtils.calculate_cartesian(np.array(tq).reshape(1, 6)).to_numpy()
+                robot_cp = CalibrationUtils.calculate_cartesian(
+                    np.array(rq).reshape(1, 6)
+                ).to_numpy()
+                tracker_cp = CalibrationUtils.calculate_cartesian(
+                    np.array(tq).reshape(1, 6)
+                ).to_numpy()
 
                 new_entry = dict(
                     step=step,

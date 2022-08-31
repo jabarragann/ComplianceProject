@@ -39,9 +39,15 @@ def print_angle_dif(error_means, error_std):
     # log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
     # log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
     # log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
-    log.info(f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
-    log.info(f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
-    log.info(f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}")
+    log.info(
+        f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 5 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 6 mean difference (deg): {mean_std_str(error_means[2]*180/np.pi,error_std[2]*180/np.pi)}"
+    )
     log.info("")
 
 
@@ -49,11 +55,14 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-    epochs = 260
+    epochs = 4660
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
-    root = study_root / "best_model5_temp"
-    data_dir = Path("data/03_replay_trajectory/d04-rec-10-traj01")
+    # root = study_root / "best_model5_temp" #epochs=260
+    root = study_root / "best_model6_psm2"  # epochs=4660
+    # data_path = Path("data/deep_learning_data/random_dataset.txt")
+    data_path = Path("data/deep_learning_data/psm2_dataset.txt")
+
     log = Logger("main_retrain").log
 
     if not root.exists():
@@ -61,7 +70,9 @@ if __name__ == "__main__":
 
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint")
+    parser.add_argument(
+        "-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint"
+    )
     args = parser.parse_args()
 
     # ------------------------------------------------------------
@@ -83,14 +94,15 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Data loading and manipulation
     # ------------------------------------------------------------
-    data_path = Path("data/deep_learning_data/random_dataset.txt")
     train_dataset = JointsDataset1(data_path, mode="train")
     normalizer = Normalizer(train_dataset.X)
     normalizer.to_json(root / "normalizer.json")
     train_dataset.normalizer = normalizer
     pickle.dump(normalizer, open(root / "normalizer.pkl", "wb"))
     valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
-    test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
+    # test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
+    log.info(f"Train dataset size: {len(train_dataset)}")
+    log.info(f"Valid dataset size: {len(valid_dataset)}")
 
     # train_data = JointsRawDataset(data_dir, mode="train")
     # valid_data = JointsRawDataset(data_dir, mode="valid")
@@ -98,8 +110,12 @@ if __name__ == "__main__":
     # train_dataset = JointsDataset(*train_data[:], normalizer)
     # valid_dataset = JointsDataset(*valid_data[:], normalizer)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=best_trial.params["batch_size"], shuffle=True)
-    validation_dataloader = DataLoader(valid_dataset, batch_size=best_trial.params["batch_size"], shuffle=False)
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=best_trial.params["batch_size"], shuffle=True
+    )
+    validation_dataloader = DataLoader(
+        valid_dataset, batch_size=best_trial.params["batch_size"], shuffle=False
+    )
 
     # ------------------------------------------------------------
     # Network & optimizer
@@ -175,6 +191,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Model Evaluation
     # ------------------------------------------------------------
+    # TODO: Show results as table
     model.eval()
     log.info("calculating accuracy after training... (With model in eval mode)")
     train_acc = trainer_handler.calculate_acc(trainer_handler.train_loader)
@@ -204,7 +221,9 @@ if __name__ == "__main__":
     error = valid_tracker_joints - valid_predicted_joints
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
-    log.info(f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}")
+    log.info(
+        f"Angle difference between predicted joints and ground-truth (Tracker). Loss values: {loss_value:0.06f}"
+    )
     print_angle_dif(error_means, error_std)
 
     loss_value = abs(valid_robot_state[:, 3:6] - valid_tracker_joints).mean(axis=0).mean()

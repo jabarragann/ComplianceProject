@@ -5,8 +5,6 @@ from abc import ABC, abstractclassmethod
 import numpy as np
 from typing import List
 
-from sympy import igcd
-
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
@@ -53,7 +51,13 @@ class Record(ABC):
 
 class CalibrationRecord(Record):
     def __init__(
-        self, ftk_handler, robot_handler, expected_markers, root_dir, mode: str = "calib", test_id: int = None
+        self,
+        ftk_handler,
+        robot_handler,
+        expected_markers,
+        root_dir,
+        mode: str = "calib",
+        test_id: int = None,
     ) -> None:
         """_summary_
 
@@ -94,12 +98,16 @@ class CalibrationRecord(Record):
             jp_filename = self.test_files / ("robot_jp.txt")
 
             if cp_filename.exists() or jp_filename.exists():
-                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
+                n = input(
+                    f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. "
+                )
                 if not (n == "y" or n == "Y"):
                     log.info("exiting the script")
                     exit(0)
         # Create records
-        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
+        self.cp_record = RobotSensorCartesianRecord(
+            robot_handler, ftk_handler, expected_markers, cp_filename
+        )
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
         self.create_paths()

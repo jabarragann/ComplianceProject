@@ -52,7 +52,7 @@ def calculate_registration(df: pd.DataFrame, root: Path):
     df = df.loc[df["area"] < 0.5]
     robot_p = df[["rpx", "rpy", "rpz"]].to_numpy().T
     tracker_p = df[["tpx", "tpy", "tpz"]].to_numpy().T
-    log.info(f"Points used for the registration {df.shape}")
+    log.info(f"Points used for the registration {robot_p.shape[1]}")
 
     trans = Frame.find_transformation_direct(robot_p, tracker_p)
     error = Frame.evaluation(robot_p, tracker_p, trans)

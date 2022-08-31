@@ -112,7 +112,9 @@ def main(testid: int):
     # TODO: Instead of loading the dataset again. I should be uploading the normalizer state_dict 
     #Calculate model predictions
     # root = Path(f"data/ModelsCheckpoints/T{3:02d}/") / "final_checkpoint.pt"
-    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    # root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    #root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model6_psm2") 
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model7_psm2_silly") 
     inference_pipeline = InferencePipeline(root)
 
     cols= ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]

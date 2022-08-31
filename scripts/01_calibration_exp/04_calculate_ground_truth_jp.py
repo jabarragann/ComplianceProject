@@ -1,4 +1,5 @@
 import tf_conversions.posemath as pm
+
 # Python imports
 import json
 from pathlib import Path
@@ -56,7 +57,9 @@ def main(testid: int):
     else:
         dst_p = Path(args.dstdir)
         registration_data_path = dst_p / root.name / "registration_results"
-        dst_p = dst_p / root.name / robot_cp_p.parent.name / "result"  # e.g d04-rec-11-traj01/01/results/
+        dst_p = (
+            dst_p / root.name / robot_cp_p.parent.name / "result"
+        )  # e.g d04-rec-11-traj01/01/results/
 
     log.info(f"Storing results in {dst_p}")
     log.info(f"Loading registration .json from {registration_data_path}")
@@ -77,7 +80,9 @@ def main(testid: int):
         # Read data
         robot_jp = pd.read_csv(robot_jp_p)
         robot_cp = pd.read_csv(robot_cp_p)
-        registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
+        registration_dict = json.load(
+            open(registration_data_path / "registration_values.json", "r")
+        )
         # calculate joints
         T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
         T_RT = T_TR.inv()
@@ -87,7 +92,9 @@ def main(testid: int):
 
         # Calculate ground truth joints
         j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(j_estimator, robot_jp, robot_cp)
+        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
+            j_estimator, robot_jp, robot_cp
+        )
 
         # Save data
         if not dst_p.exists():
@@ -101,7 +108,9 @@ def main(testid: int):
     # ------------------------------------------------------------
 
     # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  # Use the residual to get valid steps.
+    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005][
+        "step"
+    ]  # Use the residual to get valid steps.
     robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
     diff = robot_valid - tracker_valid
@@ -114,20 +123,39 @@ def main(testid: int):
     cp_error = tracker_cp - robot_cp
     mean_error = cp_error.apply(np.linalg.norm, 1)
 
+    ## TODO: Improve printing statements. It is better to use the table.
+    ## TODO: Also add a header to the table indicating which is the test & train data
+
     log.info(f"Number of valid samples: {diff.shape[0]}")
     log.info(f"Cartesian results")
-    log.info(f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}")
-    log.info(f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}")
-    log.info(f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}")
+    log.info(
+        f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}"
+    )
+    log.info(
+        f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}"
+    )
+    log.info(
+        f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}"
+    )
     log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
 
     log.info(f"Results in degrees")
-    log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
-    log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
+    log.info(
+        f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}"
+    )
     log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    log.info(f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}")
-    log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
-    log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
+    log.info(
+        f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}"
+    )
 
     # log.info(f"Results in rad")
     # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
@@ -142,7 +170,10 @@ def main(testid: int):
         CalibrationUtils.plot_joints(robot_df, tracker_df)
         fig, ax = plt.subplots(2, 1)
         CalibrationUtils.create_histogram(
-            opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
+            opt_df["q4res"],
+            axes=ax[0],
+            title=f"Q4 error (Z3 dot Z4)",
+            xlabel="Optimization residual error",
         )
         CalibrationUtils.create_histogram(
             opt_df["q56res"],

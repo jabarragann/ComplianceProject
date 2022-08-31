@@ -113,7 +113,8 @@ if __name__ == "__main__":
     # model = model.cuda()
     # model = model.eval()
 
-    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    # root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model6_psm2") 
     inference_pipeline = InferencePipeline(root)
 
     # # Check for checkpoints
