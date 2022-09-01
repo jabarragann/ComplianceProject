@@ -52,38 +52,44 @@ def main():
     pointer_geometry = json.load(open(pointer_path, "r"))
     pointer_geometry = pointer_geometry["pivot"]
     btip = Vector(pointer_geometry["x"], pointer_geometry["y"], pointer_geometry["z"])
-    btip /= 1000
-    exp_id = 1
-    df_path = Path("./data/pointer_registration") / f"exp{exp_id:02d}.csv"
-    reg_df = pd.read_csv(df_path)
+    btip /= 1000  # Convert to meters
 
-    df_list = []
-    bpost_dict = defaultdict(list)
-    for i in range(reg_df.shape[0]):
-        pose_df = reg_df.iloc[i]
-        pose = Series2PyKDLFrame(pose_df.squeeze())
-        bpost = pose * btip
-        bpost_dict[pose_df["loc"]].append([bpost.x(), bpost.y(), bpost.z()])
+    for exp_id in range(1, 7):
+        # exp_id = 1
+        df_path = Path("./data/pointer_registration") / f"exp{exp_id:02d}.csv"
+        reg_df = pd.read_csv(df_path)
 
-    analysis_df = dict(loc=[], sensor_x=[], sensor_y=[], sensor_z=[], phantom_x=[], phantom_y=[], phantom_z=[])
-    for k in phantom_coord.keys():
-        arr = np.array(bpost_dict[k])
-        arr_mean = arr.mean(axis=0)
-        analysis_df["loc"].append(k)
-        analysis_df["sensor_x"].append(arr_mean[0])
-        analysis_df["sensor_y"].append(arr_mean[1])
-        analysis_df["sensor_z"].append(arr_mean[2])
-        analysis_df["phantom_x"].append(phantom_coord[k][0])
-        analysis_df["phantom_y"].append(phantom_coord[k][1])
-        analysis_df["phantom_z"].append(phantom_coord[k][2])
-        log.info(k)
-        log.info(mean_std_str_vect(arr.mean(axis=0), arr.std(axis=0)))
+        df_list = []
+        bpost_dict = defaultdict(list)
+        for i in range(reg_df.shape[0]):
+            pose_df = reg_df.iloc[i]
+            pose = Series2PyKDLFrame(pose_df.squeeze())
+            bpost = pose * btip
+            bpost_dict[pose_df["loc"]].append([bpost.x(), bpost.y(), bpost.z()])
 
-    analysis_df = pd.DataFrame(analysis_df)
+        analysis_df = dict(
+            loc=[], sensor_x=[], sensor_y=[], sensor_z=[], phantom_x=[], phantom_y=[], phantom_z=[]
+        )
+        for k in phantom_coord.keys():
+            arr = np.array(bpost_dict[k])
+            arr_mean = arr.mean(axis=0)
+            analysis_df["loc"].append(k)
+            analysis_df["sensor_x"].append(arr_mean[0])
+            analysis_df["sensor_y"].append(arr_mean[1])
+            analysis_df["sensor_z"].append(arr_mean[2])
+            analysis_df["phantom_x"].append(phantom_coord[k][0])
+            analysis_df["phantom_y"].append(phantom_coord[k][1])
+            analysis_df["phantom_z"].append(phantom_coord[k][2])
+            # log.info(k)
+            # log.info(mean_std_str_vect(arr.mean(axis=0), arr.std(axis=0)))
 
-    sensor_cloud = analysis_df[["sensor_x", "sensor_y", "sensor_z"]].to_numpy().T
-    phantom_cloud = analysis_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
-    print_reg_error(sensor_cloud, phantom_cloud, "pointer registration")
+        analysis_df = pd.DataFrame(analysis_df)
+
+        sensor_cloud = analysis_df[["sensor_x", "sensor_y", "sensor_z"]].to_numpy().T
+        phantom_cloud = analysis_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+
+        log.info(f"Experiment id {exp_id}")
+        print_reg_error(sensor_cloud, phantom_cloud, "pointer registration")
 
 
 if __name__ == "__main__":
