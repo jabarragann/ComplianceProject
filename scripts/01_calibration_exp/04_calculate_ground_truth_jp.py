@@ -187,6 +187,8 @@ def main(testid: int):
 
 
 if __name__ == "__main__":
+    ## TODO: DSTDIR param should copy the result and original files. currently only copying the results.
+
     parser = argparse.ArgumentParser()
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
