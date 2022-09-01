@@ -82,7 +82,7 @@ if __name__ == "__main__":
     psm_kin = DvrkPsmKin()  # Forward kinematic model
 
     # Load calibration values
-    registration_data_path = Path("./data/03_replay_trajectory/d04-rec-18-trajsoft/registration_results")
+    registration_data_path = Path("./data/03_replay_trajectory/d04-rec-20-trajsoft/registration_results")
     registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
     T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
     T_RT = T_TR.inv()
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     # Load experimental data
     data_dir = Path(
-        "./data/03_replay_trajectory/d04-rec-18-trajsoft/"
+        "./data/03_replay_trajectory/d04-rec-20-trajsoft/"
         + "registration_exp/registration_sensor_exp/test_trajectories/"
     )
 
@@ -113,8 +113,8 @@ if __name__ == "__main__":
     # model = model.cuda()
     # model = model.eval()
 
-    # root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
-    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model6_psm2") 
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
+    # root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model6_psm2") 
     inference_pipeline = InferencePipeline(root)
 
     # # Check for checkpoints

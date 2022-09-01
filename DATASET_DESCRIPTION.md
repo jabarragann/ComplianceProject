@@ -49,6 +49,23 @@ And I put the sensor upside down.
     * testid 21: data with teleop 02
 Points in the phantom were touch with the PSM in order from 1-9 and A-B. Only Point D was not collected. This give us a total of 11.
 
+RECORDED ONSAME DAY 19-20 (Soft random traj - Samples per step 20)
+* d04-rec-19-trajsoft: Failed
+* d04-rec-20-trajsoft: 34 steps collected 
+	* test1
+	* test2
+	* test3
+	* test4
+	* test5
+	
+	* 20: teleop no force 
+	* 21: teleop no force
+	* 22: teleop no force
+	* 23: teleop no force
+	* 24-25: force
+	
+	* reg experiment 01: everything except D 
+	* reg experiment 02: everything except D 
 
 # Registration data collection with sensor
 
