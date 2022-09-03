@@ -1,4 +1,5 @@
 # Python imports
+import json
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -22,34 +23,31 @@ log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 data_root = Path("data/03_replay_trajectory")
-dst_filename = Path("data/deep_learning_data/psm2_dataset_silly_idea.txt")
+dst_filename = Path("data/deep_learning_data/psm2_rec20.csv")
 
 # PSM1
-dataset_def1 = [
-    {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-12-traj01", "testid": [6], "type": "random", "flag": "valid"},
-    {"path": data_root / "d04-rec-13-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-13-traj01", "testid": [6], "type": "random", "flag": "valid"},
-    {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
-    {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
-]
-
-# PSM2
-dataset_def2 = [
-    {"path": data_root / "d04-rec-18-trajsoft", "testid": [4], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-18-trajsoft", "testid": [5], "type": "random", "flag": "valid"},
-]
-
-
-# dataset_def3 = [
+# dataset_def = [
+#     {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-12-traj01", "testid": [6], "type": "random", "flag": "valid"},
+#     {"path": data_root / "d04-rec-13-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-13-traj01", "testid": [6], "type": "random", "flag": "valid"},
+#     {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
+#     {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
+# ]
+# # PSM2
+# dataset_def = [
 #     {"path": data_root / "d04-rec-18-trajsoft", "testid": [4], "type": "random", "flag": "train"},
 #     {"path": data_root / "d04-rec-18-trajsoft", "testid": [5], "type": "random", "flag": "valid"},
-#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [20], "type": "random", "flag": "train"},
 # ]
-
-
-# dataset_def = [{"path": data_root / "d04-rec-13-traj01", "testid": [4, 5, 6, 7, 8], "type": "random", "flag": "test"}]
+# fmt:off
+dataset_def = [
+    { "path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
+    { "path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
+]
+# fmt:on
 
 
 def create_nan_list():
@@ -64,7 +62,7 @@ def main():
     # Create dataset
     # -----------------------------------------------------------
     dataset_record = LearningRecord(dst_filename)
-    for d in dataset_def2:
+    for d in dataset_def:
         p = d["path"] / "test_trajectories"
         type_ = d["type"]
         flag = d["flag"]
@@ -140,6 +138,12 @@ def main():
 
     log.info(dataset_record.df.shape)
     dataset_record.to_csv()
+    dataset_def_name = dst_filename.with_suffix("").name + "_def.json"
+    dataset_def_name = dst_filename.parent / dataset_def_name
+
+    for x in dataset_def:
+        x["path"] = str(x["path"])
+    json.dump(dataset_def, open(dataset_def_name, "w"), indent=2)
 
 
 if __name__ == "__main__":

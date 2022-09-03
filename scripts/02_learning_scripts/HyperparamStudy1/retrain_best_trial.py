@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import pickle
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -55,18 +56,21 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-    epochs = 4660
+    epochs = 2500
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
     # root = study_root / "best_model5_temp" #epochs=260
-    root = study_root / "best_model6_psm2"  # epochs=4660
+    root = study_root / "best_model7_psm2"  # epochs=4660
     # data_path = Path("data/deep_learning_data/random_dataset.txt")
-    data_path = Path("data/deep_learning_data/psm2_dataset.txt")
+    data_path = Path("data/deep_learning_data/psm2_rec20.csv")
+    dataset_def_name = data_path.with_suffix("").name + "_def.json"
+    dataset_def_name = data_path.parent / dataset_def_name
 
     log = Logger("main_retrain").log
 
     if not root.exists():
         root.mkdir(parents=True)
+    shutil.copy(dataset_def_name, root / dataset_def_name.name)
 
     # args
     parser = argparse.ArgumentParser()
@@ -95,6 +99,7 @@ if __name__ == "__main__":
     # Data loading and manipulation
     # ------------------------------------------------------------
     train_dataset = JointsDataset1(data_path, mode="train")
+
     normalizer = Normalizer(train_dataset.X)
     normalizer.to_json(root / "normalizer.json")
     train_dataset.normalizer = normalizer

@@ -26,7 +26,7 @@ def print_reg_error(A, B, title: str):
 
 
 if __name__ == "__main__":
-    results_df = "data/03_replay_trajectory/d04-rec-18-trajsoft/registration_results/registration_with_phantom.csv"
+    results_df = "data/03_replay_trajectory/d04-rec-20-trajsoft/registration_results/registration_with_phantom.csv"
     results_df = pd.read_csv(results_df)
 
     test_id = results_df["test_id"].unique()
