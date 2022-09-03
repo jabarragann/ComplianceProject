@@ -37,7 +37,16 @@ class DataRecorder:
     Callable data class to record data from robot and sensor.
     """
 
-    def __init__(self, replay_device, expected_markers: int, root: Path, marker_name: str, mode: str, test_id: int):
+    def __init__(
+        self,
+        replay_device,
+        expected_markers: int,
+        root: Path,
+        marker_name: str,
+        mode: str,
+        test_id: int,
+        description: str = None,
+    ):
 
         self.replay_device = replay_device
         self.expected_markers = expected_markers
@@ -49,6 +58,7 @@ class DataRecorder:
             root_dir=root,
             mode=mode,
             test_id=test_id,
+            description=description,
         )
 
     def __call__(self, **kwargs):

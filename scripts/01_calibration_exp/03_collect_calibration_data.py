@@ -46,6 +46,8 @@ def main():
                             help="root dir to save the data.")                     
     parser.add_argument( "-s", "--save", action='store_true',  default=False, 
                             help="Use this flag to Save recorded data") 
+    parser.add_argument("-d","--description", type=str, required=True, help="One line experiment description")
+    #NUMBER OF SAMPLES ARGS
     args = parser.parse_args()
     # fmt: on
 
@@ -110,7 +112,13 @@ def main():
         replay_device=arm, save=args.save, expected_markers=expected_spheres, root=root, marker_name=marker_name
     )
     data_recorder_cb = DataRecorder(
-        arm, expected_markers=expected_spheres, root=root, marker_name=marker_name, mode=args.mode, test_id=testid
+        arm,
+        expected_markers=expected_spheres,
+        root=root,
+        marker_name=marker_name,
+        mode=args.mode,
+        test_id=testid,
+        description=args.description,
     )
 
     if args.mode == "test":
@@ -136,6 +144,7 @@ def main():
     log.info(f"Trajectory length: {len(trajectory)}")
     log.info(f"Mode:              {args.mode} ")
     log.info(f"Test id:           {testid} ")
+    log.info(f"Description:       {args.description}")
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":

@@ -28,20 +28,19 @@ def calculate_metrics_dict(path: Path):
     metrics_dict = robot_error_metrics.create_error_dict()
     metrics_dict["N"] = robot_error_metrics.joint_error.shape[0]
 
-    # Load description
-    with open(path / "description.txt", "r") as f:
-        msg = f.readline()
-        msg = msg.strip()
-    metrics_dict["notes"] = msg
+    # Load description if available
+    if (path / "description.txt").exists():
+        with open(path / "description.txt", "r") as f:
+            msg = f.readline()
+            msg = msg.strip()
+        metrics_dict["notes"] = msg
 
     # Create results table
     table = ResultsTable()
     table.add_data(robot_error_metrics.create_error_dict())
 
     print(f"**Evaluation report for test trajectory {path.name} in {path.parent.parent.name}**")
-    print(
-        f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})"
-    )
+    print(f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})")
     print(f"\n{table.get_full_table()}\n")
 
     return metrics_dict

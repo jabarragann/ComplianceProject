@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
-    # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
+    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
     # trajectory = RandomJointTrajectory.generate_trajectory(200)
     trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
 

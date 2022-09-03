@@ -58,6 +58,7 @@ class CalibrationRecord(Record):
         root_dir,
         mode: str = "calib",
         test_id: int = None,
+        description: str = None,
     ) -> None:
         """_summary_
 
@@ -75,11 +76,14 @@ class CalibrationRecord(Record):
             Operation mode, by default "calib". Needs to be either 'calib' or 'test'
         test_id : int, optional
             _description_, by default None
+        description: str, optional
+            one line experiment description
         """
 
         assert mode in ["calib", "test"], "mode needs to be calib or test"
         self.ftk_handler = ftk_handler
         self.robot_handler = robot_handler
+        self.description = description
 
         # Create paths
         self.root_dir = root_dir
@@ -98,16 +102,12 @@ class CalibrationRecord(Record):
             jp_filename = self.test_files / ("robot_jp.txt")
 
             if cp_filename.exists() or jp_filename.exists():
-                n = input(
-                    f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. "
-                )
+                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
                 if not (n == "y" or n == "Y"):
                     log.info("exiting the script")
                     exit(0)
         # Create records
-        self.cp_record = RobotSensorCartesianRecord(
-            robot_handler, ftk_handler, expected_markers, cp_filename
-        )
+        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
         self.create_paths()
@@ -120,6 +120,12 @@ class CalibrationRecord(Record):
         if self.mode == "test":
             if not self.test_files.exists():
                 self.test_files.mkdir(parents=True)
+
+        # Create description file
+        if self.description is not None:
+            description_path = self.robot_files if self.mode == "calib" else self.test_files
+            with open(description_path / "description.txt", "w") as f:
+                f.write(self.description)
 
     def create_new_entry(self, idx, joints, q7):
         self.cp_record.create_new_entry(idx, joints, q7)
