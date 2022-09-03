@@ -52,20 +52,14 @@ Points in the phantom were touch with the PSM in order from 1-9 and A-B. Only Po
 RECORDED ONSAME DAY 19-20 (Soft random traj - Samples per step 20)
 * d04-rec-19-trajsoft: Failed
 * d04-rec-20-trajsoft: 34 steps collected 
-	* test1
-	* test2
-	* test3
-	* test4
-	* test5
+	* test 1-3: prerecorded trajectories
+	* test 4-7: Soft random trajectories (N=1200)
+
+	* 20-23: teleop no force (N=120) 
+	* 24-26: force applied (N=63)
+    Trajectories 20-26 are saved in registration experiments and test trajectories directories.
 	
-	* 20: teleop no force 
-	* 21: teleop no force
-	* 22: teleop no force
-	* 23: teleop no force
-	* 24-25: force
-	
-	* reg experiment 01: everything except D 
-	* reg experiment 02: everything except D 
+	* reg experiment with phat 1-5: everything except D 
 
 # Registration data collection with sensor
 

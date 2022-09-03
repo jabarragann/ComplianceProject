@@ -1,38 +1,18 @@
 # Python imports
-import json
 from pathlib import Path
-from re import I
-import time
 import argparse
-import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import List, Tuple, Set
-from rich.logging import RichHandler
-from rich.progress import track
-import torch
-
-# ROS and DVRK imports
-from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
-from kincalib.Learning.InferencePipeline import InferencePipeline
-from kincalib.Learning.Models import BestMLP2
-import rospy
-import tf_conversions.posemath as pm
 
 # kincalib module imports
+from kincalib.Learning.InferencePipeline import InferencePipeline
 from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.Frame import Frame
-from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
-from kincalib.utils.ExperimentUtils import separate_markerandfiducial
-from kincalib.utils.CmnUtils import *
-from kincalib.Motion.DvrkKin import DvrkPsmKin
-from pytorchcheckpoint.checkpoint import CheckpointHandler
-
-from kincalib.utils.TableGenerator import ResultsTable
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils
+from kincalib.Metrics.TableGenerator import ResultsTable
+from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics 
+from kincalib.utils.CmnUtils import mean_std_str
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -60,7 +40,6 @@ def main(testid: int):
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-    # Important paths
     root = Path(args.root)
 
     if args.test:
@@ -68,16 +47,10 @@ def main(testid: int):
     else:
         robot_cp_p = root / "robot_mov" / "robot_cp.txt"
 
-    # ------------------------------------------------------------
-    # Calculate tracker joint values
-    # ------------------------------------------------------------
     dst_p = robot_cp_p.parent
     dst_p = dst_p / "result"
     registration_data_path = root / "registration_results"
-
-    log.info(f"Storing results in {dst_p}")
     log.info(f"Loading registration .json from {registration_data_path}")
-    dst_p.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------
     # Read calculated joint values
@@ -91,79 +64,37 @@ def main(testid: int):
         exit()
 
     # ------------------------------------------------------------
-    # Calculate model predictions 
+    # Calculate metrics 
     # ------------------------------------------------------------
-
-    # root = Path(f"data/ModelsCheckpoints/T{3:02d}/") / "final_checkpoint.pt"
     model_path = Path(f"data/deep_learning_data/Studies/TestStudy2")/args.modelname 
     inference_pipeline = InferencePipeline(model_path)
 
+    # Correct joints with neural net 
     cols= ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
     valstopred = robot_df[cols].to_numpy().astype(np.float32)
-
     pred =  inference_pipeline.predict(valstopred)
     pred = np.hstack((robot_df["step"].to_numpy().reshape(-1,1),pred))
     pred_df = pd.DataFrame(pred,columns=["step", "q4", "q5", "q6"])
 
     # Calculate results 
-    # Use the residual to get valid tracker points.
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  
+    cols= ["step","q1", "q2", "q3", "q4", "q5", "q6"]
+    robot_error_metrics = CalibrationMetrics("robot",robot_df, tracker_df, opt_df)
 
-    robot_valid = robot_df.loc[robot_df["step"].isin(valid_steps)].iloc[:, 1:7].to_numpy()
-    tracker_valid = tracker_df.loc[tracker_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
-    robot_error = robot_valid - tracker_valid
-    robot_mean = robot_error.mean(axis=0)
-    robot_std = robot_error.std(axis=0)
-
-    # Network error
-    network_valid = pred_df.loc[pred_df["step"].isin(valid_steps)][[ "q4", "q5", "q6"]].to_numpy()
-    network_error = network_valid - tracker_valid[:,3:]
-    network_mean = network_error.mean(axis=0)
-    network_std = network_error.std(axis=0)
-
-    # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
-    robot_cp = CalibrationUtils.calculate_cartesian(robot_valid)
-    tracker_cp = CalibrationUtils.calculate_cartesian(tracker_valid)
-
-    # Add the first three joints from the robot
-    network_valid =np.hstack((robot_valid[:,:3],network_valid))
-    network_cp = CalibrationUtils.calculate_cartesian(network_valid)
-
-    robot_cp_error = tracker_cp - robot_cp
-    robot_mean_error = robot_cp_error.apply(np.linalg.norm, 1)
-
-    net_cp_error = tracker_cp - network_cp 
-    net_mean_error = net_cp_error.apply(np.linalg.norm, 1)
+    network_df = pd.merge(robot_df.loc[:,["step","q1","q2","q3"]], pred_df, on="step")
+    network_error_metrics = CalibrationMetrics("network", network_df, tracker_df,opt_df )
 
     # Create results table
     table = ResultsTable()
-    table.add_data(
-        dict(
-            type="robot", 
-            q1=mean_std_str(robot_mean[0]*180/np.pi, robot_std[0]*180/np.pi),
-            q2=mean_std_str(robot_mean[1]*180/np.pi, robot_std[1]*180/np.pi),
-            q3=mean_std_str(robot_mean[2]*180/np.pi, robot_std[2]*180/np.pi),
-            q4=mean_std_str(robot_mean[3]*180/np.pi, robot_std[3]*180/np.pi),
-            q5=mean_std_str(robot_mean[4]*180/np.pi, robot_std[4]*180/np.pi),
-            q6=mean_std_str(robot_mean[5]*180/np.pi, robot_std[5]*180/np.pi),
-            cartesian=mean_std_str(robot_mean_error.mean()*1000, robot_mean_error.std()*1000),
-        )
-    )
-    table.add_data(
-        dict(
-            type="network", 
-            q4=mean_std_str(network_mean[0]*180/np.pi, network_std[0]*180/np.pi),
-            q5=mean_std_str(network_mean[1]*180/np.pi, network_std[1]*180/np.pi),
-            q6=mean_std_str(network_mean[2]*180/np.pi, network_std[2]*180/np.pi),
-            cartesian=mean_std_str(net_mean_error.mean()*1000, net_mean_error.std()*1000),
-        )
-    )
+    table.add_data(robot_error_metrics.create_error_dict())
+    net_dict = network_error_metrics.create_error_dict() 
+    [net_dict.pop(k,None) for k in ["q1","q2","q3"]] # Remove first three joints for the table.
+    table.add_data(net_dict)
 
     print("")
     print(f"**Evaluation report for test trajectory {testid} in {registration_data_path.parent.name}**")
     print(f"* Registration path: {registration_data_path}")
     print(f"* model path: {model_path}\n")
-    print(f"Difference from ground truth (Tracker values) (N={robot_error.shape[0]})")
+    print(f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})")
     print(f"\n{table.get_full_table()}")
 
     # plot
