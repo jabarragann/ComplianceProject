@@ -82,7 +82,13 @@ class CalibrationMetrics:
         # Calculate orientation errors
 
     def create_error_dict(self):
-        """Create error dict that can be used to aggregate the analysis of multiple trajectories."""
+        """Create error dict that can be used to aggregate the analysis of multiple trajectories.
+
+        The function returns a dictionary with the following structure
+        ```
+        return dict(type="robot", q1=3, q2=5, q3=4, q4=5, q5=6, q6=7,cartesian=8,)
+        ```
+        """
 
         return dict(
             type=self.joints_source,
