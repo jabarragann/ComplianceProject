@@ -1,32 +1,18 @@
-import tf_conversions.posemath as pm
-
 # Python imports
 import json
 from pathlib import Path
-from re import I
-import time
 import argparse
-import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import List, Tuple, Set
-from rich.logging import RichHandler
-from rich.progress import track
-
-# ROS and DVRK imports
-import rospy
 
 # kincalib module imports
+from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics
+from kincalib.Metrics.TableGenerator import ResultsTable
 from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Frame import Frame
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
-from kincalib.utils.ExperimentUtils import separate_markerandfiducial
-from kincalib.utils.CmnUtils import *
-from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -107,63 +93,21 @@ def main(testid: int):
     # Evaluate results
     # ------------------------------------------------------------
 
-    # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005][
-        "step"
-    ]  # Use the residual to get valid steps.
-    robot_valid = robot_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
-    tracker_valid = tracker_df.loc[opt_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
-    diff = robot_valid - tracker_valid
-    diff_mean = diff.mean(axis=0)
-    diff_std = diff.std(axis=0)
+    robot2_df = pd.read_csv(robot_jp_p)
+    robot_error_metrics = CalibrationMetrics("robot", robot2_df, tracker_df, opt_df)
 
-    # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
-    robot_cp = CalibrationUtils.calculate_cartesian(robot_valid)
-    tracker_cp = CalibrationUtils.calculate_cartesian(tracker_valid)
-    cp_error = tracker_cp - robot_cp
-    mean_error = cp_error.apply(np.linalg.norm, 1)
+    table = ResultsTable()
+    table.add_data(robot_error_metrics.create_error_dict())
 
-    ## TODO: Improve printing statements. It is better to use the table.
-    ## TODO: Also add a header to the table indicating which is the test & train data
-
-    log.info(f"Number of valid samples: {diff.shape[0]}")
-    log.info(f"Cartesian results")
-    log.info(
-        f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}"
+    print("")
+    print(
+        f"**Evaluation report for test trajectory {testid} in {registration_data_path.parent.name}**"
     )
-    log.info(
-        f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}"
+    print(f"* Registration path: {registration_data_path}")
+    print(
+        f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})"
     )
-    log.info(
-        f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}"
-    )
-    log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
-
-    log.info(f"Results in degrees")
-    log.info(
-        f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}"
-    )
-    log.info(
-        f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}"
-    )
-    log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    log.info(
-        f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}"
-    )
-    log.info(
-        f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}"
-    )
-    log.info(
-        f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}"
-    )
-
-    # log.info(f"Results in rad")
-    # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
-    # log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
-    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    # log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
-    # log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
-    # log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+    print(f"\n{table.get_full_table()}")
 
     # plot
     if args.plot:

@@ -77,7 +77,6 @@ def main(testid: int):
     pred_df = pd.DataFrame(pred,columns=["step", "q4", "q5", "q6"])
 
     # Calculate results 
-    cols= ["step","q1", "q2", "q3", "q4", "q5", "q6"]
     robot_error_metrics = CalibrationMetrics("robot",robot_df, tracker_df, opt_df)
 
     network_df = pd.merge(robot_df.loc[:,["step","q1","q2","q3"]], pred_df, on="step")
