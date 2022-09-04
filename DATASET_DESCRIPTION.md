@@ -74,13 +74,14 @@ RECORDED ONSAME DAY 21-22 (Soft random traj - Samples per step 20)
 	* test 7: random-soft N=200
 	
 	Teleoperation exp
+	* test 20: no force N=100
 	
 	Repetibility exp: touch fiducial point multiple time
 
 	registration_with_phantom
 	* test_traj: 1-4  phantom in same position
 	* test_traj: 5-8  phantom in same position
-	* test_traj: 9-12 phantom in same position
+	* test_traj: 9-10 phantom in same position
 
 # Registration data collection with sensor
 
