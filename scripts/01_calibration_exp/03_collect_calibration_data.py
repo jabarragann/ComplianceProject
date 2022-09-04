@@ -41,13 +41,17 @@ def main():
     #                     default="data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag",
     #                     help="rosbag trajectory to replay")
     parser.add_argument("-b", "--rosbag",type=str, default=None,
-                        help="rosbag trajectory to replay")
+                            help="rosbag trajectory to replay")
     parser.add_argument( "-r", "--root", type=str, default="data/03_replay_trajectory/d04-rec-14-traj01", 
                             help="root dir to save the data.")                     
     parser.add_argument( "-s", "--save", action='store_true',  default=False, 
                             help="Use this flag to Save recorded data") 
     parser.add_argument("-d","--description", type=str, required=True, help="One line experiment description")
-    #NUMBER OF SAMPLES ARGS
+    parser.add_argument("--traj_type",choices=['random','soft'], default="random",
+                            help="type of random trajectory")
+    parser.add_argument("--traj_size",type=int, default=500,
+                            help="Number of samples in random traj")
+        #NUMBER OF SAMPLES ARGS
     args = parser.parse_args()
     # fmt: on
 
@@ -80,8 +84,11 @@ def main():
         trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=sampling_factor)
     else:
         log.info(f"Creating random trajectory")
-        # trajectory = RandomJointTrajectory.generate_trajectory(1200)
-        trajectory = SoftRandomJointTrajectory.generate_trajectory(500, samples_per_step=20)
+        random_size = args.traj_size
+        if args.traj_type == "random":
+            trajectory = RandomJointTrajectory.generate_trajectory(random_size)
+        else:
+            trajectory = SoftRandomJointTrajectory.generate_trajectory(random_size, samples_per_step=20)
 
     log.info(f"Trajectory size {len(trajectory)}")
 
@@ -142,6 +149,8 @@ def main():
     log.info(f"Trajectory name:   {args.rosbag}")
     log.info(f"Save data:         {args.save}")
     log.info(f"Trajectory length: {len(trajectory)}")
+    if args.rosbag is None:
+        log.info(f"Random Trajectory: {args.traj_type}")
     log.info(f"Mode:              {args.mode} ")
     log.info(f"Test id:           {testid} ")
     log.info(f"Description:       {args.description}")
