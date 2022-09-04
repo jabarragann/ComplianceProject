@@ -82,7 +82,8 @@ if __name__ == "__main__":
     psm_kin = DvrkPsmKin()  # Forward kinematic model
 
     # Load calibration values
-    registration_data_path = Path("./data/03_replay_trajectory/d04-rec-20-trajsoft/registration_results")
+    root = Path("./data/03_replay_trajectory/d04-rec-23-trajrand/") 
+    registration_data_path = root / "registration_results"
     registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
     T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
     T_RT = T_TR.inv()
@@ -91,10 +92,10 @@ if __name__ == "__main__":
     wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
     # Load experimental data
-    data_dir = Path(
-        "./data/03_replay_trajectory/d04-rec-20-trajsoft/"
-        + "registration_exp/registration_sensor_exp/test_trajectories/"
-    )
+    data_dir = root / "registration_exp/registration_with_phantom2/test_trajectories/"
+
+    log.info(f"loading registration values from {registration_data_path}")
+    log.info(f"loading data from {data_dir.parent}")
 
     # # load neural network
     # study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/regression_study1.pkl")

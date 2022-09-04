@@ -33,9 +33,16 @@ todo
 
 # Scripts
 ## Data collection scripts 
-Collecting calibration data
+**Collecting calibration data**
+
+From recorded rosbag
 ```
 python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m calib -b data/psm2_trajectories/pitch_exp_traj_02_test_cropped.bag -r data/03_replay_trajectory/d04-rec-08-traj02 
+```
+
+From random trajectory
+```
+python3 scripts/01_calibration_exp/03_collect_calibration_data.py  -m test -r data/03_replay_trajectory/d04-rec-23-trajrand -s  --testid 5 -d "soft random traj" --traj_type soft --traj_size 500
 ```
 
 Collecting test trajectories

@@ -67,9 +67,7 @@ def rodrigues_rot(P, n0, n1):
     # Compute rotated points
     P_rot = np.zeros((len(P), 3))
     for i in range(len(P)):
-        P_rot[i] = (
-            P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
-        )
+        P_rot[i] = P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
 
     return P_rot
 
@@ -108,9 +106,10 @@ class Triangle3D:
         self.area = self.calculate_area()
         self.segments_list: np.ndarray = None
 
-    def calculate_area(self, scale=1):
+    def calculate_area(self, scale=1) -> float:
         AB = self.v_list[1] - self.v_list[0]
         AC = self.v_list[2] - self.v_list[0]
+
         return np.linalg.norm(np.cross(scale * AB, scale * AC)) / 2
 
     def calculate_sides(self, scale=1) -> np.ndarray:
@@ -228,7 +227,7 @@ class Circle3D:
     @staticmethod
     def fit_circle_2d(x, y, w=[]):
         A = np.array([x, y, np.ones(len(x))]).T
-        b = x**2 + y**2
+        b = x ** 2 + y ** 2
 
         # Modify A,b for weighted least squares
         if len(w) == len(x):
@@ -242,7 +241,7 @@ class Circle3D:
         # Get circle parameters from solution c
         xc = c[0] / 2
         yc = c[1] / 2
-        r = np.sqrt(c[2] + xc**2 + yc**2)
+        r = np.sqrt(c[2] + xc ** 2 + yc ** 2)
         return xc, yc, r
 
 

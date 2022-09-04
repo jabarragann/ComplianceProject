@@ -61,6 +61,27 @@ RECORDED ONSAME DAY 19-20 (Soft random traj - Samples per step 20)
 	
 	* reg experiment with phat 1-5: everything except D 
 
+RECORDED ONSAME DAY 21-22 (Soft random traj - Samples per step 20)
+* d04-rec-21-trajsoft: something failed while doing the registration. Obtained errors in the 
+* d04-rec-22-trajsoft: The workspace with soft random traj is very small.
+* d04-rec-23-trajrand: 
+	
+	Test traj
+	* test 1-3: pre-recorded
+	* test 4: random N=500
+	* test 5: random-soft N=500
+	* test 6: random N=200
+	* test 7: random-soft N=200
+	
+	Teleoperation exp
+	
+	Repetibility exp: touch fiducial point multiple time
+
+	registration_with_phantom
+	* test_traj: 1-4  phantom in same position
+	* test_traj: 5-8  phantom in same position
+	* test_traj: 9-12 phantom in same position
+
 # Registration data collection with sensor
 
 ## Experiment 1:

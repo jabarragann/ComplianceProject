@@ -60,9 +60,7 @@ if __name__ == "__main__":
             temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T,
             "Registration error neural_net (mm)",
         )
-        final_df.append(
-            pd.DataFrame({"test_id": i, "errors": error_list, "type": "neural_network_error"})
-        )
+        final_df.append(pd.DataFrame({"test_id": i, "errors": error_list, "type": "neural_network_error"}))
 
     final_df = pd.concat(final_df)
     final_df["errors"] *= 1000
