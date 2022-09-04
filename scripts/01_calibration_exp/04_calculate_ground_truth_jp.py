@@ -40,16 +40,18 @@ def main(testid: int):
         dst_p = robot_cp_p.parent
         dst_p = dst_p / "result"
         registration_data_path = root / "registration_results"
+        dst_p.mkdir(exist_ok=True)
+
     else:
         dst_p = Path(args.dstdir)
         registration_data_path = dst_p / root.name / "registration_results"
         dst_p = (
             dst_p / root.name / robot_cp_p.parent.name / "result"
         )  # e.g d04-rec-11-traj01/01/results/
+        dst_p.mkdir(parent=True, exist_ok=True)
 
     log.info(f"Storing results in {dst_p}")
     log.info(f"Loading registration .json from {registration_data_path}")
-    dst_p.mkdir(parents=True, exist_ok=True)
     # input("press enter to start ")
 
     if (dst_p / "robot_joints.txt").exists() and not args.reset:
