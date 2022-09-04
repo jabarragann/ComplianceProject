@@ -37,6 +37,8 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 log = Logger("registration").log
 
+global_area_threshold = 1.2  # PREVIOUSLY < 0.5
+
 
 def calculate_registration(df: pd.DataFrame, root: Path):
     # ------------------------------------------------------------
@@ -49,7 +51,7 @@ def calculate_registration(df: pd.DataFrame, root: Path):
     # df = pd.read_csv(filename)
 
     # Choose entries were the area is lower is than 6mm
-    df = df.loc[df["area"] < 0.5]
+    df = df.loc[df["area"] < global_area_threshold]
     robot_p = df[["rpx", "rpy", "rpz"]].to_numpy().T
     tracker_p = df[["tpx", "tpy", "tpz"]].to_numpy().T
     log.info(f"Points used for the registration {robot_p.shape[1]}")
@@ -67,7 +69,7 @@ def calculate_registration(df: pd.DataFrame, root: Path):
 
 
 def calculate_pitch_to_marker(registration_data, other_values_dict=None):
-    registration_data = registration_data.loc[registration_data["area"] < 0.5]
+    registration_data = registration_data.loc[registration_data["area"] < global_area_threshold]
     # calculate pitch orig in marker
     pitch_orig = registration_data[["mox", "moy", "moz"]].to_numpy()
     pitch_orig_mean = pitch_orig.mean(axis=0)
@@ -122,7 +124,8 @@ def calculate_pitch_to_marker(registration_data, other_values_dict=None):
     # pitch2marker_T[:3, 2] = pitch_axis_mean
     # pitch2marker_T[:3, 3] = pitch_orig_mean
 
-    return Frame.init_from_matrix(pitch2marker_T)
+    frame = Frame.init_from_matrix(pitch2marker_T)
+    return frame
 
 
 def pitch_orig_in_robot(robot_df: pd.DataFrame) -> pd.DataFrame:
@@ -212,73 +215,76 @@ def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     for step in track(keys, "Computing pitch origin in tracker coordinates"):
         if len(list(dict_files[step].keys())) < 2:
             log.warning(f"files for step {step} are not available")
-            continue
-        try:
-            # Get roll circles
-            roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[step]["roll"])
-            # Get pitch and yaw circles
-            pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[step]["pitch"])
-        except Exception as e:
-            log.error(f"Error in circles creation on step {step}")
-            log.error(e)
-            continue
+        else:
+            try:
+                # Get roll circles
+                roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[step]["roll"])
+                # Get pitch and yaw circles
+                pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[step]["pitch"])
 
-        # Calculate registration data
-        m1, m2, m3 = calib.calculate_pitch_origin(
-            roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
-        )
-        pitch_ori_T = (m1 + m2 + m3) / 3
+                ###################
+                ## MAIN CALCULATION
+                ###################
 
-        triangle = Triangle3D([m1, m2, m3])
-        # Scale area to milimiters
-        area = triangle.calculate_area(scale=1000)
-        pitch_ori_T = triangle.calculate_centroid()
-        # Add new entry to df
-        data = [step, area] + list(pitch_ori_T)
-        data = np.array(data).reshape((1, -1))
-        new_df = pd.DataFrame(data, columns=cols)
-        df_results = df_results.append(new_df)
+                # Calculate registration data
+                m1, m2, m3 = calib.calculate_pitch_origin(
+                    roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
+                )
+                pitch_ori_T = (m1 + m2 + m3) / 3
 
-        # Calculate pitch axis in Marker frame
-        pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
-            pitch_ori_T, pitch_yaw_circles, roll_cir1, prev_p_ax, prev_r_ax
-        )
-        ## IMPORTANT NOTE
-        # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
-        # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
-        # are used to ensure consistency in the selected direction for different points in the trajectory.
-        prev_p_ax = pitch_ax_M
-        prev_r_ax = roll_ax_M
+                triangle = Triangle3D([m1, m2, m3])
 
-        # Estimate wrist fiducial in yaw origin
-        # todo get the fiducial measurement from robot_cp_temp.
-        # todo fiducial_y and pitch2yaw1 have two values each. You are only using 1.
-        fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
-            pitch_ori_T, pitch_yaw_circles, roll_cir2
-        )
-        u_limit = 0.0093 + 0.009
-        l_limit = 0.0093 - 0.009
-        if pitch2yaw1[1] > u_limit or pitch2yaw1[1] < l_limit:
-            fiducial_Y[1][:] = np.nan
-            fiducial_T[1][:] = np.nan
-            pitch2yaw1[1] = np.nan
+                # Scale area to milimiters
+                area = triangle.calculate_area(scale=1000)
 
-        # Add to dataframe
-        # fmt: off
-        data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M) + \
-                list(fiducial_Y[1].squeeze())+ list(fiducial_T[1].squeeze()) +  [pitch2yaw1[1]]
-        # fmt: on
+                pitch_ori_T = triangle.calculate_centroid()
+                # Add new entry to df
+                data = [step, area] + list(pitch_ori_T)
+                data = np.array(data).reshape((1, -1))
+                new_df = pd.DataFrame(data, columns=cols)
+                df_results = df_results.append(new_df)
 
-        data = np.array(data).reshape((1, -1))
-        new_pt = pd.DataFrame(data, columns=cols_pitch_M)
-        df_pitch_axes = df_pitch_axes.append(new_pt)
+                # Calculate pitch axis in Marker frame
+                pitch_org_M, pitch_ax_M, roll_ax_M = calculate_axes_in_marker(
+                    pitch_ori_T, pitch_yaw_circles, roll_cir1, prev_p_ax, prev_r_ax
+                )
+                ## IMPORTANT NOTE
+                # Pitch and roll axis are the normal vector of a 3D circle fitted to the tracker data.
+                # Therefore, these normal vectors can have two possible directions. Previous pitch and roll axis
+                # are used to ensure consistency in the selected direction for different points in the trajectory.
+                prev_p_ax = pitch_ax_M
+                prev_r_ax = roll_ax_M
+
+                # Estimate wrist fiducial in yaw origin
+                # todo get the fiducial measurement from robot_cp_temp.
+                # todo fiducial_y and pitch2yaw1 have two values each. You are only using 1.
+                fiducial_Y, fiducial_T, pitch2yaw1 = calib.calculate_fiducial_from_yaw(
+                    pitch_ori_T, pitch_yaw_circles, roll_cir2
+                )
+                u_limit = 0.0093 + 0.009
+                l_limit = 0.0093 - 0.009
+                if pitch2yaw1[1] > u_limit or pitch2yaw1[1] < l_limit:
+                    fiducial_Y[1][:] = np.nan
+                    fiducial_T[1][:] = np.nan
+                    pitch2yaw1[1] = np.nan
+
+                # Add to dataframe
+                # fmt: off
+                data = [step] + list(pitch_org_M) + list(pitch_ax_M) + list(roll_ax_M) + \
+                        list(fiducial_Y[1].squeeze())+ list(fiducial_T[1].squeeze()) +  [pitch2yaw1[1]]
+                # fmt: on
+
+                data = np.array(data).reshape((1, -1))
+                new_pt = pd.DataFrame(data, columns=cols_pitch_M)
+                df_pitch_axes = df_pitch_axes.append(new_pt)
+            except Exception as e:
+                log.error(f"Error in circles creation on step {step}")
+                log.error(e)
 
     return df_results, df_pitch_axes
 
 
-def calculate_axes_in_marker(
-    pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax
-):
+def calculate_axes_in_marker(pitch_ori_T, pitch_yaw_circles: dict, roll_circle, prev_p_ax, prev_r_ax):
     """Calculate roll axis and pitch axis and pitch origin in the marker frame
 
     Parameters
