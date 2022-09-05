@@ -22,7 +22,7 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
 class JointsDataset1(Dataset):
-    def __init__(self, data_path: Path, mode: str, normalizer=None) -> None:
+    def __init__(self, data_path: Path, mode: str, normalizer=None, full_output:bool=False) -> None:
         """Input robot state (joint position and torque) and output corrected wrist joints.
 
         Parameters
@@ -42,7 +42,10 @@ class JointsDataset1(Dataset):
         self.normalizer: StandardScaler = normalizer
 
         input_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"] + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
-        output_cols = ["tq4", "tq5", "tq6"]
+        if full_output:
+            output_cols = ["tq1","tq2","tq3","tq4", "tq5", "tq6"]
+        else:
+            output_cols = ["tq4", "tq5", "tq6"]
 
         # Filter outliers with the optimization error of q56 lower than 1.4mm
         self.data_df = self.data_df.loc[self.data_df["opt"] < 1.4 / 1000]

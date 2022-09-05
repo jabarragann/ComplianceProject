@@ -36,10 +36,29 @@ from kincalib.utils.Logger import Logger
 #     log.info("")
 
 
-def print_angle_dif(error_means, error_std):
-    # log.info(f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}")
-    # log.info(f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}")
-    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(error_means[2],error_std[2])}")
+def print_angle_dif_full(error_means, error_std):
+    log.info(
+        f"Joint 1 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 2 mean difference (deg): {mean_std_str(error_means[1]*180/np.pi,error_std[1]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 3 mean difference (mm):  {mean_std_str(error_means[2]*1000,error_std[2]*1000)}"
+    )
+    log.info(
+        f"Joint 4 mean difference (deg): {mean_std_str(error_means[3]*180/np.pi,error_std[3]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 5 mean difference (deg): {mean_std_str(error_means[4]*180/np.pi,error_std[4]*180/np.pi)}"
+    )
+    log.info(
+        f"Joint 6 mean difference (deg): {mean_std_str(error_means[5]*180/np.pi,error_std[5]*180/np.pi)}"
+    )
+    log.info("")
+
+
+def print_angle_dif_partial(error_means, error_std):
     log.info(
         f"Joint 4 mean difference (deg): {mean_std_str(error_means[0]*180/np.pi,error_std[0]*180/np.pi)}"
     )
@@ -60,7 +79,10 @@ if __name__ == "__main__":
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
     # root = study_root / "best_model5_temp" #epochs=260
-    root = study_root / "best_model7_psm2"  # epochs=4660
+    # root = study_root / "best_model7_psm2"  # epochs=4660
+    root = study_root / "best_model8_psm2_6"  # epochs=4660
+    output_units = 6
+    assert output_units in [3, 6]
     # data_path = Path("data/deep_learning_data/random_dataset.txt")
     data_path = Path("data/deep_learning_data/psm2_rec20.csv")
     dataset_def_name = data_path.with_suffix("").name + "_def.json"
@@ -94,17 +116,21 @@ if __name__ == "__main__":
     for key, value in best_trial.params.items():
         log.info("{:20s}: {}".format(key, value))
         params_dict[key] = value
+    params_dict["n_out"] = output_units
 
     # ------------------------------------------------------------
     # Data loading and manipulation
     # ------------------------------------------------------------
-    train_dataset = JointsDataset1(data_path, mode="train")
+    full_output = output_units == 6
+    train_dataset = JointsDataset1(data_path, mode="train", full_output=full_output)
 
     normalizer = Normalizer(train_dataset.X)
     normalizer.to_json(root / "normalizer.json")
     train_dataset.normalizer = normalizer
     pickle.dump(normalizer, open(root / "normalizer.pkl", "wb"))
-    valid_dataset = JointsDataset1(data_path, mode="valid", normalizer=normalizer)
+    valid_dataset = JointsDataset1(
+        data_path, mode="valid", normalizer=normalizer, full_output=full_output
+    )
     # test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
     log.info(f"Train dataset size: {len(train_dataset)}")
     log.info(f"Valid dataset size: {len(valid_dataset)}")
@@ -222,6 +248,8 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Angle Differences
     # ------------------------------------------------------------
+    print_angle_dif = print_angle_dif_full if full_output else print_angle_dif_partial
+
     loss_value = abs(valid_predicted_joints - valid_tracker_joints).mean(axis=0).mean()
     error = valid_tracker_joints - valid_predicted_joints
     error_means = error.mean(axis=0)
@@ -231,8 +259,11 @@ if __name__ == "__main__":
     )
     print_angle_dif(error_means, error_std)
 
-    loss_value = abs(valid_robot_state[:, 3:6] - valid_tracker_joints).mean(axis=0).mean()
-    error = valid_tracker_joints - valid_robot_state[:, 3:6]
+    robot_state_slice = slice(0, 6) if full_output else slice(3, 6)
+    loss_value = (
+        abs(valid_robot_state[:, robot_state_slice] - valid_tracker_joints).mean(axis=0).mean()
+    )
+    error = valid_tracker_joints - valid_robot_state[:, robot_state_slice]
     error_means = error.mean(axis=0)
     error_std = error.std(axis=0)
     log.info(

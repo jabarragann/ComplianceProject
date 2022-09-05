@@ -11,7 +11,9 @@ class MLP(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.layers = nn.Sequential(nn.Linear(12, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 3))
+        self.layers = nn.Sequential(
+            nn.Linear(12, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 3)
+        )
 
     def forward(self, x):
         """
@@ -81,7 +83,9 @@ class CustomMLP(nn.Module):
 
 
 class JointCorrectionNet(nn.Module):
-    default_architecture = dict(n_layers=1, n_units_l0=140, dropout_l0=0.009299938244271444)
+    default_architecture = dict(
+        n_layers=1, n_units_l0=140, dropout_l0=0.009299938244271444, n_out=3
+    )
 
     def __init__(self, model_def: dict = None) -> None:
         super().__init__()
@@ -90,6 +94,9 @@ class JointCorrectionNet(nn.Module):
             self.model_def = JointCorrectionNet.default_architecture
         else:
             self.model_def = model_def
+            # Fill missing entries
+            for k, v in JointCorrectionNet.default_architecture.items():
+                self.model_def.setdefault(k, v)
 
         # We optimize the number of layers, hidden units and dropout ratio in each layer.
         n_layers = self.model_def["n_layers"]
@@ -104,7 +111,7 @@ class JointCorrectionNet(nn.Module):
             layers.append(nn.Dropout(p))
             in_features = out_features
 
-        layers.append(nn.Linear(in_features, 3))
+        layers.append(nn.Linear(in_features, self.model_def["n_out"]))
 
         self.model = nn.Sequential(*layers)
 
