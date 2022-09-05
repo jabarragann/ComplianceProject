@@ -22,7 +22,14 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
 class JointsDataset1(Dataset):
-    def __init__(self, data_path: Path, mode: str, normalizer=None, full_output:bool=False) -> None:
+    def __init__(
+        self,
+        data_path: Path,
+        mode: str,
+        normalizer=None,
+        full_output: bool = False,
+        output: str = "joints",
+    ) -> None:
         """Input robot state (joint position and torque) and output corrected wrist joints.
 
         Parameters
@@ -33,17 +40,27 @@ class JointsDataset1(Dataset):
             Either 'train', 'valid' or 'tests'
         normalizer : sklearn.preprocessing.StandardScaler
             This can be added in the constructor or later. It is required to used the __getitem__ function.
+        output: str
+            Either `joints` or `error`. Use 'joints' to output the tracker joints or 'error' to output the
+            difference between robot and tracker joints.
         """
         super().__init__()
         self.data_df = pd.read_csv(data_path)
         assert mode in ["train", "valid", "test"], "invalid mode"
+        assert output in ["joints", "error"], "invalid output"
+
         self.mode = mode
+        self.output = output
         self.data_df = self.data_df.loc[self.data_df["flag"] == mode]
         self.normalizer: StandardScaler = normalizer
 
-        input_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"] + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
+        # fmt:off
+        input_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"] + \
+                     ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
+        # fmt:on
+
         if full_output:
-            output_cols = ["tq1","tq2","tq3","tq4", "tq5", "tq6"]
+            output_cols = ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
         else:
             output_cols = ["tq4", "tq5", "tq6"]
 
@@ -64,7 +81,11 @@ class JointsDataset1(Dataset):
             exit(0)
         x_norm = self.normalizer(self.X[idx])
 
-        return x_norm, self.Y[idx]
+        if self.output == "joints":
+            return x_norm, self.Y[idx]
+        else:
+            error = self.Y[idx] - self.X[idx, 0:6]
+            return x_norm, error
 
 
 @dataclass

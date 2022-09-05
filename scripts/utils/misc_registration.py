@@ -204,25 +204,25 @@ def main():
     print_reg_error(phantom_cp.T, network_cp1.T, title="network1 FRE")
     print_reg_error(phantom_cp.T, network_cp2.T, title="network2 FRE")
 
-    correction = np.array(
-        [180 / np.pi, 180 / np.pi, 1000, 180 / np.pi, 180 / np.pi, 180 / np.pi]
-    ).reshape((1, -1))
+    # correction = np.array(
+    #     [180 / np.pi, 180 / np.pi, 1000, 180 / np.pi, 180 / np.pi, 180 / np.pi]
+    # ).reshape((1, -1))
 
-    robot_error_mat = (
-        tracker_df.drop("step", axis=1).to_numpy()
-        - robot_df[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
-    ) * correction
-    net1_error_mat = (tracker_df.drop("step", axis=1).to_numpy() - network_jp1) * correction
-    net2_error_mat = (tracker_df.drop("step", axis=1).to_numpy() - network_jp2) * correction
-    log.info(f"net1 \n{net1_error_mat}")
-    log.info(f"mean net1 \n{net1_error_mat.mean(axis=0)}")
-    log.info(f"std net1 \n{net1_error_mat.std(axis=0)}")
-    log.info(f"net2 \n{net2_error_mat}")
-    log.info(f"mean net2 \n{net2_error_mat.mean(axis=0)}")
-    log.info(f"std net2 \n{net2_error_mat.std(axis=0)}")
+    # robot_error_mat = (
+    #     tracker_df.drop("step", axis=1).to_numpy()
+    #     - robot_df[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
+    # ) * correction
+    # net1_error_mat = (tracker_df.drop("step", axis=1).to_numpy() - network_jp1) * correction
+    # net2_error_mat = (tracker_df.drop("step", axis=1).to_numpy() - network_jp2) * correction
+    # log.info(f"net1 \n{net1_error_mat}")
+    # log.info(f"mean net1 \n{net1_error_mat.mean(axis=0)}")
+    # log.info(f"std net1 \n{net1_error_mat.std(axis=0)}")
+    # log.info(f"net2 \n{net2_error_mat}")
+    # log.info(f"mean net2 \n{net2_error_mat.mean(axis=0)}")
+    # log.info(f"std net2 \n{net2_error_mat.std(axis=0)}")
 
-    log.info(f"mean robot \n{robot_error_mat.mean(axis=0)}")
-    log.info(f"std robot \n{robot_error_mat.std(axis=0)}")
+    # log.info(f"mean robot \n{robot_error_mat.mean(axis=0)}")
+    # log.info(f"std robot \n{robot_error_mat.std(axis=0)}")
 
 
 if __name__ == "__main__":
@@ -230,7 +230,7 @@ if __name__ == "__main__":
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
                     help="This directory must a registration_results subdir contain a calibration .json file.") 
-    parser.add_argument('-m','--modelname', default="best_model8_psm2_6",type=str \
+    parser.add_argument('-m','--modelname', default="best_model9_6er",type=str \
                         ,help="Name of deep learning model to use.")
 
     # fmt:on

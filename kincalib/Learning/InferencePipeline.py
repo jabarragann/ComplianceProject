@@ -62,24 +62,38 @@ class InferencePipeline:
 
         """
 
-        cols = ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
+        model_output = self.model.model_def["output"]  # Either 'joints' or 'error'
+        n_out = self.model.model_def["n_out"]
 
-        valstopred = robot_state_df[cols].to_numpy().astype(np.float32)
+        # columns
+        predicted_joints = (
+            ["q1", "q2", "q3", "q4", "q5", "q6"] if n_out == 6 else ["q4", "q5", "q6"]
+        )
+        input_features = ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
+
+        # Make prediction
+        robot_state_df = robot_state_df.reset_index(drop=True)
+        valstopred = robot_state_df[input_features].to_numpy().astype(np.float32)
         pred = self.predict(valstopred)
 
-        # Recombine
-        pred = np.hstack((robot_state_df["step"].to_numpy().reshape(-1, 1), pred))
+        # Model can predict the corrected joints or the difference between robot joints and tracker joints
+        if model_output == "error":
+            corrected_j = pred + robot_state_df[predicted_joints].to_numpy()
+        else:
+            corrected_j = pred
 
-        if pred.shape[1] == 3 + 1:  # Partial output
-            corrected_joints_df = pd.DataFrame(pred, columns=["step", "q4", "q5", "q6"])
-            # Add first three joints from robot
+        corrected_j = np.hstack((robot_state_df["step"].to_numpy().reshape(-1, 1), corrected_j))
+
+        if n_out == 3:  # Only wrist joints corrected
+            corrected_joints_df = pd.DataFrame(corrected_j, columns=["step", "q4", "q5", "q6"])
             corrected_joints_df = pd.merge(
                 robot_state_df.loc[:, ["step", "q1", "q2", "q3"]], corrected_joints_df, on="step"
             )
-        else:
+        else:  # All joints corrected
             corrected_joints_df = pd.DataFrame(
-                pred, columns=["step", "q1", "q2", "q3", "q4", "q5", "q6"]
+                corrected_j, columns=["step", "q1", "q2", "q3", "q4", "q5", "q6"]
             )
+
             # Replace network insertion joint by robot
             corrected_joints_df = pd.concat(
                 (

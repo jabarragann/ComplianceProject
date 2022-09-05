@@ -80,8 +80,9 @@ if __name__ == "__main__":
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
     # root = study_root / "best_model5_temp" #epochs=260
     # root = study_root / "best_model7_psm2"  # epochs=4660
-    root = study_root / "best_model8_psm2_6"  # epochs=4660
+    root = study_root / "best_model9_6er"  # epochs=4660
     output_units = 6
+    network_output = "error"
     assert output_units in [3, 6]
     # data_path = Path("data/deep_learning_data/random_dataset.txt")
     data_path = Path("data/deep_learning_data/psm2_rec20.csv")
@@ -117,19 +118,26 @@ if __name__ == "__main__":
         log.info("{:20s}: {}".format(key, value))
         params_dict[key] = value
     params_dict["n_out"] = output_units
+    params_dict["output"] = network_output
 
     # ------------------------------------------------------------
     # Data loading and manipulation
     # ------------------------------------------------------------
     full_output = output_units == 6
-    train_dataset = JointsDataset1(data_path, mode="train", full_output=full_output)
+    train_dataset = JointsDataset1(
+        data_path, mode="train", full_output=full_output, output=network_output
+    )
 
     normalizer = Normalizer(train_dataset.X)
     normalizer.to_json(root / "normalizer.json")
     train_dataset.normalizer = normalizer
     pickle.dump(normalizer, open(root / "normalizer.pkl", "wb"))
     valid_dataset = JointsDataset1(
-        data_path, mode="valid", normalizer=normalizer, full_output=full_output
+        data_path,
+        mode="valid",
+        normalizer=normalizer,
+        full_output=full_output,
+        output=network_output,
     )
     # test_dataset = JointsDataset1(data_path, mode="test", normalizer=normalizer)
     log.info(f"Train dataset size: {len(train_dataset)}")

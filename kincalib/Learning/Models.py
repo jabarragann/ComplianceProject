@@ -84,7 +84,7 @@ class CustomMLP(nn.Module):
 
 class JointCorrectionNet(nn.Module):
     default_architecture = dict(
-        n_layers=1, n_units_l0=140, dropout_l0=0.009299938244271444, n_out=3
+        n_layers=1, n_units_l0=140, dropout_l0=0.009299938244271444, n_out=3, output="joints"
     )
 
     def __init__(self, model_def: dict = None) -> None:
