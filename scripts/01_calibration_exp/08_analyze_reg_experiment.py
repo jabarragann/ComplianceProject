@@ -6,6 +6,7 @@ Points in the calibration phantom were touch with the PSM in order from 1-9 and 
 Point 7-D were not collected. This give us a total of 10.
 """
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -76,13 +77,15 @@ def plot_point_cloud(xs, ys, zs, labels=None):
 
     plt.show()
 
+def main():
 
-if __name__ == "__main__":
+    log.info(f"path: {args.root}")
+    log.info(f"model name: {args.modelname}\n")
 
     psm_kin = DvrkPsmKin()  # Forward kinematic model
 
     # Load calibration values
-    root = Path("./data/03_replay_trajectory/d04-rec-23-trajrand/") 
+    root = Path(args.root) 
     registration_data_path = root / "registration_results"
     registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
     T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
@@ -92,40 +95,14 @@ if __name__ == "__main__":
     wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
     # Load experimental data
-    data_dir = root / "registration_exp/registration_with_phantom2/test_trajectories/"
+    data_dir = root / "registration_exp/registration_with_phantom/test_trajectories/"
 
     log.info(f"loading registration values from {registration_data_path}")
     log.info(f"loading data from {data_dir.parent}")
 
-    # # load neural network
-    # study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/regression_study1.pkl")
-    # root = study_root.parent / "best_model5_temp"
-    # log = Logger("main_retrain").log
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2") / args.modelname
 
-    # if (study_root).exists():
-    #     log.info(f"Load: {study_root}")
-    #     study = pickle.load(open(study_root, "rb"))
-    # else:
-    #     log.error("no study")
-
-    # best_trial: optuna.Trial = study.best_trial
-    # normalizer = pickle.load(open(root / "normalizer.pkl", "rb"))
-    # model = CustomMLP.define_model(best_trial)
-    # model = model.cuda()
-    # model = model.eval()
-
-    root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model5_temp") 
-    # root = Path(f"data/deep_learning_data/Studies/TestStudy2/best_model6_psm2") 
     inference_pipeline = InferencePipeline(root)
-
-    # # Check for checkpoints
-    # checkpath = root / "final_checkpoint.pt"
-    # if checkpath.exists():
-    #     checkpoint, model, _ = CheckpointHandler.load_checkpoint_with_model(
-    #         checkpath, model, None, map_location="cuda"
-    #     )
-    # else:
-    #     log.error("no model")
 
     # Output df
     values_df_cols = [
@@ -260,3 +237,16 @@ if __name__ == "__main__":
 
     all_experiment_df = pd.concat(all_experiment_df)
     all_experiment_df.to_csv(registration_data_path / "registration_with_phantom.csv", index=None)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # fmt:off
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-traj01", 
+                    help="This directory must a registration_results subdir contain a calibration .json file.") 
+    parser.add_argument('-m','--modelname', type=str,default=False,required=True \
+                        ,help="Name of deep learning model to use.")
+
+    # fmt:on
+    args = parser.parse_args()
+    main()

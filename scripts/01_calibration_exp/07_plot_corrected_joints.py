@@ -42,25 +42,26 @@ def main(testid: int):
     # ------------------------------------------------------------
     root = Path(args.root)
 
-    if args.test:
-        robot_cp_p = root / f"test_trajectories/{testid:02d}" / "robot_cp.txt"
-    else:
-        robot_cp_p = root / "robot_mov" / "robot_cp.txt"
+    # Src paths
+    if args.test:  # Test trajectories
+        data_p = Path(args.datadir) if args.datadir is not None else root
+        data_p = data_p / f"test_trajectories/{testid:02d}"
+    else:  # Calibration points
+        data_p = root / "robot_mov"
 
-    dst_p = robot_cp_p.parent
-    dst_p = dst_p / "result"
+    data_p = data_p / "result"
     registration_data_path = root / "registration_results"
     log.info(f"Loading registration .json from {registration_data_path}")
 
     # ------------------------------------------------------------
     # Read calculated joint values
     # ------------------------------------------------------------
-    if (dst_p / "robot_joints.txt").exists():
-        robot_df = pd.read_csv(dst_p.parent / "robot_jp.txt", index_col=None)
-        tracker_df = pd.read_csv(dst_p / "tracker_joints.txt", index_col=None)
-        opt_df = pd.read_csv(dst_p / "opt_error.txt", index_col=None)
+    if (data_p / "robot_joints.txt").exists():
+        robot_df = pd.read_csv(data_p.parent / "robot_jp.txt", index_col=None)
+        tracker_df = pd.read_csv(data_p / "tracker_joints.txt", index_col=None)
+        opt_df = pd.read_csv(data_p / "opt_error.txt", index_col=None)
     else:
-        log.info(f"robot_joints.txt file not found in {dst_p}")
+        log.info(f"robot_joints.txt file not found in {data_p}")
         exit()
 
     # ------------------------------------------------------------
@@ -126,6 +127,8 @@ if __name__ == "__main__":
     parser.add_argument('--testid', nargs='*', help='test trajectories to generate', required=True, type=int)
     parser.add_argument('-m','--modelname', type=str,default=False,required=True \
                         ,help="Name of deep learning model to use.")
+    parser.add_argument("--datadir", default = None, type=str, help="Use data in a different directory. Only" 
+                            "used with the --testdata option.")
     parser.add_argument( '-l', '--log', type=str, default="DEBUG", help="log level") 
     parser.add_argument('-p','--plot', action='store_true',default=False \
                         ,help="Plot optimization error and joints plots.")
