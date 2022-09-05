@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 import numpy as np
-
+import pandas as pd
 import torch
 from kincalib.Learning.Dataset2 import Normalizer
 from kincalib.Learning.Models import JointCorrectionNet
@@ -40,7 +40,57 @@ class InferencePipeline:
         x_norm = torch.from_numpy(x_norm).cuda().float()
         x_norm = x_norm.cuda()
         pred = self.model(x_norm).cpu().detach().numpy()
+
         return pred
+
+    def correct_joints(self, robot_state_df: pd.DataFrame) -> pd.DataFrame:
+        """Correct joints using neural network model
+
+        Parameters
+        ----------
+        robot_state_df : pd.DataFrame
+            Dataframe containing the robot state. Expects the columns:
+
+            ["step", "q1", "q2", "q3", "q4", "q5", "q6","t1", "t2", "t3", "t4", "t5", "t6"]
+
+        Returns
+        -------
+        corrected_joints: pd.DataFrame
+            Dataframe of corrected joints with columns:
+
+            ["step","q1", "q2", "q3", "q4", "q5", "q6"]
+
+        """
+
+        cols = ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
+
+        valstopred = robot_state_df[cols].to_numpy().astype(np.float32)
+        pred = self.predict(valstopred)
+
+        # Recombine
+        pred = np.hstack((robot_state_df["step"].to_numpy().reshape(-1, 1), pred))
+
+        if pred.shape[1] == 3 + 1:  # Partial output
+            corrected_joints_df = pd.DataFrame(pred, columns=["step", "q4", "q5", "q6"])
+            # Add first three joints from robot
+            corrected_joints_df = pd.merge(
+                robot_state_df.loc[:, ["step", "q1", "q2", "q3"]], corrected_joints_df, on="step"
+            )
+        else:
+            corrected_joints_df = pd.DataFrame(
+                pred, columns=["step", "q1", "q2", "q3", "q4", "q5", "q6"]
+            )
+            # Replace network insertion joint by robot
+            corrected_joints_df = pd.concat(
+                (
+                    corrected_joints_df[["step", "q1", "q2"]],
+                    robot_state_df["q3"],
+                    corrected_joints_df[["q4", "q5", "q6"]],
+                ),
+                axis=1,
+            )
+
+        return corrected_joints_df
 
 
 if __name__ == "__main__":

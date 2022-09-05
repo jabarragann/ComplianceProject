@@ -28,7 +28,7 @@ def plot_joints(robot_df, tracker_df, pred_df):
             axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
             axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
 
-            if i >2:
+            if f"q{i+1}" in pred_df:
                 axes[i].plot(pred_df['step'].to_numpy(),pred_df[f"q{i+1}"].to_numpy(), color="green")
                 axes[i].plot(pred_df['step'].to_numpy(),pred_df[f"q{i+1}"].to_numpy(), marker="*", linestyle="None", color="green", label="predicted")
 
@@ -70,24 +70,16 @@ def main(testid: int):
     model_path = Path(f"data/deep_learning_data/Studies/TestStudy2")/args.modelname 
     inference_pipeline = InferencePipeline(model_path)
 
-    # Correct joints with neural net 
-    cols= ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
-    valstopred = robot_df[cols].to_numpy().astype(np.float32)
-    pred =  inference_pipeline.predict(valstopred)
-    pred = np.hstack((robot_df["step"].to_numpy().reshape(-1,1),pred))
-    pred_df = pd.DataFrame(pred,columns=["step", "q4", "q5", "q6"])
+    network_df = inference_pipeline.correct_joints(robot_state_df=robot_df)
 
     # Calculate results 
     robot_error_metrics = CalibrationMetrics("robot",robot_df, tracker_df, opt_df)
-
-    network_df = pd.merge(robot_df.loc[:,["step","q1","q2","q3"]], pred_df, on="step")
     network_error_metrics = CalibrationMetrics("network", network_df, tracker_df,opt_df )
 
     # Create results table
     table = ResultsTable()
     table.add_data(robot_error_metrics.create_error_dict())
     net_dict = network_error_metrics.create_error_dict() 
-    [net_dict.pop(k,None) for k in ["q1","q2","q3"]] # Remove first three joints for the table.
     table.add_data(net_dict)
 
     print("")
@@ -99,7 +91,7 @@ def main(testid: int):
 
     # plot
     if args.plot:
-        plot_joints(robot_df, tracker_df, pred_df)
+        plot_joints(robot_df, tracker_df, network_df)
         fig, ax = plt.subplots(2, 1)
         CalibrationUtils.create_histogram(
             opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
