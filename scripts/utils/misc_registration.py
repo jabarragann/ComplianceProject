@@ -142,8 +142,10 @@ def main():
     log.info(f"available tracker point {tracker_df.shape}")
 
     # Filter data points with available tracker positions
-    robot_df = robot_df.loc[robot_df["step"].isin(tracker_df["step"].to_list())]
-    opt_df = opt_df.loc[opt_df["step"].isin(tracker_df["step"].to_list())]
+    robot_df = robot_df.loc[robot_df["step"].isin(tracker_df["step"].to_list())].reset_index(
+        drop=True
+    )
+    opt_df = opt_df.loc[opt_df["step"].isin(tracker_df["step"].to_list())].reset_index(drop=True)
 
     # Calculate phantom cp
     phantom_cp = []
@@ -161,38 +163,39 @@ def main():
     tracker_cp = psm_kin.fkine(tracker_df[["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]].to_numpy())
     tracker_cp = extract_cartesian_xyz(tracker_cp.data)
 
-    # # Calculate network cp - with 3 joint ouput
+    # Calculate network cp
+    network_jp1 = inference_pipeline.correct_joints(robot_df)
+    network_jp2 = pd.merge(
+        tracker_df.loc[:, ["step", "tq1", "tq2", "tq3"]],
+        network_jp1[["step", "q4", "q5", "q6"]],
+        on="step",
+    )
+    # With robot base joints
+    network_jp1 = network_jp1.drop("step", axis=1).to_numpy()
+    network_cp1 = psm_kin.fkine(network_jp1)
+    network_cp1 = extract_cartesian_xyz(network_cp1.data)
+
+    # With tracker base joints
+    network_jp2 = network_jp2.drop("step", axis=1).to_numpy()
+    network_cp2 = psm_kin.fkine(network_jp2)
+    network_cp2 = extract_cartesian_xyz(network_cp2.data)
+
+    # # Calculate network cp - with 6 joint ouput
     # input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
     # input_cols += ["t1", "t2", "t3", "t4", "t5", "t6"]
     # robot_state = robot_df[input_cols].to_numpy()
     # network_jp = inference_pipeline.predict(robot_state)
 
-    # # With robot base joints
-    # complete_network_jp1 = np.hstack((robot_df[["q1", "q2", "q3"]].to_numpy(), network_jp))
-    # network_cp1 = psm_kin.fkine(complete_network_jp1)
+    # # With only network
+    # network_cp1 = psm_kin.fkine(network_jp)
     # network_cp1 = extract_cartesian_xyz(network_cp1.data)
 
-    # # With tracker base joints
-    # complete_network_jp2 = np.hstack((tracker_df[["tq1", "tq2", "tq3"]].to_numpy(), network_jp))
+    # # With network and robot insertion
+    # complete_network_jp2 = np.hstack(
+    #     (network_jp[:, 0:2], robot_df["q3"].to_numpy().reshape(-1, 1), network_jp[:, 3:6])
+    # )
     # network_cp2 = psm_kin.fkine(complete_network_jp2)
     # network_cp2 = extract_cartesian_xyz(network_cp2.data)
-
-    # Calculate network cp - with 6 joint ouput
-    input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
-    input_cols += ["t1", "t2", "t3", "t4", "t5", "t6"]
-    robot_state = robot_df[input_cols].to_numpy()
-    network_jp = inference_pipeline.predict(robot_state)
-
-    # With only network
-    network_cp1 = psm_kin.fkine(network_jp)
-    network_cp1 = extract_cartesian_xyz(network_cp1.data)
-
-    # With network and robot insertion
-    complete_network_jp2 = np.hstack(
-        (network_jp[:, 0:2], robot_df["q3"].to_numpy().reshape(-1, 1), network_jp[:, 3:6])
-    )
-    network_cp2 = psm_kin.fkine(complete_network_jp2)
-    network_cp2 = extract_cartesian_xyz(network_cp2.data)
 
     # Print results
     log.info(f"Results")
@@ -204,8 +207,22 @@ def main():
     correction = np.array(
         [180 / np.pi, 180 / np.pi, 1000, 180 / np.pi, 180 / np.pi, 180 / np.pi]
     ).reshape((1, -1))
-    log.info(f"net1 \n{(tracker_df.drop('step', axis=1).to_numpy() - network_jp) * correction}")
-    log.info(f"net2 \n{(tracker_df.drop('step', axis=1).to_numpy() - complete_network_jp2) * correction}")
+
+    robot_error_mat = (
+        tracker_df.drop("step", axis=1).to_numpy()
+        - robot_df[["q1", "q2", "q3", "q4", "q5", "q6"]].to_numpy()
+    ) * correction
+    net1_error_mat = (tracker_df.drop("step", axis=1).to_numpy() - network_jp1) * correction
+    net2_error_mat = (tracker_df.drop("step", axis=1).to_numpy() - network_jp2) * correction
+    log.info(f"net1 \n{net1_error_mat}")
+    log.info(f"mean net1 \n{net1_error_mat.mean(axis=0)}")
+    log.info(f"std net1 \n{net1_error_mat.std(axis=0)}")
+    log.info(f"net2 \n{net2_error_mat}")
+    log.info(f"mean net2 \n{net2_error_mat.mean(axis=0)}")
+    log.info(f"std net2 \n{net2_error_mat.std(axis=0)}")
+
+    log.info(f"mean robot \n{robot_error_mat.mean(axis=0)}")
+    log.info(f"std robot \n{robot_error_mat.std(axis=0)}")
 
 
 if __name__ == "__main__":
