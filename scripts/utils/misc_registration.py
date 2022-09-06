@@ -180,29 +180,12 @@ def main():
     network_cp2 = psm_kin.fkine(network_jp2)
     network_cp2 = extract_cartesian_xyz(network_cp2.data)
 
-    # # Calculate network cp - with 6 joint ouput
-    # input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
-    # input_cols += ["t1", "t2", "t3", "t4", "t5", "t6"]
-    # robot_state = robot_df[input_cols].to_numpy()
-    # network_jp = inference_pipeline.predict(robot_state)
-
-    # # With only network
-    # network_cp1 = psm_kin.fkine(network_jp)
-    # network_cp1 = extract_cartesian_xyz(network_cp1.data)
-
-    # # With network and robot insertion
-    # complete_network_jp2 = np.hstack(
-    #     (network_jp[:, 0:2], robot_df["q3"].to_numpy().reshape(-1, 1), network_jp[:, 3:6])
-    # )
-    # network_cp2 = psm_kin.fkine(complete_network_jp2)
-    # network_cp2 = extract_cartesian_xyz(network_cp2.data)
-
     # Print results
     log.info(f"Results")
     print_reg_error(phantom_cp.T, robot_cp.T, title="robot FRE")
     print_reg_error(phantom_cp.T, tracker_cp.T, title="tracker FRE")
     print_reg_error(phantom_cp.T, network_cp1.T, title="network1 FRE")
-    print_reg_error(phantom_cp.T, network_cp2.T, title="network2 FRE")
+    print_reg_error(phantom_cp.T, network_cp2.T, title="network2 FRE (Cheating)")
 
     # correction = np.array(
     #     [180 / np.pi, 180 / np.pi, 1000, 180 / np.pi, 180 / np.pi, 180 / np.pi]

@@ -33,6 +33,7 @@ if __name__ == "__main__":
     reg_errors = pd.DataFrame(["test_id", "robot_error", "tracker_error", "neural_net_error"])
 
     final_df = []
+    test_id.sort()
     for i in test_id:
         log.info(f"Test id {i}")
 
@@ -60,7 +61,9 @@ if __name__ == "__main__":
             temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T,
             "Registration error neural_net (mm)",
         )
-        final_df.append(pd.DataFrame({"test_id": i, "errors": error_list, "type": "neural_network_error"}))
+        final_df.append(
+            pd.DataFrame({"test_id": i, "errors": error_list, "type": "neural_network_error"})
+        )
 
     final_df = pd.concat(final_df)
     final_df["errors"] *= 1000

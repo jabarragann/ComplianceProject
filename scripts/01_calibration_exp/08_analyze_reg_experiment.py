@@ -8,25 +8,17 @@ Point 7-D were not collected. This give us a total of 10.
 
 import argparse
 import json
-import os
 from pathlib import Path
-import pickle
-from click import progressbar
-import optuna
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-import torch
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 from kincalib.Learning.InferencePipeline import InferencePipeline
-from kincalib.Learning.Models import CustomMLP
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
-from kincalib.utils.IcpSolver import icp
 from kincalib.utils.Frame import Frame
 from kincalib.utils.Logger import Logger
-from pytorchcheckpoint.checkpoint import CheckpointHandler
 
 log = Logger(__name__).log
 
@@ -121,9 +113,7 @@ def main():
         "neuralnet_y",
         "neuralnet_z",
     ]
-    values_df = pd.DataFrame(columns=values_df_cols)
 
-    files_dict = {}
     all_experiment_df = []
     for dir in data_dir.glob("*/robot_cp.txt"):
         test_id = dir.parent.name
@@ -159,22 +149,13 @@ def main():
             )
             cartesian_tracker = extract_cartesian_xyz(cartesian_tracker.data)
 
-            # Calculate neural network joints
+            # Calculate network corrected joints
             #fmt:off 
-            input_cols = ["q1", "q2", "q3", "q4", "q5", "q6"] + [
+            joint_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
+            input_cols = ["step","q1", "q2", "q3", "q4", "q5", "q6"] + [
                 "t1", "t2", "t3", "t4", "t5", "t6", ]#fmt:on
-
-            # robot_state = torch.Tensor(robot_jp_df.iloc[idx][input_cols].to_numpy())
-            robot_state = robot_jp_df.iloc[idx][input_cols].to_numpy()
-            robot_state = robot_state.reshape(1,12)
-            # norm_robot_state = normalizer(robot_state)
-            # output = model(norm_robot_state.cuda())
-            # output = output.detach().cpu().numpy().squeeze()
-            output = inference_pipeline.predict(robot_state)
-
-            output = output.squeeze()
-            corrected_jp = np.concatenate((robot_jp_df.iloc[idx][["q1","q2","q3"]].to_numpy(),output))
-            cartesian_network = psm_kin.fkine( corrected_jp )
+            corrected_jp = inference_pipeline.correct_joints(robot_jp_df.iloc[idx][input_cols].to_frame().T)
+            cartesian_network = psm_kin.fkine( corrected_jp[joint_cols].to_numpy() )
             cartesian_network= extract_cartesian_xyz(cartesian_network.data)
 
             ## Cartesian tracker is  single line!!
@@ -242,7 +223,7 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt:off
-    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-traj01", 
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
                     help="This directory must a registration_results subdir contain a calibration .json file.") 
     parser.add_argument('-m','--modelname', type=str,default=False,required=True \
                         ,help="Name of deep learning model to use.")
