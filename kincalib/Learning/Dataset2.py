@@ -64,8 +64,8 @@ class JointsDataset1(Dataset):
         else:
             output_cols = ["tq4", "tq5", "tq6"]
 
-        # Filter outliers with the optimization error of q56 lower than 1.4mm
-        self.data_df = self.data_df.loc[self.data_df["opt"] < 1.4 / 1000]
+        # Filter outliers with the optimization error of q56 lower than 3.0 (previous 1.4mm)
+        self.data_df = self.data_df.loc[self.data_df["opt"] < 3.0 / 1000]
         self.X = self.data_df[input_cols].to_numpy()
         self.Y = self.data_df[output_cols].to_numpy()
 

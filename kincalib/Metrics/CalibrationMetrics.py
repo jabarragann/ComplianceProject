@@ -51,7 +51,7 @@ class CalibrationMetrics:
 
     def __post_init__(self):
 
-        threshold = 0.002
+        threshold = 0.003
 
         # Use the residual to filter tracker values with high errors.
         valid_steps = self.gt_error_df.loc[self.gt_error_df["q56res"] < threshold]["step"]
