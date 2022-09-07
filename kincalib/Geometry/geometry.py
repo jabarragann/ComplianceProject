@@ -13,7 +13,10 @@ np.set_printoptions(precision=3, suppress=True)
 
 
 def dist_circle3_plane(circle: Circle3D, plane: Plane3D) -> np.ndarray:
-    """Simple derivation to find closest distance from circle to plane.
+    """
+    Return closest point to plane that lies in circle.
+
+    Simple derivation to find closest distance from circle to plane.
     WARNING: A simplification was done to obtain an easier formula this might not work for the general case.
     THIS FUNCTION REQUIRES MORE TESTING
 
@@ -67,7 +70,9 @@ def rodrigues_rot(P, n0, n1):
     # Compute rotated points
     P_rot = np.zeros((len(P), 3))
     for i in range(len(P)):
-        P_rot[i] = P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
+        P_rot[i] = (
+            P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
+        )
 
     return P_rot
 
@@ -227,7 +232,7 @@ class Circle3D:
     @staticmethod
     def fit_circle_2d(x, y, w=[]):
         A = np.array([x, y, np.ones(len(x))]).T
-        b = x ** 2 + y ** 2
+        b = x**2 + y**2
 
         # Modify A,b for weighted least squares
         if len(w) == len(x):
@@ -241,7 +246,7 @@ class Circle3D:
         # Get circle parameters from solution c
         xc = c[0] / 2
         yc = c[1] / 2
-        r = np.sqrt(c[2] + xc ** 2 + yc ** 2)
+        r = np.sqrt(c[2] + xc**2 + yc**2)
         return xc, yc, r
 
 
