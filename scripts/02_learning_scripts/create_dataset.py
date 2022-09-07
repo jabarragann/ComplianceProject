@@ -62,11 +62,12 @@ def create_nan_list():
     return a.tolist()
 
 
-# TODO: I am not filtering the bad tracker points!
 def main():
     # ------------------------------------------------------------
     # Create dataset
     # -----------------------------------------------------------
+    # Add all the points here filter with the dataset class
+
     dataset_record = LearningRecord(dst_filename)
     for d in dataset_def:
         p = d["path"] / "test_trajectories"

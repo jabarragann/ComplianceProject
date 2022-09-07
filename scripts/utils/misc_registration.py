@@ -127,7 +127,7 @@ def main():
     inference_pipeline = InferencePipeline(model_path)
 
     # Load experimental data
-    data_p = root / "registration_exp/registration_with_phantom/test_trajectories/01/result"
+    data_p = root / "registration_exp/registration_with_phantom/test_trajectories/02/result"
 
     if (data_p / "robot_joints.txt").exists():
         robot_df = pd.read_csv(data_p.parent / "robot_jp.txt", index_col=None)

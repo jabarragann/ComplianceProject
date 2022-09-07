@@ -1,3 +1,5 @@
+import argparse
+from pathlib import Path
 import pandas as pd
 import seaborn as sns
 from kincalib.utils.CmnUtils import mean_std_str
@@ -26,7 +28,15 @@ def print_reg_error(A, B, title: str):
 
 
 if __name__ == "__main__":
-    results_df = "data/03_replay_trajectory/d04-rec-20-trajsoft/registration_results/registration_with_phantom.csv"
+
+    parser = argparse.ArgumentParser()
+    # fmt:off
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
+                    help="This directory must a registration_results subdir contain a calibration .json file.") 
+    # fmt:on
+    args = parser.parse_args()
+
+    results_df = Path(args.root) / "registration_results/registration_with_phantom.csv"
     # results_df = "data/03_replay_trajectory/d04-rec-23-trajrand/registration_results/registration_with_phantom.csv"
     results_df = pd.read_csv(results_df)
 
