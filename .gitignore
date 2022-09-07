@@ -1,5 +1,6 @@
 
 # Project especific
+/data3newcalib
 /data2
 /data_backups
 *.log

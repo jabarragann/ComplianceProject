@@ -56,6 +56,22 @@ log = Logger(__name__).log
 #     return np.array(transf)
 
 
+def my_trnorm(a) -> np.ndarray:
+    """Required to avoid weird issue with numpy cross product and pylance.
+
+    https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
+    """
+    return trnorm(a)
+
+
+def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Required to avoid weird issue with numpy cross product and pylance.
+
+    https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
+    """
+    return np.cross(a, b)
+
+
 def fkins_v2(q5, q6):
     """Angles especified in rad"""
     E = (
@@ -141,13 +157,13 @@ class JointEstimator:
         T_R_F3 = Frame.init_from_matrix(self.psm_kin.fkine_chain([q1, q2, q3], ignore_base=True))
         T_T_F3 = self.T_TR @ T_R_F3
         # Re orthogonalize.
-        T_T_F3 = trnorm(trnorm(np.array(T_T_F3)))
+        T_T_F3 = my_trnorm(my_trnorm(np.array(T_T_F3)))
 
         # Calculate pitch frame in tracker space.
         # This is the target pose
         T_TP = T_TM @ self.T_MP
         # Re orthogonalize.
-        T_TP = trnorm(trnorm(np.array(T_TP)))
+        T_TP = my_trnorm(my_trnorm(np.array(T_TP)))
 
         ##CALCULATE Q4V1: VIA OPTIMIZATION
         ## Create a 1 joint robot
@@ -167,7 +183,7 @@ class JointEstimator:
         va = T_T_F3[:3, 0]  # x3 axis (see DVRK manual)
         vb = T_TP[:3, 0]  # x4 axis (see DVRK manual)
         vn = T_T_F3[:3, 2]  # Vector pointing along instrument shaft
-        q4_est = arctan2(np.cross(va, vb).dot(vn), np.dot(va, vb))
+        q4_est = arctan2(cross_product(va, vb).dot(vn), np.dot(va, vb))
         # log.info(f"Solution: {q4_est}")
         # log.info(f"Residual: {q4_error}")
 
@@ -394,17 +410,17 @@ class CalibrationUtils:
             # Optimization residuals
             d = np.array([step, q4res, q56res]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_opt)
-            df_opt = df_opt.append(new_pt)
+            df_opt = pd.concat((df_opt,new_pt))
             # opt_error.append(evaluation)
 
             # Save data
             d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_robot)
-            df_robot = df_robot.append(new_pt)
+            df_robot = pd.concat((df_robot,new_pt))
 
             d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_tracker)
-            df_tracker = df_tracker.append(new_pt)
+            df_tracker = pd.concat((df_tracker, new_pt))
 
             # if step > 40:
             #     break
