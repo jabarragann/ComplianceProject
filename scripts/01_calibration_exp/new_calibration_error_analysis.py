@@ -5,6 +5,7 @@ import argparse
 from re import I
 import pandas as pd
 from pathlib import Path
+import numpy as np
 
 # ROS and DVRK imports
 import seaborn as sns
@@ -29,12 +30,14 @@ class CalibrationErrorAnalysis:
     # def boxandstrip(self,df,y,ax):
 
     def plot_error(self):
-        fig, ax = plt.subplots(2, 3)
+        fig, ax = plt.subplots(5, 3)
+        subplot_params = dict( top=0.94, bottom=0.055, left=0.095, right=0.94, hspace=0.24, wspace=0.405)
+        plt.subplots_adjust(**subplot_params)
 
         # error area
-        temp_df = self.registration_data_df[["error_area"]]
-        sns.boxplot(data=temp_df, y="error_area", ax=ax[0, 0])
-        sns.stripplot(data=temp_df, y="error_area", ax=ax[0, 0], color="black")
+        temp_df = self.registration_data_df[["area"]]
+        sns.boxplot(data=temp_df, y="area", ax=ax[0, 0])
+        sns.stripplot(data=temp_df, y="area", ax=ax[0, 0], color="black")
 
         # pitch2yaw
         temp = self.calibration_constants_df["pitch2yaw1"].to_list()
@@ -53,12 +56,61 @@ class CalibrationErrorAnalysis:
         sns.boxplot(data=temp_df, y="oz1_M", ax=ax[1, 2])
         sns.stripplot(data=temp_df, y="oz1_M", ax=ax[1, 2], dodge=True, color="black")
 
-        # temp_df = self.calibration_constants_df[["ox1_M", "oy1_M", "oz1_M"]]
-        # temp_df = pd.melt(
-        #     temp_df, value_vars=["ox1_M", "oy1_M", "oz1_M"], var_name="coord", value_name="value"
-        # )
-        # sns.boxplot(data=temp_df, x="coord", y="value", ax=ax[2])
-        # sns.stripplot(data=temp_df, x="coord", y="value", ax=ax[2], dodge=True, color="black")
+        # yaw location in Yaw 
+        #fmt:off
+        yaw_fid_cols = [
+            "yaw_fidx1_Y", "yaw_fidy1_Y", "yaw_fidz1_Y",
+            "yaw_fidx2_Y", "yaw_fidy2_Y", "yaw_fidz2_Y" ] #fmt:on
+
+        temp_df = self.calibration_constants_df[yaw_fid_cols].to_numpy() * 1000
+        temp_df = np.vstack((temp_df[:,:3],temp_df[:,3:]))
+        temp_df = pd.DataFrame(temp_df , columns=["yaw_fidx_Y", "yaw_fidy_Y", "yaw_fidz_Y"] ) 
+
+        sns.boxplot(data=temp_df, y="yaw_fidx_Y", ax=ax[2, 0])
+        sns.stripplot(data=temp_df, y="yaw_fidx_Y", ax=ax[2, 0], dodge=True, color="black")
+        sns.boxplot(data=temp_df, y="yaw_fidy_Y", ax=ax[2, 1])
+        sns.stripplot(data=temp_df, y="yaw_fidy_Y", ax=ax[2, 1], dodge=True, color="black")
+        sns.boxplot(data=temp_df, y="yaw_fidz_Y", ax=ax[2, 2])
+        sns.stripplot(data=temp_df, y="yaw_fidz_Y", ax=ax[2, 2], dodge=True, color="black")
+
+        # pitch axis in marker 
+        pitch_axis_cols = [ "px1_M", "py1_M", "pz1_M", 
+                            "px2_M", "py2_M", "pz2_M" ] #fmt:on
+
+        temp_df = self.calibration_constants_df[pitch_axis_cols].to_numpy()
+        temp_df = np.vstack((temp_df[:,:3],temp_df[:,3:]))
+        temp_df = pd.DataFrame(temp_df , columns=["px1_M", "py1_M", "pz1_M"] ) 
+
+        id =1
+        sns.boxplot(data=temp_df, y=f"px{id}_M", ax=ax[3, 0])
+        sns.stripplot(data=temp_df, y=f"px{id}_M", ax=ax[3, 0], dodge=True, color="black")
+        sns.boxplot(data=temp_df, y=f"py{id}_M", ax=ax[3, 1])
+        sns.stripplot(data=temp_df, y=f"py{id}_M", ax=ax[3, 1], dodge=True, color="black")
+        sns.boxplot(data=temp_df, y=f"pz{id}_M", ax=ax[3, 2])
+        sns.stripplot(data=temp_df, y=f"pz{id}_M", ax=ax[3, 2], dodge=True, color="black")
+
+        # id =2
+        # sns.boxplot(data=temp_df, y=f"px{id}_M", ax=ax[4, 0])
+        # sns.stripplot(data=temp_df, y=f"px{id}_M", ax=ax[4, 0], dodge=True, color="black")
+        # sns.boxplot(data=temp_df, y=f"py{id}_M", ax=ax[4, 1])
+        # sns.stripplot(data=temp_df, y=f"py{id}_M", ax=ax[4, 1], dodge=True, color="black")
+        # sns.boxplot(data=temp_df, y=f"pz{id}_M", ax=ax[4, 2])
+        # sns.stripplot(data=temp_df, y=f"pz{id}_M", ax=ax[4, 2], dodge=True, color="black")
+
+        # roll axis in marker
+        roll_axis_cols = [ "rx1_M", "ry1_M", "rz1_M", 
+                           "rx2_M", "ry2_M", "rz2_M" ] #fmt:on
+
+        temp_df = self.calibration_constants_df[roll_axis_cols].to_numpy()
+        temp_df = np.vstack((temp_df[:,:3],temp_df[:,3:]))
+        temp_df = pd.DataFrame(temp_df , columns=["rx1_M", "ry1_M", "rz1_M"] ) 
+
+        sns.boxplot(data=temp_df, y="rx1_M", ax=ax[4, 0])
+        sns.stripplot(data=temp_df, y="rx1_M", ax=ax[4, 0], dodge=True, color="black")
+        sns.boxplot(data=temp_df, y="ry1_M", ax=ax[4, 1])
+        sns.stripplot(data=temp_df, y="ry1_M", ax=ax[4, 1], dodge=True, color="black")
+        sns.boxplot(data=temp_df, y="rz1_M", ax=ax[4, 2])
+        sns.stripplot(data=temp_df, y="rz1_M", ax=ax[4, 2], dodge=True, color="black")
 
         plt.show()
 
@@ -69,8 +121,7 @@ def main():
     # ------------------------------------------------------------
 
     # Important paths
-    log_level = args.log
-    log = Logger("pitch_exp_analize2", log_level=log_level).log
+    log = Logger("pitch_exp_analize2").log
     root = Path(args.root)
 
     # Paths
@@ -90,10 +141,10 @@ if __name__ == "__main__":
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-23-trajrand", 
                     help="root dir") 
-    parser.add_argument( "--reset", action='store_true',default=False,  help="Re calculate error metrics") 
-    parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
-                    help="log level") 
     parser.add_argument('--dstdir', default='./data3newcalib', help='directory to save results')
+
+    # parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
+    #                 help="root dir") 
     # fmt:on
 
     args = parser.parse_args()

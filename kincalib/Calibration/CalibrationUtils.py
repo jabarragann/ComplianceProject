@@ -410,13 +410,13 @@ class CalibrationUtils:
             # Optimization residuals
             d = np.array([step, q4res, q56res]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_opt)
-            df_opt = pd.concat((df_opt,new_pt))
+            df_opt = pd.concat((df_opt, new_pt))
             # opt_error.append(evaluation)
 
             # Save data
             d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_robot)
-            df_robot = pd.concat((df_robot,new_pt))
+            df_robot = pd.concat((df_robot, new_pt))
 
             d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_tracker)
@@ -470,6 +470,6 @@ class CalibrationUtils:
         for p in cartesian_pose.data:
             posi = p[:3, 3]
             new_df = pd.DataFrame(posi.reshape(1, -1), columns=cols)
-            cartesian_df = cartesian_df.append(new_df)
+            cartesian_df = pd.concat((cartesian_df, new_df))
 
         return cartesian_df

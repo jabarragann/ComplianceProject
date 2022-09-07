@@ -1,33 +1,20 @@
-import tf_conversions.posemath as pm
-
 # Python imports
+import json
 from pathlib import Path
-import time
 import argparse
-import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import List, Tuple, Set
-from rich.logging import RichHandler
+from typing import Tuple
 from rich.progress import track
-from collections import defaultdict
-import re
-import json
 
 # ROS and DVRK imports
 from kincalib.Motion.DvrkKin import DvrkPsmKin
-import rospy
-from sensor_msgs.msg import JointState
-
-import matplotlib.pyplot as plt
 
 # kincalib module imports
 from kincalib.utils.Frame import Frame
 from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
+from kincalib.utils.ExperimentUtils import load_registration_data
 from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D, dist_circle3_plane
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
@@ -36,8 +23,6 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
 log = Logger("registration").log
-
-global_area_threshold = 1.2  # PREVIOUSLY < 0.5
 
 
 def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -49,6 +34,9 @@ def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def calculate_registration(df: pd.DataFrame, root: Path):
+
+    global_area_threshold = 1.2  # PREVIOUSLY < 0.5
+
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
@@ -76,64 +64,82 @@ def calculate_registration(df: pd.DataFrame, root: Path):
     return trans
 
 
-def calculate_pitch_to_marker(registration_data, other_values_dict=None):
-    registration_data = registration_data.loc[registration_data["area"] < global_area_threshold]
-    # calculate pitch orig in marker
-    pitch_orig = registration_data[["mox", "moy", "moz"]].to_numpy()
-    pitch_orig_mean = pitch_orig.mean(axis=0)
-    pitch_orig_std = pitch_orig.std(axis=0)
-    # calculate pitch axis in marker
-    pitch_axis = registration_data[["mpx", "mpy", "mpz"]].to_numpy()
-    pitch_axis_mean = pitch_axis.mean(axis=0)
-    pitch_axis_std = pitch_axis.std(axis=0)
-    # calculate roll axis in marker
-    roll_axis = registration_data[["mrx", "mry", "mrz"]].to_numpy()
-    roll_axis_mean = roll_axis.mean(axis=0)
-    roll_axis_std = roll_axis.std(axis=0)
-    # calculate fiducial in yaw
-    fiducial_yaw = registration_data[["yfx", "yfy", "yfz"]].to_numpy()
-    fiducial_yaw_mean = np.nanmean(fiducial_yaw, axis=0)
-    fiducial_yaw_std = np.nanstd(fiducial_yaw, axis=0)
-    # Calculate pitch2yaw
-    pitch2yaw = registration_data["pitch2yaw"].to_numpy()
-    pitch2yaw_mean = np.nanmean(pitch2yaw)
-    pitch2yaw_std = np.nanstd(pitch2yaw)
+def calculate_final_calibration(calibration_constants_df) -> Tuple[Frame, dict]:
+    """_summary_
 
-    other_values_dict["pitchaxis"] = pitch_axis_mean
-    other_values_dict["rollaxis"] = roll_axis_mean
-    other_values_dict["pitchorigin"] = pitch_orig_mean
-    other_values_dict["fiducial_yaw"] = fiducial_yaw_mean
-    other_values_dict["pitch2yaw"] = pitch2yaw_mean
+    Parameters
+    ----------
+    calibration_constants_df : _type_
+        _description_
+
+    Returns
+    -------
+    T_MP: Frame
+        _description_
+
+    calibration_dict: dict
+        __description_
+    """
+
+    calibration_dict = {}
+
+    # calculate pitch orig in marker
+    pitch_orig: np.ndarray = calibration_constants_df[["ox1_M", "oy1_M", "oz1_M"]].to_numpy()
+    pitch_orig_median = np.median(pitch_orig, axis=0)
+
+    # calculate pitch axis in marker
+    pitch_axis_cols = ["px1_M", "py1_M", "pz1_M", "px2_M", "py2_M", "pz2_M"]  # fmt:on
+    temp_df = calibration_constants_df[pitch_axis_cols].to_numpy()
+    pitch_axis = np.vstack((temp_df[:, :3], temp_df[:, 3:]))
+    pitch_axis_median = np.median(pitch_axis, axis=0)
+
+    # calculate roll axis in marker
+    roll_axis_cols = ["rx1_M", "ry1_M", "rz1_M", "rx2_M", "ry2_M", "rz2_M"]  # fmt:on
+    temp_df = calibration_constants_df[roll_axis_cols].to_numpy()
+    roll_axis = np.vstack((temp_df[:, :3], temp_df[:, 3:]))
+    roll_axis_median = np.median(roll_axis, axis=0)
+
+    # calculate fiducial in yaw
+    yaw_fid_cols = [
+        "yaw_fidx1_Y",
+        "yaw_fidy1_Y",
+        "yaw_fidz1_Y",
+        "yaw_fidx2_Y",
+        "yaw_fidy2_Y",
+        "yaw_fidz2_Y",
+    ]  # fmt:on
+    temp_df = calibration_constants_df[yaw_fid_cols].to_numpy()
+    yaw_fiducial = np.vstack((temp_df[:, :3], temp_df[:, 3:]))
+    yaw_fiducial_median = np.median(yaw_fiducial, axis=0)
+
+    # Calculate pitch2yaw
+    pitch2yaw = calibration_constants_df["pitch2yaw1"].to_list()
+    pitch2yaw += calibration_constants_df["pitch2yaw2"].to_list()
+    pitch2yaw_median = np.median(np.array(pitch2yaw))
+
+    calibration_dict["pitchaxis"] = pitch_axis_median
+    calibration_dict["rollaxis"] = roll_axis_median
+    calibration_dict["pitchorigin"] = pitch_orig_median
+    calibration_dict["fiducial_yaw"] = yaw_fiducial_median
+    calibration_dict["pitch2yaw"] = pitch2yaw_median
 
     # CRITICAL STEP OF THE IKIN CALCULATIONS
     # calculate transformation
     # ------------------------------------------------------------
-    # Version2
+    # Version2 - See frame 4 of DVRK dh parameters
     # pitch_axis aligned with y
     # roll_axis aligned with z
     # ------------------------------------------------------------
-    pitch_x_axis = np.cross(pitch_axis_mean, roll_axis_mean)
+    pitch_x_axis = cross_product(pitch_axis_median, roll_axis_median)
 
     pitch2marker_T = np.identity(4)
     pitch2marker_T[:3, 0] = pitch_x_axis
-    pitch2marker_T[:3, 1] = pitch_axis_mean
-    pitch2marker_T[:3, 2] = roll_axis_mean
-    pitch2marker_T[:3, 3] = pitch_orig_mean
-    # ------------------------------------------------------------
-    # Version1
-    # pitch_axis aligned with z
-    # roll_axis aligned with x
-    # ------------------------------------------------------------
-    # pitch_y_axis = np.cross(pitch_axis_mean, roll_axis_mean)
+    pitch2marker_T[:3, 1] = pitch_axis_median
+    pitch2marker_T[:3, 2] = roll_axis_median
+    pitch2marker_T[:3, 3] = pitch_orig_median
 
-    # pitch2marker_T = np.identity(4)
-    # pitch2marker_T[:3, 0] = roll_axis_mean
-    # pitch2marker_T[:3, 1] = pitch_y_axis
-    # pitch2marker_T[:3, 2] = pitch_axis_mean
-    # pitch2marker_T[:3, 3] = pitch_orig_mean
-
-    frame = Frame.init_from_matrix(pitch2marker_T)
-    return frame
+    T_MP = Frame.init_from_matrix(pitch2marker_T)
+    return T_MP, calibration_dict
 
 
 class RobotTrackerCalibration:
@@ -155,7 +161,7 @@ class RobotTrackerCalibration:
 
     # fmt: off
     cols_calib_constants = ["step",  "pitch2yaw1","pitch2yaw2",
-                            "ox_M", "oy_M", "oz_M", "error_area" 
+                            "ox_M", "oy_M", "oz_M", "area" 
                             "px1_M", "py1_M", "pz1_M", "px2_M", "py2_M", "pz2_M",
                             "rx1_M", "ry1_M", "rz1_M", "rx2_M", "ry2_M", "rz2_M",
                             "yaw_fidx1_Y", "yaw_fidy1_Y", "yaw_fidz1_Y",
@@ -279,7 +285,7 @@ class RobotTrackerCalibration:
 
                     pitch_orig_T_dict = {
                         "step": step,
-                        "error_area": area,
+                        "area": area,
                         "tpx": pitch_ori_T[0],
                         "tpy": pitch_ori_T[1],
                         "tpz": pitch_ori_T[2],
@@ -430,10 +436,10 @@ class RobotTrackerCalibration:
         # fmt: off
         calibration_constants_dict1 = dict(ox1_M=pitch_orig1[0], oy1_M=pitch_orig1[1], oz1_M=pitch_orig1[2],
                                            ox2_M=pitch_orig2[0], oy2_M=pitch_orig2[1], oz2_M=pitch_orig2[2])
-        calibration_constants_dict2 = dict(px1_M=pitch_ax1[0], py1_M=pitch_ax1[0], pz1_M=pitch_ax1[0],
+        calibration_constants_dict2 = dict(px1_M=pitch_ax1[0], py1_M=pitch_ax1[1], pz1_M=pitch_ax1[2],
                                            px2_M=pitch_ax2[0], py2_M=pitch_ax2[1], pz2_M=pitch_ax2[2])
-        calibration_constants_dict3 = dict(px1_M=roll_ax1[0], py1_M=roll_ax1[0], pz1_M=roll_ax1[0],
-                                           px2_M=roll_ax2[0], py2_M=roll_ax2[1], pz2_M=roll_ax2[2])
+        calibration_constants_dict3 = dict(rx1_M=roll_ax1[0], ry1_M=roll_ax1[1], rz1_M=roll_ax1[2],
+                                           rx2_M=roll_ax2[0], ry2_M=roll_ax2[1], rz2_M=roll_ax2[2])
         # fmt: on
         calibration_constants_dict = {
             **calibration_constants_dict1,
@@ -463,42 +469,47 @@ def main():
     # Obtain registration data
     if (registration_data_path / "robot_tracker_registration.csv").exists() and not args.reset:
         log.info("Loading registration data ...")
-        registration_data = pd.read_csv(registration_data_path / "robot_tracker_registration.csv")
+        registration_df = pd.read_csv(registration_data_path / "robot_tracker_registration.csv")
+        calibration_constants_df = pd.read_csv(registration_data_path / "calibration_constants.csv")
     else:
         log.info("Calculating registration data")
-        pitch_df, calibration_constants_df = RobotTrackerCalibration.obtain_registration_data(root)
+        (
+            registration_df,
+            calibration_constants_df,
+        ) = RobotTrackerCalibration.obtain_registration_data(root)
         # Save df
-        pitch_df.to_csv(registration_data_path / "robot_tracker_registration.csv", index=None)
+        registration_df.to_csv(
+            registration_data_path / "robot_tracker_registration.csv", index=None
+        )
         calibration_constants_df.to_csv(
             registration_data_path / "calibration_constants.csv", index=None
         )
 
-    # # Calculate registration
-    # robot2tracker_t = calculate_registration(registration_data, root)
-    # # Calculate marker to pitch transformation
-    # axis_dict = {}
-    # pitch2marker_t = calculate_pitch_to_marker(registration_data, other_values_dict=axis_dict)
+    # Calculate registration
+    robot2tracker_t = calculate_registration(registration_df, root)
+    # Calculate marker to pitch transformation
+    pitch2marker_t, axis_dict = calculate_final_calibration(calibration_constants_df)
 
-    # # Save everything as a JSON file.
-    # json_data = {}
-    # json_data["robot2tracker_T"] = np.array(robot2tracker_t).tolist()
-    # json_data["pitch2marker_T"] = np.array(pitch2marker_t).tolist()
-    # json_data["pitchorigin_in_marker"] = axis_dict["pitchorigin"].tolist()
-    # json_data["pitchaxis_in_marker"] = axis_dict["pitchaxis"].tolist()
-    # json_data["rollaxis_in_marker"] = axis_dict["rollaxis"].tolist()
-    # json_data["fiducial_in_jaw"] = axis_dict["fiducial_yaw"].tolist()
-    # json_data["pitch2yaw"] = axis_dict["pitch2yaw"].tolist()
+    # Save everything as a JSON file.
+    json_data = {}
+    json_data["robot2tracker_T"] = np.array(robot2tracker_t).tolist()
+    json_data["pitch2marker_T"] = np.array(pitch2marker_t).tolist()
+    json_data["pitchorigin_in_marker"] = axis_dict["pitchorigin"].tolist()
+    json_data["pitchaxis_in_marker"] = axis_dict["pitchaxis"].tolist()
+    json_data["rollaxis_in_marker"] = axis_dict["rollaxis"].tolist()
+    json_data["fiducial_in_jaw"] = axis_dict["fiducial_yaw"].tolist()
+    json_data["pitch2yaw"] = axis_dict["pitch2yaw"].tolist()
 
-    # new_name = registration_data_path / "registration_values.json"
-    # with open(new_name, "w", encoding="utf-8") as f:
-    #     json.dump(json_data, f, ensure_ascii=False, indent=4)
+    new_name = registration_data_path / "registration_values.json"
+    with open(new_name, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=4)
 
-    # # Load json
-    # registration_dict = json.load(open(new_name, "r"))
-    # T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
-    # T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
-    # log.info(f"Robot to Tracker\n{T_RT}")
-    # log.info(f"Pitch to marker\n{T_MP}")
+    # Load json
+    registration_dict = json.load(open(new_name, "r"))
+    T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+    log.info(f"Robot to Tracker\n{T_RT}")
+    log.info(f"Pitch to marker\n{T_MP}")
 
 
 parser = argparse.ArgumentParser()
