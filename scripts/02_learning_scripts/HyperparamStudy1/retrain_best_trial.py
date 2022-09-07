@@ -75,18 +75,19 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-    epochs = 2500
+    epochs = 4500
     study_name = "regression_study1.pkl"
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
     # root = study_root / "best_model5_temp" #epochs=260
     # root = study_root / "best_model7_psm2"  # epochs=4660
-    root = study_root / "best_model9_6er"  # epochs=4660
+    # root = study_root / "best_model9_6er"  # epochs=4660
+    root = study_root / "model10_rec23_6er"  # epochs=4660
     output_units = 6
     network_output = "error"
     assert output_units in [3, 6]
     # data_path = Path("data/deep_learning_data/random_dataset.txt")
-    data_path = Path("data/deep_learning_data/psm2_rec20.csv")
-    dataset_def_name = data_path.with_suffix("").name + "_def.json"
+    data_path = Path("data/deep_learning_data/rec23_data.csv")
+    dataset_def_name = "dataset_def_" + data_path.with_suffix("").name + ".json"
     dataset_def_name = data_path.parent / dataset_def_name
 
     log = Logger("main_retrain").log
