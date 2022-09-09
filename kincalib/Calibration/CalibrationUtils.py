@@ -1,4 +1,5 @@
 # Python modules
+import json
 from re import I
 from numpy import sin, cos
 from scipy.optimize import dual_annealing
@@ -70,6 +71,34 @@ def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
     """
     return np.cross(a, b)
+
+
+@dataclass
+# TODO: Use this class in script 04
+class TrackerJointsEstimator:
+    calibration_file: Path
+
+    def __post_init__(self):
+
+        # Load calibration values
+        root = Path(self.calibration_file)
+        registration_dict = json.load(open(root / "registration_values.json", "r"))
+        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+        T_RT = T_TR.inv()
+        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+        T_PM = T_MP.inv()
+        self.wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
+
+        self.j_estimator = JointEstimator(T_RT, T_MP, self.wrist_fid_Y)
+
+    def calculate_joints(self, robot_jp_df, robot_cp_df, use_progress_bar=True):
+        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
+            self.j_estimator,
+            robot_jp_df,
+            robot_cp_df,
+            use_progress_bar=use_progress_bar,
+        )
+        return robot_df, tracker_df, opt_df
 
 
 def fkins_v2(q5, q6):

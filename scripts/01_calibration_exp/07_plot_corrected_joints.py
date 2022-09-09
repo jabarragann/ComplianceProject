@@ -8,9 +8,11 @@ from pathlib import Path
 
 # kincalib module imports
 from kincalib.Learning.InferencePipeline import InferencePipeline
+from kincalib.Metrics.RegistrationError import FRE, get_wrist_fiducials_cp
+from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.Logger import Logger
-from kincalib.Calibration.CalibrationUtils import CalibrationUtils
-from kincalib.Metrics.TableGenerator import ResultsTable
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils, TrackerJointsEstimator
+from kincalib.Metrics.TableGenerator import FRETable, ResultsTable
 from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics 
 from kincalib.utils.CmnUtils import mean_std_str
 
@@ -60,6 +62,9 @@ def main(testid: int):
         robot_df = pd.read_csv(data_p.parent / "robot_jp.txt", index_col=None)
         tracker_df = pd.read_csv(data_p / "tracker_joints.txt", index_col=None)
         opt_df = pd.read_csv(data_p / "opt_error.txt", index_col=None)
+        robot_cp = pd.read_csv(data_p.parent / "robot_cp.txt", index_col=None)
+
+        tracker_joints_estimator = TrackerJointsEstimator(root / "registration_results")
     else:
         log.info(f"robot_joints.txt file not found in {data_p}")
         exit()
@@ -82,12 +87,60 @@ def main(testid: int):
     net_dict = network_error_metrics.create_error_dict() 
     table.add_data(net_dict)
 
+    # ----------------
+    # calculate FRE
+    # ----------------
+
+    # Get wrist fiducials data
+    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp)
+    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
+
+    tool_offset = np.identity(4)
+    tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
+    psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
+
+    # robot data
+    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
+    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
+
+    # tracker data
+    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
+    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
+
+    # network data
+    network_dict = dict(mode="joint",data=network_df,fk=psm_kin)
+
+    robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
+    robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
+    tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
+    tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
+    network_joints_FRE = FRE(wrist_fiducial_dict, network_dict)
+    network_reg_errors = network_joints_FRE.calculate_fre() * 1000
+
+    fre_table = FRETable()
+    fre_table.add_data(
+        dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
+    )
+    fre_table.add_data(
+        dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
+    )
+    fre_table.add_data(
+        dict(type="network", fre=mean_std_str(network_reg_errors.mean(), network_reg_errors.std()))
+    )
+
+    # ------------------
+    # Results report
+    # ------------------
+
     print("")
     print(f"**Evaluation report for test trajectory {testid} in {registration_data_path.parent.name}**")
     print(f"* Registration path: {registration_data_path}")
     print(f"* model path: {model_path}\n")
     print(f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})")
-    print(f"\n{table.get_full_table()}")
+    print(f"\n{table.get_full_table()}\n")
+
+    print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
+    print(f"\n{fre_table.get_full_table()}\n")
 
     # plot
     if args.plot:
