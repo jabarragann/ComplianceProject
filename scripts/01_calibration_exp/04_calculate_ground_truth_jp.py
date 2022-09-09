@@ -120,7 +120,7 @@ def main(testid: int):
     # ------------------------------------------------------------
 
     # -----------------------------------------------
-    # calculate difference between robot and tracker 
+    # calculate difference between robot and tracker
     # -----------------------------------------------
 
     robot2_df = pd.read_csv(robot_jp_p)
@@ -128,14 +128,6 @@ def main(testid: int):
 
     table = ResultsTable()
     table.add_data(robot_error_metrics.create_error_dict())
-
-    print("")
-    print(f"**Evaluation report for test trajectory {testid} in {registration_p.parent.name}**")
-    print(f"* Registration path: {registration_p}")
-    print(
-        f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})"
-    )
-    print(f"\n{table.get_full_table()}\n")
 
     # ----------------
     # calculate FRE
@@ -169,6 +161,18 @@ def main(testid: int):
     fre_table.add_data(
         dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
     )
+
+    # ------------------
+    # Results report
+    # ------------------
+
+    print("")
+    print(f"**Evaluation report for test trajectory {testid} in {registration_p.parent.name}**")
+    print(f"* Registration path: {registration_p}")
+    print(
+        f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})"
+    )
+    print(f"\n{table.get_full_table()}\n")
 
     print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
     print(f"\n{fre_table.get_full_table()}\n")
