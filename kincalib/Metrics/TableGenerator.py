@@ -5,6 +5,47 @@ from tabulate import tabulate
 tabulate.PRESERVE_WHITESPACE = True
 
 
+class FRETable:
+    def __init__(self):
+        self.headers = [
+            "type",
+            "FRE (mm)",
+        ]
+
+        self.table = []
+    def add_data(self, data_dict: dict):
+        """Pass  data as a dictionary with the following keys: type, fre. 
+        The data_dict is transformed into a default dict so any missing values
+        will be transformed to an empty string.
+
+        ```
+        table.add_data( dict(type="robot", fre=0.0))
+        ```
+
+        Parameters
+        ----------
+        data_dict : dict
+           Data store as dictionary
+        """
+
+        data_dict = defaultdict(lambda: "", data_dict)
+        self.table.append(
+            [
+                data_dict["type"],
+                data_dict["fre"],
+            ]
+        )
+
+    def get_full_table(self):
+        """Get complete table. (All joints)
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        return tabulate(self.table, self.headers, tablefmt="github")
+
 class ResultsTable:
     """Table to show errors with respect to ground truth (Tracker values)."""
 

@@ -16,6 +16,14 @@ log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
+def my_trnorm(a) -> np.ndarray:
+    """Required to avoid weird issue with numpy cross product and pylance.
+
+    https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
+    """
+    return trnorm(a)
+
+
 class DvrkPsmKin(DHRobot):
     lrcc = 0.4318
     ltool = 0.4162
@@ -43,13 +51,13 @@ class DvrkPsmKin(DHRobot):
 
     def __init__(self, tool_offset=None, base_transform=None):
         if tool_offset is None:
-            self.tool_offset = SE3(trnorm(DvrkPsmKin.tool_offset))
+            self.tool_offset = SE3(my_trnorm(DvrkPsmKin.tool_offset))
         else:
-            self.tool_offset = SE3(trnorm(tool_offset))
+            self.tool_offset = SE3(my_trnorm(tool_offset))
         if base_transform is None:
-            self.base_transform = SE3(trnorm(np.identity(4)))
+            self.base_transform = SE3(my_trnorm(np.identity(4)))
         else:
-            self.base_transform = SE3(trnorm(base_transform))
+            self.base_transform = SE3(my_trnorm(base_transform))
 
         super(DvrkPsmKin, self).__init__(
             DvrkPsmKin.links, tool=self.tool_offset, base=self.base_transform, name="DVRK PSM"

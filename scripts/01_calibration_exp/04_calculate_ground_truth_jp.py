@@ -1,20 +1,55 @@
 # Python imports
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import argparse
+from re import I
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+import spatialmath
 
 # kincalib module imports
 from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics
-from kincalib.Metrics.TableGenerator import ResultsTable
+from kincalib.Metrics.RegistrationError import FRE, get_wrist_fiducials_cp
+from kincalib.Metrics.TableGenerator import FRETable, ResultsTable
+from kincalib.Motion.DvrkKin import DvrkPsmKin
+from kincalib.utils.CmnUtils import mean_std_str
+from kincalib.utils.ExperimentUtils import separate_markerandfiducial
 from kincalib.utils.Logger import Logger
 from kincalib.utils.Frame import Frame
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
+
+
+@dataclass
+# TODO: Use this class in script 04
+class TrackerJointsEstimator:
+    calibration_file: Path
+
+    def __post_init__(self):
+
+        # Load calibration values
+        root = Path(self.calibration_file)
+        registration_dict = json.load(open(root / "registration_values.json", "r"))
+        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+        T_RT = T_TR.inv()
+        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+        T_PM = T_MP.inv()
+        self.wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
+
+        self.j_estimator = JointEstimator(T_RT, T_MP, self.wrist_fid_Y)
+
+    def calculate_joints(self, robot_jp_df, robot_cp_df, use_progress_bar=True):
+        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
+            self.j_estimator,
+            robot_jp_df,
+            robot_cp_df,
+            use_progress_bar=use_progress_bar,
+        )
+        return robot_df, tracker_df, opt_df
 
 
 def main(testid: int):
@@ -33,6 +68,8 @@ def main(testid: int):
             f"registration_values.json does not exists. Add calibration file to {registration_p.parent}"
         )
         exit()
+
+    tracker_joints_estimator = TrackerJointsEstimator(root / "registration_results")
 
     # Src paths
     if args.testdata:  # Test trajectories
@@ -62,6 +99,8 @@ def main(testid: int):
         robot_df = pd.read_csv(dst_p / "robot_joints.txt", index_col=None)
         tracker_df = pd.read_csv(dst_p / "tracker_joints.txt", index_col=None)
         opt_df = pd.read_csv(dst_p / "opt_error.txt", index_col=None)
+
+        robot_cp = pd.read_csv(robot_cp_p)  # df with robot cp and atracsys cp
     else:
         # ------------------------------------------------------------
         # Calculate tracker joint values
@@ -69,19 +108,8 @@ def main(testid: int):
         # Read data
         robot_jp = pd.read_csv(robot_jp_p)
         robot_cp = pd.read_csv(robot_cp_p)
-        registration_dict = json.load(open(registration_p, "r"))
-        # calculate joints
-        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
-        T_RT = T_TR.inv()
-        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
-        T_PM = T_MP.inv()
-        wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
-        # Calculate ground truth joints
-        j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
-            j_estimator, robot_jp, robot_cp
-        )
+        robot_df, tracker_df, opt_df = tracker_joints_estimator.calculate_joints(robot_jp, robot_cp)
 
         robot_df.to_csv(dst_p / "robot_joints.txt", index=False)
         tracker_df.to_csv(dst_p / "tracker_joints.txt", index=False)
@@ -90,6 +118,10 @@ def main(testid: int):
     # ------------------------------------------------------------
     # Evaluate results
     # ------------------------------------------------------------
+
+    # -----------------------------------------------
+    # calculate difference between robot and tracker 
+    # -----------------------------------------------
 
     robot2_df = pd.read_csv(robot_jp_p)
     robot_error_metrics = CalibrationMetrics("robot", robot2_df, tracker_df, opt_df)
@@ -103,7 +135,43 @@ def main(testid: int):
     print(
         f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})"
     )
-    print(f"\n{table.get_full_table()}")
+    print(f"\n{table.get_full_table()}\n")
+
+    # ----------------
+    # calculate FRE
+    # ----------------
+
+    # Get wrist fiducials data
+    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp)
+    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
+
+    tool_offset = np.identity(4)
+    tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
+    psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
+
+    # robot data
+    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
+    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
+
+    # tracker data
+    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
+    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
+
+    robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
+    robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
+    tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
+    tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
+
+    fre_table = FRETable()
+    fre_table.add_data(
+        dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
+    )
+    fre_table.add_data(
+        dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
+    )
+
+    print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
+    print(f"\n{fre_table.get_full_table()}\n")
 
     # plot
     if args.plot:

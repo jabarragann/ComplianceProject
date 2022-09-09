@@ -22,7 +22,8 @@ from kincalib.utils.Logger import Logger
 log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
-data_root = Path("data/03_replay_trajectory")
+# data_root = Path("data/03_replay_trajectory")
+data_root = Path("data3newcalib/")
 dst_filename = Path("data/deep_learning_data/rec23_data.csv")
 
 # PSM1

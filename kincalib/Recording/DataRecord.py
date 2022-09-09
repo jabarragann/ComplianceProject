@@ -102,12 +102,16 @@ class CalibrationRecord(Record):
             jp_filename = self.test_files / ("robot_jp.txt")
 
             if cp_filename.exists() or jp_filename.exists():
-                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
+                n = input(
+                    f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. "
+                )
                 if not (n == "y" or n == "Y"):
                     log.info("exiting the script")
                     exit(0)
         # Create records
-        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
+        self.cp_record = RobotSensorCartesianRecord(
+            robot_handler, ftk_handler, expected_markers, cp_filename
+        )
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
         self.create_paths()
@@ -358,7 +362,7 @@ class LearningRecord(Record):
         new_pt = [step, root, testid, type, flag] + rq + rt + rs + tq + [opt] + rc + tc + ce
         new_pt = np.array(new_pt).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(new_pt, columns=self.df_cols)
-        self.df = self.df.append(new_pt)
+        self.df = pd.concat((self.df, new_pt))
 
 
 class LearningSummaryRecord(Record):

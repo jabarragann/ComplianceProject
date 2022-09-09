@@ -51,8 +51,13 @@ def separate_markerandfiducial(
         df (pd.DataFrame, optional): [description]. Defaults to None.
 
     Returns:
-        Tuple[List[PyKDL.Frame], np.ndarray]: returns a list PyKDL.Frames corresponding to the all the available poses
-        of the marker in the shaft and a array of the wrist marker fiducial.
+        pose_arr: List[PyKDL.Frame]
+            list PyKDL.Frames corresponding to the all the available poses
+            of the marker in the shaft
+
+        wrist_fiducials: np.ndarray
+            array of the wrist marker fiducial.
+
     """
 
     # Read df and marker files

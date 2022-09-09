@@ -43,33 +43,6 @@ order_of_pt = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C"]
 collection_steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 
-@dataclass
-class CalibrationPipeline:
-    calibration_file: Path
-
-    def __post_init__(self):
-
-        # Load calibration values
-        root = Path(self.calibration_file)
-        registration_dict = json.load(open(root / "registration_values.json", "r"))
-        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
-        T_RT = T_TR.inv()
-        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
-        T_PM = T_MP.inv()
-        wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
-
-        self.j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
-
-    def calculate_joints(self, robot_jp_df, robot_cp_df):
-        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
-            self.j_estimator,
-            robot_jp_df,
-            robot_cp_df,
-            use_progress_bar=False,
-        )
-        return robot_df, tracker_df, opt_df
-
-
 def extract_cartesian_xyz(cartesian_t: np.ndarray):
     position_list = []
     for i in range(len(cartesian_t)):
@@ -121,7 +94,7 @@ def main():
 
     # Load calibration values
     root = Path(args.root)
-    calibration_pipeline = CalibrationPipeline(root / "registration_results")
+
     # Load correction model
     model_path = Path(f"data/deep_learning_data/Studies/TestStudy2") / args.modelname
     inference_pipeline = InferencePipeline(model_path)
