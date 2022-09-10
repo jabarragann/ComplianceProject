@@ -63,15 +63,6 @@ dataset_def = [
     {"path": data_root / "d04-rec-20-trajsoft", "testid": [20,21,22,24,25], "type": "recorded", "flag": "valid"},
     {"path": data_root / "d04-rec-20-trajsoft", "testid": [23,26], "type": "random", "flag": "valid"},
 ]
-
-dataset_def = [
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [20,21,22,24,25], "type": "recorded", "flag": "valid"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [23,26], "type": "random", "flag": "valid"},
-]
 # fmt:on
 
 
