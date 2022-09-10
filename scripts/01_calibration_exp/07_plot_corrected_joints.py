@@ -51,12 +51,15 @@ def plot_joints_torque(robot_jp_df: pd.DataFrame):
     return axes
 
 def plot_joints_difference(robot_joints,tracker_joints):
+    rad2d = 180 / np.pi
+    scale = np.array([rad2d, rad2d, 1000, rad2d, rad2d, rad2d])
+
     joints_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
     robot_joints_2 = robot_joints.rename(lambda x: x.replace("rq", "q"), axis=1)
     tracker_joints_2 = tracker_joints.rename(lambda x: x.replace("tq", "q"), axis=1)
     robot_joints_2 = robot_joints_2[joints_cols].to_numpy() 
     tracker_joints_2 = tracker_joints_2[joints_cols].to_numpy() 
-    diff = (robot_joints_2 - tracker_joints_2)*180/np.pi
+    diff = (robot_joints_2 - tracker_joints_2)* scale
     diff = pd.DataFrame(diff,columns=joints_cols)
 
     # layout

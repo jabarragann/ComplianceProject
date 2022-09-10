@@ -466,10 +466,10 @@ class CalibrationUtils:
         for i in range(6):
             # fmt:off
             axes[i].set_title(f"joint {i+1} ({unit})")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, color="blue")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, color="orange")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, color="blue")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, color="orange")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
             # fmt:on
         axes[0].legend()
 

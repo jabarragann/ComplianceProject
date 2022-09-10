@@ -328,12 +328,15 @@ class LearningRecord(Record):
     cei:     where i=[x,y,z]. Cartesian error. cei = tci - rci
     """
 
+    robot_joints_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+    tracker_joints_cols = ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+
     df_cols = (
         ["step", "root", "testid", "type", "flag"]
-        + ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+        + robot_joints_cols 
         + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
         + ["rs1", "rs2", "rs3", "rs4", "rs5", "rs6"]
-        + ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+        + tracker_joints_cols 
         + ["opt"]
         + ["rcx", "rcy", "rcz"]
         + ["tcx", "tcy", "tcz"]
