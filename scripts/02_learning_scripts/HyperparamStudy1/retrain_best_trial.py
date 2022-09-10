@@ -80,13 +80,14 @@ if __name__ == "__main__":
     study_root = Path(f"data/deep_learning_data/Studies/TestStudy2/")
     # root = study_root / "best_model5_temp" #epochs=260
     # root = study_root / "best_model7_psm2"  # epochs=4660
-    # root = study_root / "best_model9_6er"  # epochs=4660
-    root = study_root / "model10_rec23_6er"  # epochs=4660
+    root = study_root / "model12_rec20v3_6er"  # epochs=4660
+    # root = study_root / "best_model09_6er"  # epochs=4660
+    # root = study_root / "model10_rec23_6er"  # epochs=4660
     output_units = 6
     network_output = "error"
     assert output_units in [3, 6]
     # data_path = Path("data/deep_learning_data/random_dataset.txt")
-    data_path = Path("data/deep_learning_data/rec23_data.csv")
+    data_path = Path("data/deep_learning_data/rec20_data_v3.csv")
     dataset_def_name = "dataset_def_" + data_path.with_suffix("").name + ".json"
     dataset_def_name = data_path.parent / dataset_def_name
 
@@ -98,9 +99,8 @@ if __name__ == "__main__":
 
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c", "--loadcheckpoint", type=bool, default=True, help="Resume training from checkpoint"
-    )
+    parser.add_argument("-r", "--reset", action="store_true", help="reset training")
+
     args = parser.parse_args()
 
     # ------------------------------------------------------------
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     )
 
     # Check for checkpoints
-    if args.loadcheckpoint:
+    if not args.reset:
         checkpath = root / "final_checkpoint.pt"
         if checkpath.exists():
             trainer_handler.load_checkpoint(checkpath)

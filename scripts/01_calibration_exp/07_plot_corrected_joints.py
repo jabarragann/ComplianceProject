@@ -1,10 +1,13 @@
 # Python imports
 from pathlib import Path
 import argparse
+from re import I
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 from pathlib import Path
+import seaborn as sns
 
 # kincalib module imports
 from kincalib.Learning.InferencePipeline import InferencePipeline
@@ -27,8 +30,8 @@ def plot_joints(robot_df, tracker_df, pred_df):
             axes[i].set_title(f"joint {i+1}")
             axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy(), color="blue")
             axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy(), marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
-            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy(), color="orange")
+            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
 
             if f"q{i+1}" in pred_df:
                 axes[i].plot(pred_df['step'].to_numpy(),pred_df[f"q{i+1}"].to_numpy(), color="green")
@@ -37,6 +40,31 @@ def plot_joints(robot_df, tracker_df, pred_df):
             # fmt:on
 
         axes[5].legend()
+
+def plot_joints_torque(robot_jp_df: pd.DataFrame):
+
+    # layout
+    fig, axes = plt.subplots(2, 3, figsize=(10, 5))
+    for i, ax in enumerate(axes.reshape(-1)):
+        sns.boxplot(data=robot_jp_df, x=f"t{i+1}", ax=ax)
+        sns.stripplot(data=robot_jp_df, x=f"t{i+1}", ax=ax, color="black")
+    return axes
+
+def plot_joints_difference(robot_joints,tracker_joints):
+    joints_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
+    robot_joints_2 = robot_joints.rename(lambda x: x.replace("rq", "q"), axis=1)
+    tracker_joints_2 = tracker_joints.rename(lambda x: x.replace("tq", "q"), axis=1)
+    robot_joints_2 = robot_joints_2[joints_cols].to_numpy() 
+    tracker_joints_2 = tracker_joints_2[joints_cols].to_numpy() 
+    diff = (robot_joints_2 - tracker_joints_2)*180/np.pi
+    diff = pd.DataFrame(diff,columns=joints_cols)
+
+    # layout
+    fig, axes = plt.subplots(2, 3, figsize=(10, 5))
+    for i, ax in enumerate(axes.reshape(-1)):
+        sns.boxplot(data=diff, x=f"q{i+1}", ax=ax)
+        sns.stripplot(data=diff, x=f"q{i+1}", ax=ax, color="black")
+    return axes
 
 def main(testid: int):
     # ------------------------------------------------------------
@@ -60,9 +88,10 @@ def main(testid: int):
     # ------------------------------------------------------------
     if (data_p / "robot_joints.txt").exists():
         robot_df = pd.read_csv(data_p.parent / "robot_jp.txt", index_col=None)
-        tracker_df = pd.read_csv(data_p / "tracker_joints.txt", index_col=None)
-        opt_df = pd.read_csv(data_p / "opt_error.txt", index_col=None)
         robot_cp = pd.read_csv(data_p.parent / "robot_cp.txt", index_col=None)
+        tracker_df = pd.read_csv(data_p / "tracker_joints.txt", index_col=None)
+        robot_joints = pd.read_csv(data_p / "robot_joints.txt", index_col=None)
+        opt_df = pd.read_csv(data_p / "opt_error.txt", index_col=None)
 
         tracker_joints_estimator = TrackerJointsEstimator(root / "registration_results")
     else:
@@ -128,6 +157,11 @@ def main(testid: int):
         dict(type="network", fre=mean_std_str(network_reg_errors.mean(), network_reg_errors.std()))
     )
 
+    robot_reg_errors =   pd.DataFrame(dict(type="robot",errors=robot_reg_errors.tolist())  )  
+    tracker_reg_errors = pd.DataFrame(dict(type="tracker",errors=tracker_reg_errors.tolist()))
+    network_reg_errors = pd.DataFrame(dict(type="network",errors=network_reg_errors.tolist()))
+    errors_df = pd.concat((robot_reg_errors,tracker_reg_errors,network_reg_errors))
+
     # ------------------
     # Results report
     # ------------------
@@ -157,6 +191,16 @@ def main(testid: int):
             max_val=0.003,
         )
         fig.set_tight_layout(True)
+
+        matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+        fig, ax = plt.subplots(1,1)
+        sns.boxplot(data=errors_df,y="errors",x="type")
+        sns.stripplot(data=errors_df,y="errors",x="type",dodge=True, color='black', size=3)
+        ax.grid()
+
+        ax_torque = plot_joints_torque(robot_df)
+        ax_diff = plot_joints_difference(robot_joints,tracker_df)
+
         plt.show()
 
 

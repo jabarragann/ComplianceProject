@@ -24,7 +24,7 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 # data_root = Path("data/03_replay_trajectory")
 data_root = Path("data3newcalib/")
-dst_filename = Path("data/deep_learning_data/rec23_data.csv")
+dst_filename = Path("data/deep_learning_data/rec20_data_v3.csv")
 
 # PSM1
 # dataset_def = [
@@ -49,10 +49,28 @@ dst_filename = Path("data/deep_learning_data/rec23_data.csv")
 #     {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
 # ]
 
+# dataset_def = [
+#     {"path": data_root / "d04-rec-23-trajrand", "testid": [1, 2, 3], "type": "recorded", "flag": "train"},
+#     {"path": data_root / "d04-rec-23-trajrand", "testid": [4, 5 ], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-23-trajrand", "testid": [6, 7], "type": "random", "flag": "valid"},
+# ]
+
 dataset_def = [
-    {"path": data_root / "d04-rec-23-trajrand", "testid": [1, 2, 3], "type": "recorded", "flag": "train"},
-    {"path": data_root / "d04-rec-23-trajrand", "testid": [4, 5 ], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-23-trajrand", "testid": [6, 7], "type": "random", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [20,21,22,24,25], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [23,26], "type": "random", "flag": "valid"},
+]
+
+dataset_def = [
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [20,21,22,24,25], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [23,26], "type": "random", "flag": "valid"},
 ]
 # fmt:on
 
