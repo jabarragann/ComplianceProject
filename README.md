@@ -100,6 +100,8 @@ Problem: Outlier in pitch data creates a wrong circle
 
 ```
 
+# Future work
+
 Ransac might be a good solution.
 https://scikit-image.org/docs/dev/auto_examples/transform/plot_ransac.html
 https://www.cse.psu.edu/~rtc12/CSE486/lecture15.pdf
@@ -107,3 +109,9 @@ https://www.cse.psu.edu/~rtc12/CSE486/lecture15.pdf
 Outlier detection
 https://nirpyresearch.com/detecting-outliers-using-mahalanobis-distance-pca-python/
 https://www.statology.org/how-to-find-iqr-of-box-plot/
+
+[DOES USING TWO DIFFERENT PITCH AXIS FOR THE CALCULATION OF THE PITCH ORIGIN IS REALLY HELPING? INVESTIGATE WHETHER USING TWO PITCH AXIS IMPROVES THE REGISTRATION ERROR]
+
+Midpoint of shortest segment
+
+* This algorithm can be easily adapted to optimize the DH-parameters and then use the neural network to only predict the non-linear portions (cable-related effects - compliance)

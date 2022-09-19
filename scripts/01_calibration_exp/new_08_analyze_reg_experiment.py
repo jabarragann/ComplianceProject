@@ -147,12 +147,12 @@ def calculate_reg_residual_error(path, inference_pipeline):
     network1_error_df = calculate_reg_error_df(
         phantom_cp.T, network_cp1.T, title="network1 FRE", test_id=test_id
     )
-    network2_error_df = calculate_reg_error_df(
-        phantom_cp.T, network_cp2.T, title="network2 FRE (Cheat)", test_id=test_id
-    )
+    # network2_error_df = calculate_reg_error_df(
+    #     phantom_cp.T, network_cp2.T, title="network2 FRE (Cheat)", test_id=test_id
+    # )
 
-    final_df = pd.concat([robot_error_df, tracker_error_df, network1_error_df, network2_error_df])
-    # final_df = pd.concat([robot_error_df, tracker_error_df, network1_error_df])
+    # final_df = pd.concat([robot_error_df, tracker_error_df, network1_error_df, network2_error_df])
+    final_df = pd.concat([robot_error_df, tracker_error_df, network1_error_df])
 
     return final_df
 
@@ -182,13 +182,16 @@ def main(args):
     sns.set_style("whitegrid")
     sns.barplot(x="test_id", y="errors", hue="type", ci="sd", data=results_df, capsize=0.1, ax=ax)
     # palette="husl",
-    ax.set_xlabel("Test id")
-    ax.set_ylabel("Mean registration error (mm)")
-    ax.set_title(f"Phantom registration experiment ({args.modelname})\n{Path(args.root).name}")
+    # ax.set_xlabel("Test id")
+    ax.set_xlabel("")
+    ax.set_ylabel("Mean registration error (mm)", fontsize=12, labelpad=12)
+    # ax.set_title(f"Phantom registration experiment ({args.modelname})\n{Path(args.root).name}")
     ax.set_facecolor("white")
-    ax.set_yticks(list(range(0, 7)))
+    ax.set_yticks(list(range(0, 5)))
+    # ax.set_yticklabels(fontsize=20)
     ax.grid(visible="major")
-
+    ax.tick_params(axis="y", labelsize=10)
+    # plt.yticks(fontsize=20)
     plt.show()
 
 
