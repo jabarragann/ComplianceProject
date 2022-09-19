@@ -66,7 +66,7 @@ class CalibrationMetrics:
         gt_valid = gt_valid.to_numpy()
 
         # Calculate joints space errors
-        self.joint_error = joints_valid - gt_valid
+        self.joint_error = np.abs(joints_valid - gt_valid)
         self.jp_error_mean = self.joint_error.mean(axis=0)
         self.jp_error_std = self.joint_error.std(axis=0)
 
@@ -90,6 +90,7 @@ class CalibrationMetrics:
         ```
         """
 
+        # q3 uses mm the rest of the joints rad.
         return dict(
             type=self.joints_source,
             q1=mean_std_str(
@@ -98,9 +99,7 @@ class CalibrationMetrics:
             q2=mean_std_str(
                 self.jp_error_mean[1] * 180 / np.pi, self.jp_error_std[1] * 180 / np.pi
             ),
-            q3=mean_std_str(
-                self.jp_error_mean[2] * 180 / np.pi, self.jp_error_std[2] * 180 / np.pi
-            ),
+            q3=mean_std_str(self.jp_error_mean[2] * 1000, self.jp_error_std[2] * 1000),
             q4=mean_std_str(
                 self.jp_error_mean[3] * 180 / np.pi, self.jp_error_std[3] * 180 / np.pi
             ),
