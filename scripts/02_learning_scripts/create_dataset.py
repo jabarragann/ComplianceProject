@@ -1,10 +1,6 @@
 # Python imports
+import json
 from pathlib import Path
-from re import I
-import time
-import argparse
-import sys
-from venv import create
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +12,6 @@ from rich.progress import track
 # ROS and DVRK imports
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 from kincalib.Recording.DataRecord import LearningRecord
-import rospy
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
@@ -27,20 +22,48 @@ from kincalib.utils.Logger import Logger
 log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
-data_root = Path("/home/jbarrag3/research_juan/ComplianceProject/data/03_replay_trajectory")
-dst_filename = Path("data/deep_learning_data/random_dataset.txt")
+# data_root = Path("data/03_replay_trajectory")
+data_root = Path("data3newcalib/")
+dst_filename = Path("data/deep_learning_data/rec20_data_v3.csv")
+
+# PSM1
+# dataset_def = [
+#     {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-12-traj01", "testid": [6], "type": "random", "flag": "valid"},
+#     {"path": data_root / "d04-rec-13-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-13-traj01", "testid": [6], "type": "random", "flag": "valid"},
+#     {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
+#     {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
+# ]
+# # PSM2
+# dataset_def = [
+#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [4], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [5], "type": "random", "flag": "valid"},
+# ]
+# fmt:off
+# dataset_def = [
+#     { "path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
+#     { "path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
+#     {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
+# ]
+
+# dataset_def = [
+#     {"path": data_root / "d04-rec-23-trajrand", "testid": [1, 2, 3], "type": "recorded", "flag": "train"},
+#     {"path": data_root / "d04-rec-23-trajrand", "testid": [4, 5 ], "type": "random", "flag": "train"},
+#     {"path": data_root / "d04-rec-23-trajrand", "testid": [6, 7], "type": "random", "flag": "valid"},
+# ]
 
 dataset_def = [
-    {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-12-traj01", "testid": [6], "type": "random", "flag": "valid"},
-    {"path": data_root / "d04-rec-13-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
-    {"path": data_root / "d04-rec-13-traj01", "testid": [6], "type": "random", "flag": "valid"},
-    {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
-    {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [20,21,22,24,25], "type": "recorded", "flag": "valid"},
+    {"path": data_root / "d04-rec-20-trajsoft", "testid": [23,26], "type": "random", "flag": "valid"},
 ]
-
-# dataset_def = [{"path": data_root / "d04-rec-13-traj01", "testid": [4, 5, 6, 7, 8], "type": "random", "flag": "test"}]
+# fmt:on
 
 
 def create_nan_list():
@@ -53,6 +76,8 @@ def main():
     # ------------------------------------------------------------
     # Create dataset
     # -----------------------------------------------------------
+    # Add all the points here filter with the dataset class
+
     dataset_record = LearningRecord(dst_filename)
     for d in dataset_def:
         p = d["path"] / "test_trajectories"
@@ -87,22 +112,30 @@ def main():
                 # Some dataset don't have robot torque and setpoints
                 if "s1" in robot_data:
                     rs = (
-                        robot_data.loc[robot_data["step"] == step][["s1", "s2", "s3", "s4", "s5", "s6"]]
+                        robot_data.loc[robot_data["step"] == step][
+                            ["s1", "s2", "s3", "s4", "s5", "s6"]
+                        ]
                         .to_numpy()
                         .tolist()[0]
                     )
                 else:
                     rs = create_nan_list()
                 tq = (
-                    tracker_data.loc[tracker_data["step"] == step][["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]]
+                    tracker_data.loc[tracker_data["step"] == step][
+                        ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+                    ]
                     .to_numpy()
                     .tolist()[0]
                 )
                 opt = opt_data.loc[opt_data["step"] == step]["q56res"].item()
 
                 # calculate cartesian positions
-                robot_cp = CalibrationUtils.calculate_cartesian(np.array(rq).reshape(1, 6)).to_numpy()
-                tracker_cp = CalibrationUtils.calculate_cartesian(np.array(tq).reshape(1, 6)).to_numpy()
+                robot_cp = CalibrationUtils.calculate_cartesian(
+                    np.array(rq).reshape(1, 6)
+                ).to_numpy()
+                tracker_cp = CalibrationUtils.calculate_cartesian(
+                    np.array(tq).reshape(1, 6)
+                ).to_numpy()
 
                 new_entry = dict(
                     step=step,
@@ -122,6 +155,14 @@ def main():
 
     log.info(dataset_record.df.shape)
     dataset_record.to_csv()
+    dataset_def_name = "dataset_def_" + dst_filename.with_suffix("").name + ".json"
+    dataset_def_name = dst_filename.parent / dataset_def_name
+
+    for x in dataset_def:
+        x["path"] = str(x["path"])
+
+    dataset_def_dict = dict(name=dataset_def_name.name, dataset=dataset_def)
+    json.dump(dataset_def_dict, open(dataset_def_name, "w"), indent=2)
 
 
 if __name__ == "__main__":

@@ -5,8 +5,6 @@ from abc import ABC, abstractclassmethod
 import numpy as np
 from typing import List
 
-from sympy import igcd
-
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
@@ -53,7 +51,14 @@ class Record(ABC):
 
 class CalibrationRecord(Record):
     def __init__(
-        self, ftk_handler, robot_handler, expected_markers, root_dir, mode: str = "calib", test_id: int = None
+        self,
+        ftk_handler,
+        robot_handler,
+        expected_markers,
+        root_dir,
+        mode: str = "calib",
+        test_id: int = None,
+        description: str = None,
     ) -> None:
         """_summary_
 
@@ -71,11 +76,14 @@ class CalibrationRecord(Record):
             Operation mode, by default "calib". Needs to be either 'calib' or 'test'
         test_id : int, optional
             _description_, by default None
+        description: str, optional
+            one line experiment description
         """
 
         assert mode in ["calib", "test"], "mode needs to be calib or test"
         self.ftk_handler = ftk_handler
         self.robot_handler = robot_handler
+        self.description = description
 
         # Create paths
         self.root_dir = root_dir
@@ -94,12 +102,16 @@ class CalibrationRecord(Record):
             jp_filename = self.test_files / ("robot_jp.txt")
 
             if cp_filename.exists() or jp_filename.exists():
-                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
+                n = input(
+                    f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. "
+                )
                 if not (n == "y" or n == "Y"):
                     log.info("exiting the script")
                     exit(0)
         # Create records
-        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
+        self.cp_record = RobotSensorCartesianRecord(
+            robot_handler, ftk_handler, expected_markers, cp_filename
+        )
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
         self.create_paths()
@@ -112,6 +124,12 @@ class CalibrationRecord(Record):
         if self.mode == "test":
             if not self.test_files.exists():
                 self.test_files.mkdir(parents=True)
+
+        # Create description file
+        if self.description is not None:
+            description_path = self.robot_files if self.mode == "calib" else self.test_files
+            with open(description_path / "description.txt", "w") as f:
+                f.write(self.description)
 
     def create_new_entry(self, idx, joints, q7):
         self.cp_record.create_new_entry(idx, joints, q7)
@@ -310,12 +328,15 @@ class LearningRecord(Record):
     cei:     where i=[x,y,z]. Cartesian error. cei = tci - rci
     """
 
+    robot_joints_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+    tracker_joints_cols = ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+
     df_cols = (
         ["step", "root", "testid", "type", "flag"]
-        + ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
+        + robot_joints_cols 
         + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
         + ["rs1", "rs2", "rs3", "rs4", "rs5", "rs6"]
-        + ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+        + tracker_joints_cols 
         + ["opt"]
         + ["rcx", "rcy", "rcz"]
         + ["tcx", "tcy", "tcz"]
@@ -344,7 +365,7 @@ class LearningRecord(Record):
         new_pt = [step, root, testid, type, flag] + rq + rt + rs + tq + [opt] + rc + tc + ce
         new_pt = np.array(new_pt).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(new_pt, columns=self.df_cols)
-        self.df = self.df.append(new_pt)
+        self.df = pd.concat((self.df, new_pt))
 
 
 class LearningSummaryRecord(Record):

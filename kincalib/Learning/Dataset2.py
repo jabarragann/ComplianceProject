@@ -22,7 +22,14 @@ np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
 class JointsDataset1(Dataset):
-    def __init__(self, data_path: Path, mode: str, normalizer=None) -> None:
+    def __init__(
+        self,
+        data_path: Path,
+        mode: str,
+        normalizer=None,
+        full_output: bool = False,
+        output: str = "joints",
+    ) -> None:
         """Input robot state (joint position and torque) and output corrected wrist joints.
 
         Parameters
@@ -33,19 +40,32 @@ class JointsDataset1(Dataset):
             Either 'train', 'valid' or 'tests'
         normalizer : sklearn.preprocessing.StandardScaler
             This can be added in the constructor or later. It is required to used the __getitem__ function.
+        output: str
+            Either `joints` or `error`. Use 'joints' to output the tracker joints or 'error' to output the
+            difference between robot and tracker joints.
         """
         super().__init__()
         self.data_df = pd.read_csv(data_path)
         assert mode in ["train", "valid", "test"], "invalid mode"
+        assert output in ["joints", "error"], "invalid output"
+
         self.mode = mode
+        self.output = output
         self.data_df = self.data_df.loc[self.data_df["flag"] == mode]
         self.normalizer: StandardScaler = normalizer
 
-        input_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"] + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
-        output_cols = ["tq4", "tq5", "tq6"]
+        # fmt:off
+        input_cols = ["rq1", "rq2", "rq3", "rq4", "rq5", "rq6"] + \
+                     ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
+        # fmt:on
 
-        # Filter outliers with the optimization error of q56 lower than 1.4mm
-        self.data_df = self.data_df.loc[self.data_df["opt"] < 1.4 / 1000]
+        if full_output:
+            output_cols = ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+        else:
+            output_cols = ["tq4", "tq5", "tq6"]
+
+        # Filter outliers with the optimization error of q56 lower than 3.0 (previous 1.4mm)
+        self.data_df = self.data_df.loc[self.data_df["opt"] < 3.0 / 1000]
         self.X = self.data_df[input_cols].to_numpy()
         self.Y = self.data_df[output_cols].to_numpy()
 
@@ -61,23 +81,47 @@ class JointsDataset1(Dataset):
             exit(0)
         x_norm = self.normalizer(self.X[idx])
 
-        return x_norm, self.Y[idx]
+        if self.output == "joints":
+            return x_norm, self.Y[idx]
+        else:
+            error = self.Y[idx] - self.X[idx, 0:6]
+            return x_norm, error
 
 
 @dataclass
 class Normalizer:
     xdata: np.ndarray
+    state_dict: dict = None
 
     def __post_init__(self):
         """Calculate mean and std of data"""
-        self.mean = self.xdata.mean(axis=0)
-        self.std = self.xdata.std(axis=0)
+        if self.xdata is not None:
+            self.mean = self.xdata.mean(axis=0)
+            self.std = self.xdata.std(axis=0)
+        elif self.state_dict is not None:
+            self.load_state_dict(self.state_dict)
+        else:
+            # log.info("state_dict and xdata cannot be None at the same time")
+            raise ValueError("state_dict and xdata cannot be None at the same time")
 
     def __call__(self, x):
         return (x - self.mean) / self.std
 
     def reverse(self, x):
         return (x * self.std) + self.mean
+
+    def get_state_dict(self):
+        return {"mean": self.mean.tolist(), "std": self.std.tolist()}
+
+    def load_state_dict(self, scale_values_dict):
+        self.mean = np.array(scale_values_dict["mean"], dtype=np.float32)
+        self.std = np.array(scale_values_dict["std"], dtype=np.float32)
+
+    def to_json(self, path: Path):
+        state_dict = self.get_state_dict()
+        json_str = json.dumps(state_dict, indent=2)
+        with open(path, "w") as f:
+            f.write(json_str)
 
 
 if __name__ == "__main__":

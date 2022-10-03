@@ -11,7 +11,8 @@ from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial 
 from kincalib.Atracsys.ftk_utils import markerfile2triangles, identify_marker
 from kincalib.Atracsys.ftk_500_api import ftk_500
-from kincalib.geometry import Circle3D, Plotter3D
+from kincalib.Geometry.geometry import Circle3D
+from kincalib.Geometry.Plotter import  Plotter3D
 import argparse
 import sys
 from pathlib import Path

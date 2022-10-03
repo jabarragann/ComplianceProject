@@ -72,7 +72,14 @@ class CalibrationMotions:
     # - pitch_motion
     # - roll_motion
     # ------------------------------------------------------------
-    def outer_pitch_yaw_motion(init_jp, psm_handler, root: Path = None, expected_markers: int = 4, save: bool = True):
+    def outer_pitch_yaw_motion(
+        init_jp,
+        psm_handler,
+        ftk_handler: ftk_500,
+        root: Path = None,
+        expected_markers: int = 4,
+        save: bool = True,
+    ):
         # Init outer roll(Shaft)
         init_jp[3] = -0.1589
         # Generate outer yaw trajectory
@@ -89,18 +96,34 @@ class CalibrationMotions:
         init_jp[0] = 0.0
         init_jp[1] = 0.0
         CalibrationMotions.outer_joints_motion(
-            init_jp, psm_handler, expected_markers, save, filename=outer_yaw_file, trajectory=outer_yaw_trajectory
+            init_jp,
+            psm_handler,
+            expected_markers,
+            save,
+            filename=outer_yaw_file,
+            trajectory=outer_yaw_trajectory,
         )
         # Outer pitch trajectory (q2)
         init_jp[0] = 0.0
         init_jp[1] = 0.0
         CalibrationMotions.outer_joints_motion(
-            init_jp, psm_handler, expected_markers, save, filename=outer_pitch_file, trajectory=outer_pitch_trajectory
+            init_jp,
+            psm_handler,
+            expected_markers,
+            save,
+            filename=outer_pitch_file,
+            trajectory=outer_pitch_trajectory,
         )
 
     @staticmethod
     def pitch_roll_independent_motion(
-        init_jp, psm_handler, log, expected_markers=4, save: bool = False, filename: Path = None
+        init_jp,
+        psm_handler,
+        ftk_handler,
+        log,
+        expected_markers=4,
+        save: bool = False,
+        filename: Path = None,
     ):
         """Move each axis independently. Save the measurements from each movement in different df.
         First the swing the pitch axis with two different roll values.
@@ -122,13 +145,18 @@ class CalibrationMotions:
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
         #DvrkMotions.pitch_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file, trajectory=pitch_trajectory)
-        CalibrationMotions.pitch_roll_together_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file)
-        CalibrationMotions.roll_motion(  init_jp, psm_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
+        CalibrationMotions.pitch_roll_together_motion( init_jp, psm_handler,ftk_handler, log, expected_markers, save, pitch_file)
+        CalibrationMotions.roll_motion(  init_jp, psm_handler,ftk_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
         # fmt:on
 
     @staticmethod
     def pitch_yaw_roll_independent_motion(
-        init_jp, psm_handler, expected_markers=4, save: bool = False, filename: Path = None
+        init_jp,
+        psm_handler,
+        ftk_handler: ftk_500,
+        expected_markers=4,
+        save: bool = False,
+        filename: Path = None,
     ):
         """Move each axis independently. Save the measurements from each movement in different df.
         First the swing the pitch axis with two different roll values.
@@ -149,17 +177,19 @@ class CalibrationMotions:
         pitch_yaw_traj = []
         roll_v = [0.2, -0.3]
         for r in roll_v:
-            pitch_yaw_traj += list(product([r], pitch_trajectory, [0.0])) + list(product([r], [0.0], yaw_trajectory))
+            pitch_yaw_traj += list(product([r], pitch_trajectory, [0.0])) + list(
+                product([r], [0.0], yaw_trajectory)
+            )
         roll_traj = CalibrationMotions.generate_roll_motion()
         roll_traj = list(product(roll_traj, [0], [0]))
         pitch_yaw_file = filename.parent / (filename.with_suffix("").name + "_pitch_yaw.txt")
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
         # roll trajectory
-        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, expected_markers, save,
+        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, ftk_handler, expected_markers, save,
                                  filename=roll_file, trajectory=roll_traj)
         # pitch trajectory
-        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, expected_markers, save,
+        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, ftk_handler, expected_markers, save,
                                                 filename=pitch_yaw_file,trajectory=pitch_yaw_traj)
         # fmt:on
 
@@ -173,6 +203,7 @@ class CalibrationMotions:
     def outer_joints_motion(
         init_jp,
         psm_handler,
+        ftk_handler: ftk_500,
         expected_markers=4,
         save: bool = False,
         filename: Path = None,
@@ -195,10 +226,12 @@ class CalibrationMotions:
         if filename is None:
             raise Exception("filename not give")
 
-        ftk_handler = ftk_500("custom_marker_112")
+        # ftk_handler = ftk_500("custom_marker_112")
 
         # Create record to store the measured data
-        sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
+        sensor_record = AtracsysCartesianRecord(
+            ftk_handler, expected_markers=expected_markers, filename=filename
+        )
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
@@ -224,6 +257,7 @@ class CalibrationMotions:
     def wrist_joints_motion(
         init_jp,
         psm_handler,
+        ftk_handler: ftk_500,
         expected_markers=4,
         save: bool = False,
         filename: Path = None,
@@ -252,10 +286,12 @@ class CalibrationMotions:
         roll_trajectory = [0.2, -0.3]
         total = len(roll_trajectory) * len(pitch_trajectory)
 
-        ftk_handler = ftk_500("custom_marker_112")
+        # ftk_handler = ftk_500("custom_marker_112")
 
         # Create record to store the measured data
-        sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
+        sensor_record = AtracsysCartesianRecord(
+            ftk_handler, expected_markers=expected_markers, filename=filename
+        )
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)

@@ -2,32 +2,17 @@ from __future__ import annotations
 
 # Python
 from pathlib import Path
-from random import Random
-import time
-from typing import Any, Union
-from dataclasses import dataclass, field
-from black import out
-import numpy as np
-import numpy
-from typing import List
-
-from psutil import cpu_count
+from typing import Any
 
 # ros
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Header
+from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory
 
 # Custom
-from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.Logger import Logger
 from kincalib.Recording.DataRecord import CalibrationRecord
-from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
-from kincalib.Sensors.ftk_500_api import ftk_500
-from kincalib.utils.SavingUtilities import save_without_overwritting
+from kincalib.Sensors.ftk_500_api import FTKDummy, ftk_500
 from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
-from collections import namedtuple
 
 log = Logger(__name__).log
 
@@ -37,11 +22,21 @@ class DataRecorder:
     Callable data class to record data from robot and sensor.
     """
 
-    def __init__(self, replay_device, expected_markers: int, root: Path, marker_name: str, mode: str, test_id: int):
+    def __init__(
+        self,
+        replay_device,
+        ftk_handler: ftk_500,
+        expected_markers: int,
+        root: Path,
+        marker_name: str,
+        mode: str,
+        test_id: int,
+        description: str = None,
+    ):
 
         self.replay_device = replay_device
         self.expected_markers = expected_markers
-        self.ftk_handler = ftk_500(marker_name)
+        self.ftk_handler = ftk_handler
         self.calibration_record = CalibrationRecord(
             ftk_handler=self.ftk_handler,
             robot_handler=self.replay_device,
@@ -49,6 +44,7 @@ class DataRecorder:
             root_dir=root,
             mode=mode,
             test_id=test_id,
+            description=description,
         )
 
     def __call__(self, **kwargs):
@@ -79,9 +75,18 @@ class OuterJointsCalibrationRecorder:
     robot and sensor
     """
 
-    def __init__(self, replay_device, save: bool, expected_markers: int, root: Path, marker_name: str):
+    def __init__(
+        self,
+        replay_device,
+        ftk_handler: ftk_500,
+        save: bool,
+        expected_markers: int,
+        root: Path,
+        marker_name: str,
+    ):
         self.save = save
         self.replay_device = replay_device
+        self.ftk_handler = ftk_handler
         self.expected_markers = expected_markers
 
         self.outer_js_files = root / "outer_mov"
@@ -92,6 +97,7 @@ class OuterJointsCalibrationRecorder:
         CalibrationMotions.outer_pitch_yaw_motion(
             self.replay_device.measured_jp(),
             psm_handler=self.replay_device,
+            ftk_handler=self.ftk_handler,
             expected_markers=self.expected_markers,
             save=self.save,
             root=self.outer_js_files,
@@ -103,10 +109,19 @@ class WristJointsCalibrationRecorder:
     robot and sensor
     """
 
-    def __init__(self, replay_device, save: bool, expected_markers: int, root: Path, marker_name: str):
+    def __init__(
+        self,
+        replay_device,
+        ftk_handler: ftk_500,
+        save: bool,
+        expected_markers: int,
+        root: Path,
+        marker_name: str,
+    ):
         self.save = save
         self.replay_device = replay_device
         self.expected_markers = expected_markers
+        self.ftk_handler = ftk_handler
 
         self.wrist_files = root / "pitch_roll_mov"
         if not self.wrist_files.exists():
@@ -120,6 +135,7 @@ class WristJointsCalibrationRecorder:
         CalibrationMotions.pitch_yaw_roll_independent_motion(
             self.replay_device.measured_jp(),
             psm_handler=self.replay_device,
+            ftk_handler=self.ftk_handler,
             expected_markers=self.expected_markers,
             save=self.save,
             filename=self.wrist_files / f"step{index:03d}_wrist_motion.txt",
@@ -131,9 +147,12 @@ if __name__ == "__main__":
     from kincalib.Motion.TrajectoryPlayer import Trajectory, TrajectoryPlayer
 
     # Test calibration motions
-    rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag")
-    rosbag_handle = RosbagUtils(rosbag_path)
-    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=60)
+
+    # rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag")
+    # rosbag_handle = RosbagUtils(rosbag_path)
+    # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=60)
+
+    trajectory = SoftRandomJointTrajectory.generate_trajectory(50, samples_per_step=20)
 
     log.info(f"Initial pt {trajectory.setpoints[0].position}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
@@ -143,21 +162,30 @@ if __name__ == "__main__":
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
     arm.home_device()
 
+    # Sensors
+    # ftk_handler = ftk_500("marker_12")
+    ftk_handler = FTKDummy()
+
     # Setup calibration callbacks
     outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
     )
     wrist_js_calib_cb = WristJointsCalibrationRecorder(
-        replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
     )
-    data_recorder_cb = DataRecorder(arm, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11)
+    data_recorder_cb = DataRecorder(
+        arm, ftk_handler, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11
+    )
 
     # Create trajectory player with cb
     # trajectory_player = TrajectoryPlayer(
     #     arm, trajectory, before_motion_cb=[outer_js_calib_cb], after_motion_cb=[wrist_js_calib_cb]
     # )
     trajectory_player = TrajectoryPlayer(
-        arm, trajectory, before_motion_loop_cb=[], after_motion_cb=[data_recorder_cb, wrist_js_calib_cb]
+        arm,
+        trajectory,
+        before_motion_loop_cb=[],
+        after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
     )
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')

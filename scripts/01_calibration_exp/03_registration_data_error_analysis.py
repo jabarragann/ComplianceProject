@@ -29,7 +29,8 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.ExperimentUtils import load_registration_data, calculate_midpoints
-from kincalib.geometry import Line3D, Circle3D, Plotter3D, Triangle3D, dist_circle3_plane
+from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D, dist_circle3_plane
+from kincalib.Geometry.Plotter import Plotter3D
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 from kincalib.utils.CmnUtils import *
@@ -285,7 +286,9 @@ def plot_results():
 
     # Histograms for triangle area
     fig, axes = plt.subplots(2, 1, sharey=True, tight_layout=True)
-    create_histogram(list_area, axes[0], xlabel="Triangle area mm^2", title="Pitch origin measurements")
+    create_histogram(
+        list_area, axes[0], xlabel="Triangle area mm^2", title="Pitch origin measurements"
+    )
     create_histogram(list_pitch2yaw, axes[1], xlabel="m", title="pitch2yaw measurements")
 
     # fig, axes = plt.subplots(1, 3)

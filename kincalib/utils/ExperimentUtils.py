@@ -5,7 +5,7 @@ from tf_conversions import posemath as pm
 import numpy as np
 import matplotlib.pyplot as plt
 from kincalib.Sensors.ftk_utils import markerfile2triangles, identify_marker
-from kincalib.geometry import Line3D, Circle3D, Triangle3D
+from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from pathlib import Path
 from typing import Tuple, List
@@ -40,7 +40,9 @@ def load_registration_data(root: Path) -> dict:
     return dict_files
 
 
-def separate_markerandfiducial(filename, marker_file, df: pd.DataFrame = None) -> Tuple[List[PyKDL.Frame], np.ndarray]:
+def separate_markerandfiducial(
+    filename, marker_file, df: pd.DataFrame = None
+) -> Tuple[List[PyKDL.Frame], np.ndarray]:
     """Read atracsys data and separates the wrist fiducials from the fiducials on the shaft marker.
 
     Args:
@@ -49,8 +51,13 @@ def separate_markerandfiducial(filename, marker_file, df: pd.DataFrame = None) -
         df (pd.DataFrame, optional): [description]. Defaults to None.
 
     Returns:
-        Tuple[List[PyKDL.Frame], np.ndarray]: returns a list PyKDL.Frames corresponding to the all the available poses
-        of the marker in the shaft and a array of the wrist marker fiducial.
+        pose_arr: List[PyKDL.Frame]
+            list PyKDL.Frames corresponding to the all the available poses
+            of the marker in the shaft
+
+        wrist_fiducials: np.ndarray
+            array of the wrist marker fiducial.
+
     """
 
     # Read df and marker files
@@ -69,7 +76,9 @@ def separate_markerandfiducial(filename, marker_file, df: pd.DataFrame = None) -
     for n in n_step:
         step_n_d = df_f.loc[df_f["step"] == n]
         s_time = time.time()
-        dd, closest_t = identify_marker(step_n_d.loc[:, ["px", "py", "pz"]].to_numpy(), triangles_list[0])
+        dd, closest_t = identify_marker(
+            step_n_d.loc[:, ["px", "py", "pz"]].to_numpy(), triangles_list[0]
+        )
         e_time = time.time()
         # log.info(f"identify_marker time {e_time-s_time:0.04f}")
         # log.info(f"{n} - step_n_d shape {step_n_d.shape}")
@@ -91,7 +100,9 @@ def separate_markerandfiducial(filename, marker_file, df: pd.DataFrame = None) -
     return pose_arr, wrist_fiducials
 
 
-def calculate_midpoints(roll_df: pd.DataFrame, pitch_df: pd.DataFrame, other_vals_dict: dict = {}) -> Tuple[np.ndarray]:
+def calculate_midpoints(
+    roll_df: pd.DataFrame, pitch_df: pd.DataFrame, other_vals_dict: dict = {}
+) -> Tuple[np.ndarray]:
     """Calculate pitch axis origin candidates from a roll movement and pitch movement.
 
     Args:
