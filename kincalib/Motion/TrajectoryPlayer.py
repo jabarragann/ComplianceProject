@@ -11,7 +11,6 @@ import numpy as np
 import numpy
 from typing import List
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils
-from kincalib.Recording.DataRecorder import OuterJointsCalibrationRecorder
 
 # ros
 from sensor_msgs.msg import JointState
@@ -309,8 +308,8 @@ if __name__ == "__main__":
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
     trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
-    # trajectory = RandomJointTrajectory.generate_trajectory(50)
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
+    trajectory = RandomJointTrajectory.generate_trajectory(50)
+    # trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
 
     log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")

@@ -184,13 +184,13 @@ if __name__ == "__main__":
 
     # Setup calibration callbacks
     outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
     )
     wrist_js_calib_cb = WristJointsCalibrationRecorder(
-        replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
     )
     data_recorder_cb = DataRecorder(
-        arm, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11
+        arm, ftk_handler, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11
     )
 
     # Create trajectory player with cb
@@ -204,9 +204,7 @@ if __name__ == "__main__":
         after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
     )
 
-    ans = input(
-        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
-    )
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True)
     else:
