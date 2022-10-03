@@ -2,11 +2,8 @@ from __future__ import annotations
 
 # Python
 from pathlib import Path
-from random import Random
 import time
-from typing import Union
 from dataclasses import dataclass, field
-from black import out
 import numpy as np
 import numpy
 from typing import List
@@ -14,19 +11,13 @@ from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 
 # ros
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Header
 
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
-from kincalib.Recording.DataRecord import CalibrationRecord
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
-from kincalib.Sensors.ftk_500_api import ftk_500
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
-from collections import namedtuple
 
 log = Logger(__name__).log
 
