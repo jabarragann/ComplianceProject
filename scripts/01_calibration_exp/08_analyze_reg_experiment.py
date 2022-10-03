@@ -6,17 +6,17 @@ Points in the calibration phantom were touch with the PSM in order from 1-9 and 
 Point 7-D were not collected. This give us a total of 10.
 """
 
+import argparse
 import json
-import os
 from pathlib import Path
-from click import progressbar
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
+from kincalib.Learning.InferencePipeline import InferencePipeline
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
-from kincalib.utils.IcpSolver import icp
 from kincalib.utils.Frame import Frame
 from kincalib.utils.Logger import Logger
 
@@ -38,7 +38,8 @@ phantom_coord = {
     "D": np.array([-193.675, 95.25, 101.6]) / 1000,
 }
 
-order_of_pt = ["1", "2", "3", "4", "5", "6", "8", "9", "A", "B", "C"]
+# order_of_pt = ["1", "2", "3", "4", "5", "6", "8", "9", "A", "B", "C"]
+order_of_pt = ["1", "2", "3", "4", "5", "6","7", "8", "9", "A", "B", "C"]
 # order_of_pt = ["1", "2", "3", "4", "5", "6"]
 
 
@@ -68,13 +69,16 @@ def plot_point_cloud(xs, ys, zs, labels=None):
 
     plt.show()
 
+def main():
 
-if __name__ == "__main__":
+    log.info(f"path: {args.root}")
+    log.info(f"model name: {args.modelname}\n")
 
     psm_kin = DvrkPsmKin()  # Forward kinematic model
 
     # Load calibration values
-    registration_data_path = Path("./data2/d04-rec-15-trajsoft/registration_results")
+    root = Path(args.root) 
+    registration_data_path = root / "registration_results"
     registration_dict = json.load(open(registration_data_path / "registration_values.json", "r"))
     T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
     T_RT = T_TR.inv()
@@ -83,10 +87,14 @@ if __name__ == "__main__":
     wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
     # Load experimental data
-    data_dir = Path(
-        "./data/03_replay_trajectory/d04-rec-16-trajsoft/"
-        + "registration_exp/registration_sensor_exp/test_trajectories/"
-    )
+    data_dir = root / "registration_exp/registration_with_phantom/test_trajectories/"
+
+    log.info(f"loading registration values from {registration_data_path}")
+    log.info(f"loading data from {data_dir.parent}")
+
+    root = Path(f"data/deep_learning_data/Studies/TestStudy2") / args.modelname
+
+    inference_pipeline = InferencePipeline(root)
 
     # Output df
     values_df_cols = [
@@ -101,10 +109,12 @@ if __name__ == "__main__":
         "phantom_x",
         "phantom_y",
         "phantom_z",
+        "neuralnet_x",
+        "neuralnet_y",
+        "neuralnet_z",
     ]
-    values_df = pd.DataFrame(columns=values_df_cols)
 
-    files_dict = {}
+    all_experiment_df = []
     for dir in data_dir.glob("*/robot_cp.txt"):
         test_id = dir.parent.name
         log.info(f">>>>>> Processing >>>>>>")
@@ -124,11 +134,9 @@ if __name__ == "__main__":
         # Calculate cartesian pose with tracker estimated joints
         j_estimator = JointEstimator(T_RT, T_MP, wrist_fid_Y)
 
-        ## TODO: some positions can not be calculated because the shaft marker is not observed
-        ## TODO: account for that when creating the final df
-
         loc_df = []
         for idx, loc in enumerate(order_of_pt):
+
             # Calculate tracker joints
             robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
                 j_estimator,
@@ -140,6 +148,16 @@ if __name__ == "__main__":
                 tracker_df[["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]].to_numpy()
             )
             cartesian_tracker = extract_cartesian_xyz(cartesian_tracker.data)
+
+            # Calculate network corrected joints
+            #fmt:off 
+            joint_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
+            input_cols = ["step","q1", "q2", "q3", "q4", "q5", "q6"] + [
+                "t1", "t2", "t3", "t4", "t5", "t6", ]#fmt:on
+            corrected_jp = inference_pipeline.correct_joints(robot_jp_df.iloc[idx][input_cols].to_frame().T)
+            cartesian_network = psm_kin.fkine( corrected_jp[joint_cols].to_numpy() )
+            cartesian_network= extract_cartesian_xyz(cartesian_network.data)
+
             ## Cartesian tracker is  single line!!
             data_dict = dict(
                 test_id=[test_id],
@@ -153,15 +171,19 @@ if __name__ == "__main__":
                 phantom_x=[phantom_coord[loc][0]],
                 phantom_y=[phantom_coord[loc][1]],
                 phantom_z=[phantom_coord[loc][2]],
+                neuralnet_x=[cartesian_network[0, 0]],
+                neuralnet_y=[cartesian_network[0, 1]],
+                neuralnet_z=[cartesian_network[0, 2]],
             )
             loc_df.append(pd.DataFrame(data_dict, columns=values_df_cols))
 
-        final_df = pd.concat(loc_df, ignore_index=True)
+        experiment_df = pd.concat(loc_df, ignore_index=True)
+        all_experiment_df.append(experiment_df)
 
         # Calculate registration error robot
-        A = final_df[["robot_x", "robot_y", "robot_z"]].to_numpy().T
-        B = final_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
-        labels = final_df["location_id"].to_numpy().T
+        A = experiment_df[["robot_x", "robot_y", "robot_z"]].to_numpy().T
+        B = experiment_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = experiment_df["location_id"].to_numpy().T
         # Registration assuming point correspondances
         Trig = Frame.find_transformation_direct(A, B)
         error, std = Frame.evaluation(A, B, Trig, return_std=True)
@@ -170,7 +192,7 @@ if __name__ == "__main__":
         # print(f"final df\n{final_df.head()}")
 
         # Calculate registration error tracker
-        temp_df = final_df.dropna(axis=0)
+        temp_df = experiment_df.dropna(axis=0)
         A = temp_df[["tracker_x", "tracker_y", "tracker_z"]].to_numpy().T
         B = temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
         labels = temp_df["location_id"].to_numpy().T
@@ -179,6 +201,33 @@ if __name__ == "__main__":
         error, std = Frame.evaluation(A, B, Trig, return_std=True)
         log.info(f"Registration error tracker (mm):   {mean_std_str(1000*error,1000*std)}")
 
+        # Calculate registration error model
+        temp_df = experiment_df.dropna(axis=0)
+        A = temp_df[["neuralnet_x", "neuralnet_y", "neuralnet_z"]].to_numpy().T
+        B = temp_df[["phantom_x", "phantom_y", "phantom_z"]].to_numpy().T
+        labels = temp_df["location_id"].to_numpy().T
+
+        # Registration assuming point correspondances
+        Trig = Frame.find_transformation_direct(A, B)
+        error, std = Frame.evaluation(A, B, Trig, return_std=True)
+        log.info(f"Registration error neural net (mm):   {mean_std_str(1000*error,1000*std)}")
+
         # Plot point clouds
         # plot_point_cloud(B.T[:, 0], B.T[:, 1], B.T[:, 2], labels=labels)
         # plot_point_cloud(A.T[:, 0], A.T[:, 1], A.T[:, 2], labels=labels)
+
+    all_experiment_df = pd.concat(all_experiment_df)
+    all_experiment_df.to_csv(registration_data_path / "registration_with_phantom.csv", index=None)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # fmt:off
+    parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
+                    help="This directory must a registration_results subdir contain a calibration .json file.") 
+    parser.add_argument('-m','--modelname', type=str,default=False,required=True \
+                        ,help="Name of deep learning model to use.")
+
+    # fmt:on
+    args = parser.parse_args()
+    main()

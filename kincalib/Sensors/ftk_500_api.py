@@ -67,14 +67,16 @@ class ftk_500:
             )
         self.poses_arr = record
 
-    def collect_measurements_raw(self, m: int, t: float = 1000, sample_time: float = 50) -> List[List[float]]:
+    def collect_measurements_raw(
+        self, m: int, t: float = 1000, sample_time: float = 50
+    ) -> List[List[float]]:
         """Collectect measurements from `m` fiducials for a specific amount of time.
         Marker pose will also be collected if it is provided when initializing the class.
 
         Output dict keys:
         * "fiducials": recorded,
         * "fiducials_dropped": records_removed,
-        * "marker": marker_pose_arr,
+        * "markers": marker_pose_arr,
         * "markers_dropped": markers_dropped,
 
         Args:
@@ -115,16 +117,27 @@ class ftk_500:
             "markers_dropped": markers_dropped,
         }
 
-    def obtain_processed_measurement(self, m: int, t: float = 1000, sample_time: float = 50) -> dict:
-        """[summary]
+    def obtain_processed_measurement(
+        self, m: int, t: float = 1000, sample_time: float = 50
+    ) -> dict:
+        """_summary_
 
-        Args:
-            m (int):  Expected number of markers
-            t (float, optional): [description]. Defaults to 1000.
-            sample_time (float, optional): [description]. Defaults to 50.
+        Parameters
+        ----------
+        m : int
+            Expected number of markers
+        t : float, optional
+            Collect measurements for t milli seconds, by default 1000
+        sample_time : float, optional
+            Query a new measurement every `sample_time` milli seconds, by default 50
 
-        Returns:
-            dict: [description]
+        Returns
+        -------
+        mean_frame: PyKDL.Frame
+            mean frame from all the measurements
+        mean_fiducials_position: np.ndarray
+            array with the fiducials' mean location
+
         """
         records_dict = self.collect_measurements_raw(m, t, sample_time)
         sensor_vals = records_dict["fiducials"]
@@ -188,10 +201,6 @@ class ftk_500:
 
         return np.array(sorted_records)
 
-    @staticmethod
-    def average_marker_pose(
-        pose_arr: List[PyKDL.Frame],
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """[summary]
 
         Args:
@@ -199,6 +208,32 @@ class ftk_500:
 
         Returns:
             Tuple[np.ndarray,np.ndarray,np.ndarray]: mean_frame, position_std, orientation_std
+        """
+
+    @staticmethod
+    def average_marker_pose(
+        pose_arr: List[PyKDL.Frame],
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Calculate the mean position and orientation of multiple frame measurements
+        TODO: What is the best way to calculate a mean rotation matrix? Is taking the mean quaternion the
+        best option?
+
+        Parameters
+        ----------
+        pose_arr : List[PyKDL.Frame]
+            List of PyKDL frames
+
+        Returns
+        -------
+        mean_frame: PyKDL.Frame
+            mean PyKDL frame
+
+        position_std: np.ndarray
+            x,y,z component's standard deviation
+
+        orientation_std:np.ndarray
+            standard deviation of quaternions
+
         """
         if len(pose_arr) < 2:
             print("Not enough records (2 minimum)")  # this is totally arbitrary
@@ -215,7 +250,9 @@ class ftk_500:
         orientation_std = np.array(orientation).std(axis=0)
         orientation_mean = orientation_mean / np.linalg.norm(orientation_mean)
 
-        mean_frame = PyKDL.Frame(PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean))
+        mean_frame = PyKDL.Frame(
+            PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
+        )
         return mean_frame, position_std, orientation_std
 
 
@@ -239,6 +276,25 @@ def clean_avg_measurements(measurements, expected_markers=1):
         else:
             print("expected markers needs to be a positive number")
             sys.exit(0)
+
+
+class FTKDummy(ftk_500):
+    def __init__(self) -> None:
+        
+        pass
+
+    def obtain_processed_measurement(
+        self, m: int, t: float = 1000, sample_time: float = 50
+    ) -> dict:
+
+        init_time = time.time()
+        while time.time() - init_time < t / 1000:
+            time.sleep(0.05)
+
+        mean_frame = PyKDL.Frame.Identity()
+        mean_fiducials_pos = np.zeros((m, 3))
+
+        return mean_frame, mean_fiducials_pos
 
 
 if __name__ == "__main__":
@@ -304,5 +360,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Obtain processed measurements
     # ------------------------------------------------------------
-    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(expected_markers, t=500, sample_time=15)
+    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(
+        expected_markers, t=500, sample_time=15
+    )
     log.debug(f"Mean value shape {mean_value.shape}")

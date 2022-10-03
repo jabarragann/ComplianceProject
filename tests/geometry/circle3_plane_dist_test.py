@@ -30,7 +30,14 @@ from kincalib.utils.ExperimentUtils import (
     calculate_midpoints,
     separate_markerandfiducial,
 )
-from kincalib.geometry import Line3D, Circle3D, Plane3D, Plotter3D, Triangle3D, dist_circle3_plane
+from kincalib.Geometry.geometry import (
+    Line3D,
+    Circle3D,
+    Plane3D,
+    Plotter3D,
+    Triangle3D,
+    dist_circle3_plane,
+)
 import kincalib.utils.CmnUtils as utils
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")

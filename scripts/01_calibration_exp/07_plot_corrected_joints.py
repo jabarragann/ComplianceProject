@@ -1,36 +1,23 @@
 # Python imports
-import json
 from pathlib import Path
-from re import I
-import time
 import argparse
-import sys
+from re import I
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 from pathlib import Path
-from typing import List, Tuple, Set
-from rich.logging import RichHandler
-from rich.progress import track
-import torch
-
-# ROS and DVRK imports
-import dvrk
-from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
-from kincalib.Learning.Models import BestMLP2
-import rospy
-import tf_conversions.posemath as pm
+import seaborn as sns
 
 # kincalib module imports
-from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.Frame import Frame
-from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimator
-from kincalib.utils.ExperimentUtils import separate_markerandfiducial
-from kincalib.utils.CmnUtils import *
+from kincalib.Learning.InferencePipeline import InferencePipeline
+from kincalib.Metrics.RegistrationError import FRE, get_wrist_fiducials_cp
 from kincalib.Motion.DvrkKin import DvrkPsmKin
-from pytorchcheckpoint.checkpoint import CheckpointHandler
+from kincalib.utils.Logger import Logger
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils, TrackerJointsEstimator
+from kincalib.Metrics.TableGenerator import FRETable, ResultsTable
+from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics 
+from kincalib.utils.CmnUtils import mean_std_str
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
@@ -43,10 +30,10 @@ def plot_joints(robot_df, tracker_df, pred_df):
             axes[i].set_title(f"joint {i+1}")
             axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy(), color="blue")
             axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy(), marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), color="orange")
-            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy(), color="orange")
+            axes[i].plot(tracker_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy(), marker="*", linestyle="None", color="orange", label="tracker")
 
-            if i >2:
+            if f"q{i+1}" in pred_df:
                 axes[i].plot(pred_df['step'].to_numpy(),pred_df[f"q{i+1}"].to_numpy(), color="green")
                 axes[i].plot(pred_df['step'].to_numpy(),pred_df[f"q{i+1}"].to_numpy(), marker="*", linestyle="None", color="green", label="predicted")
 
@@ -54,116 +41,147 @@ def plot_joints(robot_df, tracker_df, pred_df):
 
         axes[5].legend()
 
+def plot_joints_torque(robot_jp_df: pd.DataFrame):
+
+    # layout
+    fig, axes = plt.subplots(2, 3, figsize=(10, 5))
+    for i, ax in enumerate(axes.reshape(-1)):
+        sns.boxplot(data=robot_jp_df, x=f"t{i+1}", ax=ax)
+        sns.stripplot(data=robot_jp_df, x=f"t{i+1}", ax=ax, color="black")
+    return axes
+
+def plot_joints_difference(robot_joints,tracker_joints):
+    rad2d = 180 / np.pi
+    scale = np.array([rad2d, rad2d, 1000, rad2d, rad2d, rad2d])
+
+    joints_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
+    robot_joints_2 = robot_joints.rename(lambda x: x.replace("rq", "q"), axis=1)
+    tracker_joints_2 = tracker_joints.rename(lambda x: x.replace("tq", "q"), axis=1)
+    robot_joints_2 = robot_joints_2[joints_cols].to_numpy() 
+    tracker_joints_2 = tracker_joints_2[joints_cols].to_numpy() 
+    diff = (robot_joints_2 - tracker_joints_2)* scale
+    diff = pd.DataFrame(diff,columns=joints_cols)
+
+    # layout
+    fig, axes = plt.subplots(2, 3, figsize=(10, 5))
+    for i, ax in enumerate(axes.reshape(-1)):
+        sns.boxplot(data=diff, x=f"q{i+1}", ax=ax)
+        sns.stripplot(data=diff, x=f"q{i+1}", ax=ax, color="black")
+    return axes
+
 def main(testid: int):
     # ------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------
-
-    # Important paths
     root = Path(args.root)
-    marker_file = Path("./share/custom_marker_id_112.json")
 
-    if args.test:
-        robot_jp_p = root / f"test_trajectories/{testid:02d}" / "robot_jp.txt"
-        robot_cp_p = root / f"test_trajectories/{testid:02d}" / "robot_cp.txt"
-    else:
-        robot_jp_p = root / "robot_mov" / "robot_jp.txt"
-        robot_cp_p = root / "robot_mov" / "robot_cp.txt"
+    # Src paths
+    if args.test:  # Test trajectories
+        data_p = Path(args.datadir) if args.datadir is not None else root
+        data_p = data_p / f"test_trajectories/{testid:02d}"
+    else:  # Calibration points
+        data_p = root / "robot_mov"
 
-    # ------------------------------------------------------------
-    # Calculate tracker joint values
-    # ------------------------------------------------------------
-    if args.dstdir is None:
-        dst_p = robot_cp_p.parent
-        dst_p = dst_p / "result"
-        registration_data_path = root / "registration_results"
-    else:
-        dst_p = Path(args.dstdir)
-        registration_data_path = dst_p / root.name / "registration_results"
-        dst_p = dst_p / root.name / robot_cp_p.parent.name / "result"  # e.g d04-rec-11-traj01/01/results/
-
-    log.info(f"Storing results in {dst_p}")
+    data_p = data_p / "result"
+    registration_data_path = root / "registration_results"
     log.info(f"Loading registration .json from {registration_data_path}")
-    dst_p.mkdir(parents=True, exist_ok=True)
-    # input("press enter to start ")
 
-    if (dst_p / "robot_joints.txt").exists() and not args.reset:
-        # ------------------------------------------------------------
-        # Read calculated joint values
-        # ------------------------------------------------------------
-        robot_df = pd.read_csv(dst_p.parent / "robot_jp.txt", index_col=None)
-        tracker_df = pd.read_csv(dst_p / "tracker_joints.txt", index_col=None)
-        opt_df = pd.read_csv(dst_p / "opt_error.txt", index_col=None)
+    # ------------------------------------------------------------
+    # Read calculated joint values
+    # ------------------------------------------------------------
+    if (data_p / "robot_joints.txt").exists():
+        robot_df = pd.read_csv(data_p.parent / "robot_jp.txt", index_col=None)
+        robot_cp = pd.read_csv(data_p.parent / "robot_cp.txt", index_col=None)
+        tracker_df = pd.read_csv(data_p / "tracker_joints.txt", index_col=None)
+        robot_joints = pd.read_csv(data_p / "robot_joints.txt", index_col=None)
+        opt_df = pd.read_csv(data_p / "opt_error.txt", index_col=None)
+
+        tracker_joints_estimator = TrackerJointsEstimator(root / "registration_results")
     else:
-        log.info(f"No files found in {dst_p}")
+        log.info(f"robot_joints.txt file not found in {data_p}")
         exit()
 
     # ------------------------------------------------------------
-    # Evaluate results
+    # Calculate metrics 
     # ------------------------------------------------------------
+    model_path = Path(f"data/deep_learning_data/Studies/TestStudy2")/args.modelname 
+    inference_pipeline = InferencePipeline(model_path)
 
-    #Calculate model predictions
-    data_path = Path("data/deep_learning_data/random_dataset.txt")
-    train_dataset = JointsDataset1(data_path, mode="train")
-    normalizer = Normalizer(train_dataset.X.cpu().numpy())
-    cols= ["q1", "q2", "q3", "q4", "q5", "q6"] + ["t1", "t2", "t3", "t4", "t5", "t6"]
-    valstopred = robot_df[cols].to_numpy().astype(np.float32)
-    valstopred = normalizer(valstopred) 
-    valstopred = torch.from_numpy(valstopred).cuda()
-    root = Path(f"data/ModelsCheckpoints/T{3:02d}/") / "final_checkpoint.pt"
-    model = BestMLP2()
-    model.eval()
-    checkpoint = torch.load(root, map_location="cpu")
-    model.load_state_dict(checkpoint.model_state_dict)
-    model = model.cuda()
-    pred = model(valstopred).cpu().detach().numpy()
+    network_df = inference_pipeline.correct_joints(robot_state_df=robot_df)
 
-    pred = np.hstack((robot_df["step"].to_numpy().reshape(-1,1),pred))
-    pred_df = pd.DataFrame(pred,columns=["step", "q4", "q5", "q6"])
+    # Calculate results 
+    robot_error_metrics = CalibrationMetrics("robot",robot_df, tracker_df, opt_df)
+    network_error_metrics = CalibrationMetrics("network", network_df, tracker_df,opt_df )
 
-    # Calculate stats
-    valid_steps = opt_df.loc[opt_df["q56res"] < 0.005]["step"]  # Use the residual to get valid steps.
-    # import pdb
+    # Create results table
+    table = ResultsTable()
+    table.add_data(robot_error_metrics.create_error_dict())
+    net_dict = network_error_metrics.create_error_dict() 
+    table.add_data(net_dict)
 
-    # pdb.set_trace()
-    robot_valid = robot_df.loc[robot_df["step"].isin(valid_steps)].iloc[:, 1:7].to_numpy()
-    tracker_valid = tracker_df.loc[tracker_df["step"].isin(valid_steps)].iloc[:, 1:].to_numpy()
-    diff = robot_valid - tracker_valid
-    diff_mean = diff.mean(axis=0)
-    diff_std = diff.std(axis=0)
+    # ----------------
+    # calculate FRE
+    # ----------------
 
-    # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
-    robot_cp = CalibrationUtils.calculate_cartesian(robot_valid)
-    tracker_cp = CalibrationUtils.calculate_cartesian(tracker_valid)
-    cp_error = tracker_cp - robot_cp
-    mean_error = cp_error.apply(np.linalg.norm, 1)
+    # Get wrist fiducials data
+    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp)
+    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
 
-    log.info(f"Number of valid samples: {diff.shape[0]}")
-    log.info(f"Cartesian results")
-    log.info(f"X mean error (mm):   {mean_std_str(cp_error['X'].mean()*1000, cp_error['X'].std()*1000)}")
-    log.info(f"Y mean error (mm):   {mean_std_str(cp_error['Y'].mean()*1000, cp_error['Y'].std()*1000)}")
-    log.info(f"Z mean error (mm):   {mean_std_str(cp_error['Z'].mean()*1000, cp_error['Z'].std()*1000)}")
-    log.info(f"Mean error   (mm):   {mean_std_str(mean_error.mean()*1000, mean_error.std()*1000)}")
+    tool_offset = np.identity(4)
+    tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
+    psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
 
-    log.info(f"Results in degrees")
-    log.info(f"Joint 1 mean difference (deg): {mean_std_str(diff_mean[0]*180/np.pi,diff_std[0]*180/np.pi)}")
-    log.info(f"Joint 2 mean difference (deg): {mean_std_str(diff_mean[1]*180/np.pi,diff_std[1]*180/np.pi)}")
-    log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    log.info(f"Joint 4 mean difference (deg): {mean_std_str(diff_mean[3]*180/np.pi,diff_std[3]*180/np.pi)}")
-    log.info(f"Joint 5 mean difference (deg): {mean_std_str(diff_mean[4]*180/np.pi,diff_std[4]*180/np.pi)}")
-    log.info(f"Joint 6 mean difference (deg): {mean_std_str(diff_mean[5]*180/np.pi,diff_std[5]*180/np.pi)}")
+    # robot data
+    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
+    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
 
-    # log.info(f"Results in rad")
-    # log.info(f"Joint 1 mean difference (rad): {mean_std_str(diff_mean[0],diff_std[0])}")
-    # log.info(f"Joint 2 mean difference (rad): {mean_std_str(diff_mean[1],diff_std[1])}")
-    # log.info(f"Joint 3 mean difference (m):   {mean_std_str(diff_mean[2],diff_std[2])}")
-    # log.info(f"Joint 4 mean difference (rad): {mean_std_str(diff_mean[3],diff_std[3])}")
-    # log.info(f"Joint 5 mean difference (rad): {mean_std_str(diff_mean[4],diff_std[4])}")
-    # log.info(f"Joint 6 mean difference (rad): {mean_std_str(diff_mean[5],diff_std[5])}")
+    # tracker data
+    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
+    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
+
+    # network data
+    network_dict = dict(mode="joint",data=network_df,fk=psm_kin)
+
+    robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
+    robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
+    tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
+    tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
+    network_joints_FRE = FRE(wrist_fiducial_dict, network_dict)
+    network_reg_errors = network_joints_FRE.calculate_fre() * 1000
+
+    fre_table = FRETable()
+    fre_table.add_data(
+        dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
+    )
+    fre_table.add_data(
+        dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
+    )
+    fre_table.add_data(
+        dict(type="network", fre=mean_std_str(network_reg_errors.mean(), network_reg_errors.std()))
+    )
+
+    robot_reg_errors =   pd.DataFrame(dict(type="robot",errors=robot_reg_errors.tolist())  )  
+    tracker_reg_errors = pd.DataFrame(dict(type="tracker",errors=tracker_reg_errors.tolist()))
+    network_reg_errors = pd.DataFrame(dict(type="network",errors=network_reg_errors.tolist()))
+    errors_df = pd.concat((robot_reg_errors,tracker_reg_errors,network_reg_errors))
+
+    # ------------------
+    # Results report
+    # ------------------
+
+    print("")
+    print(f"**Evaluation report for test trajectory {testid} in {registration_data_path.parent.name}**")
+    print(f"* Registration path: {registration_data_path}")
+    print(f"* model path: {model_path}\n")
+    print(f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})")
+    print(f"\n{table.get_full_table()}\n")
+
+    print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
+    print(f"\n{fre_table.get_full_table()}\n")
 
     # plot
     if args.plot:
-        plot_joints(robot_df, tracker_df, pred_df)
+        plot_joints(robot_df, tracker_df, network_df)
         fig, ax = plt.subplots(2, 1)
         CalibrationUtils.create_histogram(
             opt_df["q4res"], axes=ax[0], title=f"Q4 error (Z3 dot Z4)", xlabel="Optimization residual error"
@@ -176,27 +194,40 @@ def main(testid: int):
             max_val=0.003,
         )
         fig.set_tight_layout(True)
+
+        matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+        fig, ax = plt.subplots(1,1)
+        sns.boxplot(data=errors_df,y="errors",x="type")
+        sns.stripplot(data=errors_df,y="errors",x="type",dodge=True, color='black', size=3)
+        ax.grid()
+
+        ax_torque = plot_joints_torque(robot_df)
+        ax_diff = plot_joints_difference(robot_joints,tracker_df)
+
         plt.show()
 
 
 if __name__ == "__main__":
+    ##TODO: Indicate that you need to use script 04 first to generate the tracker joints and then use this 
+    ##TODO: to plot the corrected joints.
+
     parser = argparse.ArgumentParser()
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
-                    help="root dir") 
+                    help="This directory must a registration_results subdir contain a calibration .json file.") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
-    # parser.add_argument("--testid", type=int, help="The id of the test trajectory to use") 
     parser.add_argument('--testid', nargs='*', help='test trajectories to generate', required=True, type=int)
+    parser.add_argument('-m','--modelname', type=str,default=False,required=True \
+                        ,help="Name of deep learning model to use.")
+    parser.add_argument("--datadir", default = None, type=str, help="Use data in a different directory. Only" 
+                            "used with the --testdata option.")
     parser.add_argument( '-l', '--log', type=str, default="DEBUG", help="log level") 
-    parser.add_argument('--reset', action='store_true',help="Recalculate joint values")
-    parser.add_argument('--dstdir', default=None, help='Directory to save results. This directory must ' \
-                            'contain a calibration .json file. If None, root dir is used a destination.')
     parser.add_argument('-p','--plot', action='store_true',default=False \
                         ,help="Plot optimization error and joints plots.")
     # fmt:on
     args = parser.parse_args()
     log_level = args.log
-    log = Logger("pitch_exp_analize2", log_level=log_level).log
+    log = Logger(__name__, log_level=log_level).log
 
     log.info(f"Calculating the following test trajectories: {args.testid}")
 

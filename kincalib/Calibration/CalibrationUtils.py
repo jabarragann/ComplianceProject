@@ -1,4 +1,5 @@
 # Python modules
+import json
 from re import I
 from numpy import sin, cos
 from scipy.optimize import dual_annealing
@@ -21,7 +22,7 @@ from spatialmath.base import trnorm
 from roboticstoolbox import DHRobot, RevoluteMDH
 
 # My modules
-from kincalib.geometry import Circle3D, Line3D, dist_circle3_plane
+from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
     load_registration_data,
@@ -54,6 +55,50 @@ log = Logger(__name__).log
 #     ]
 #     # fmt:on
 #     return np.array(transf)
+
+
+def my_trnorm(a) -> np.ndarray:
+    """Required to avoid weird issue with numpy cross product and pylance.
+
+    https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
+    """
+    return trnorm(a)
+
+
+def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Required to avoid weird issue with numpy cross product and pylance.
+
+    https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
+    """
+    return np.cross(a, b)
+
+
+@dataclass
+# TODO: Use this class in script 04
+class TrackerJointsEstimator:
+    calibration_file: Path
+
+    def __post_init__(self):
+
+        # Load calibration values
+        root = Path(self.calibration_file)
+        registration_dict = json.load(open(root / "registration_values.json", "r"))
+        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+        T_RT = T_TR.inv()
+        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+        T_PM = T_MP.inv()
+        self.wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
+
+        self.j_estimator = JointEstimator(T_RT, T_MP, self.wrist_fid_Y)
+
+    def calculate_joints(self, robot_jp_df, robot_cp_df, use_progress_bar=True):
+        robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
+            self.j_estimator,
+            robot_jp_df,
+            robot_cp_df,
+            use_progress_bar=use_progress_bar,
+        )
+        return robot_df, tracker_df, opt_df
 
 
 def fkins_v2(q5, q6):
@@ -141,13 +186,13 @@ class JointEstimator:
         T_R_F3 = Frame.init_from_matrix(self.psm_kin.fkine_chain([q1, q2, q3], ignore_base=True))
         T_T_F3 = self.T_TR @ T_R_F3
         # Re orthogonalize.
-        T_T_F3 = trnorm(trnorm(np.array(T_T_F3)))
+        T_T_F3 = my_trnorm(my_trnorm(np.array(T_T_F3)))
 
         # Calculate pitch frame in tracker space.
         # This is the target pose
         T_TP = T_TM @ self.T_MP
         # Re orthogonalize.
-        T_TP = trnorm(trnorm(np.array(T_TP)))
+        T_TP = my_trnorm(my_trnorm(np.array(T_TP)))
 
         ##CALCULATE Q4V1: VIA OPTIMIZATION
         ## Create a 1 joint robot
@@ -167,7 +212,7 @@ class JointEstimator:
         va = T_T_F3[:3, 0]  # x3 axis (see DVRK manual)
         vb = T_TP[:3, 0]  # x4 axis (see DVRK manual)
         vn = T_T_F3[:3, 2]  # Vector pointing along instrument shaft
-        q4_est = arctan2(np.cross(va, vb).dot(vn), np.dot(va, vb))
+        q4_est = arctan2(cross_product(va, vb).dot(vn), np.dot(va, vb))
         # log.info(f"Solution: {q4_est}")
         # log.info(f"Residual: {q4_error}")
 
@@ -310,59 +355,6 @@ class CalibrationUtils:
 
         return midpoint1, midpoint2, midpoint3
 
-    def calculate_fiducial_from_yaw(pitch_orig_T, pitch_yaw_circles, roll_circle2):
-        """Using the yaw and pitch circle calculate the location of the robot's wrist fiducial from
-        the tracker frame and the yaw frame, and the yaw2pitch distance. This three values will evaluated for
-        each roll position of the robot.
-
-        Parameters
-        ----------
-        pitch_orig_T : _type_
-            _description_
-        pitch_yaw_circles : _type_
-            _description_
-        roll_circle2 : _type_
-            _description_
-
-        Returns
-        -------
-        fiducial_Y: List[np.ndarray]
-            List containing the wrist's fiducial locations from Yaw frame.
-        fiducial_T: List[np.ndarray]
-            List containing the wrist's fiducial location from Tracker frame
-        pitch2yaw1: List[float]
-            List containing pitch2 yaw distances
-        """
-        fiducial_Y = []
-        fiducial_T = []
-        pitch2yaw1 = []
-        for kk in range(2):
-            pitch_cir, yaw_cir = pitch_yaw_circles[kk]["pitch"], pitch_yaw_circles[kk]["yaw"]
-
-            # Construct jaw2tracker transformation
-            l1 = Line3D(ref_point=pitch_cir.center, direction=pitch_cir.normal)
-            l2 = Line3D(ref_point=yaw_cir.center, direction=yaw_cir.normal)
-            inter_params = []
-            l3 = Line3D.perpendicular_to_skew(l1, l2, intersect_params=inter_params)
-            yaw_orig_M = l2(inter_params[0][1])
-            pitch2yaw1.append(np.linalg.norm(pitch_orig_T - yaw_orig_M))
-
-            T_TJ = np.identity(4)
-            T_TJ[:3, 0] = pitch_cir.normal
-            T_TJ[:3, 1] = np.cross(yaw_cir.normal, pitch_cir.normal)
-            T_TJ[:3, 2] = yaw_cir.normal
-            T_TJ[:3, 3] = yaw_orig_M
-            T_TJ = Frame.init_from_matrix(T_TJ)
-            # Get fiducial in jaw coordinates==>
-            # Changed calculated the fid_T:
-            # v1 used pitch_cir and the roll_circle2 plane.
-            # v2 uses pitch_cir and the yaw_circle plane
-            fid_T, solutions = dist_circle3_plane(pitch_cir, roll_circle2.get_plane())
-            fiducial_Y.append(T_TJ.inv() @ fid_T)
-            fiducial_T.append(fid_T)
-
-        return fiducial_Y, fiducial_T, pitch2yaw1
-
     # ------------------------------------------------------------
     # Joint estimation utils
     # ------------------------------------------------------------
@@ -373,6 +365,33 @@ class CalibrationUtils:
         robot_cp: pd.DataFrame,
         use_progress_bar: bool = True,
     ) -> pd.DataFrame:
+        """Calculates joints based on tracker information.
+
+        Notes:
+        * This will return an empty df_tracker dataframe in case the required tracker values
+        are not available. You can check this with `df_tracker.shape[0]>0`
+
+        Parameters
+        ----------
+        estimator : JointEstimator
+            _description_
+        robot_jp : pd.DataFrame
+            _description_
+        robot_cp : pd.DataFrame
+            _description_
+        use_progress_bar : bool, optional
+            _description_, by default True
+
+        Returns
+        -------
+        df_robot: pd.DataFrame
+            _description_
+        df_tracker: pd.DataFrame
+            _description_
+        df_opt: pd.DataFrame
+            _description_
+
+        """
 
         cols_robot = ["step", "rq1", "rq2", "rq3", "rq4", "rq5", "rq6"]
         cols_tracker = ["step", "tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
@@ -420,17 +439,17 @@ class CalibrationUtils:
             # Optimization residuals
             d = np.array([step, q4res, q56res]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_opt)
-            df_opt = df_opt.append(new_pt)
+            df_opt = pd.concat((df_opt, new_pt))
             # opt_error.append(evaluation)
 
             # Save data
             d = np.array([step, rq1, rq2, rq3, rq4, rq5, rq6]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_robot)
-            df_robot = df_robot.append(new_pt)
+            df_robot = pd.concat((df_robot, new_pt))
 
             d = np.array([step, tq1, tq2, tq3, tq4, tq5, tq6]).reshape(1, -1)
             new_pt = pd.DataFrame(d, columns=cols_tracker)
-            df_tracker = df_tracker.append(new_pt)
+            df_tracker = pd.concat((df_tracker, new_pt))
 
             # if step > 40:
             #     break
@@ -447,10 +466,10 @@ class CalibrationUtils:
         for i in range(6):
             # fmt:off
             axes[i].set_title(f"joint {i+1} ({unit})")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, color="blue")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, color="orange")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, color="blue")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, color="orange")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
             # fmt:on
         axes[0].legend()
 
@@ -480,6 +499,6 @@ class CalibrationUtils:
         for p in cartesian_pose.data:
             posi = p[:3, 3]
             new_df = pd.DataFrame(posi.reshape(1, -1), columns=cols)
-            cartesian_df = cartesian_df.append(new_df)
+            cartesian_df = pd.concat((cartesian_df, new_df))
 
         return cartesian_df

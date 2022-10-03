@@ -1,7 +1,8 @@
 
 # Project especific
-data2/
 data3newcalib/
+data2/
+data_backups/
 *.log
 cisstLog.txt
 documents
@@ -9,6 +10,8 @@ Marker_design
 temp/
 data/
 .vscode
+.vs
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

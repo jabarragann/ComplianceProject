@@ -2,32 +2,22 @@ from __future__ import annotations
 
 # Python
 from pathlib import Path
-from random import Random
 import time
-from typing import Union
 from dataclasses import dataclass, field
-from black import out
 import numpy as np
 import numpy
 from typing import List
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils
-from kincalib.Recording.DataRecorder import OuterJointsCalibrationRecorder
 
 # ros
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Header
 
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
-from kincalib.Recording.DataRecord import CalibrationRecord
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
-from kincalib.Sensors.ftk_500_api import ftk_500
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
-from collections import namedtuple
 
 log = Logger(__name__).log
 
@@ -270,11 +260,10 @@ class SoftRandomJointTrajectory(RandomJointTrajectory):
     max_dist = 0.2632
 
     def __post_init__(self) -> None:
-
         return super().__post_init__()
 
     @classmethod
-    def generate_trajectory(cls, samples: int):
+    def generate_trajectory(cls, samples: int, samples_per_step=18):
         setpoints = []
 
         init_jp = RandomJointTrajectory.generate_random_joint()
@@ -289,7 +278,7 @@ class SoftRandomJointTrajectory(RandomJointTrajectory):
             dist = np.linalg.norm(cp_positions[0, :] - cp_positions[1, :])
 
             # Set number of samples proportional to the distance between start and end. At least use 2 samples
-            num = int((dist / SoftRandomJointTrajectory.max_dist) * 18)
+            num = int((dist / SoftRandomJointTrajectory.max_dist) * samples_per_step)
             num = max(2, num)
             all_setpoints = np.linspace(init_jp, new_jp, num=num)
 
@@ -309,9 +298,9 @@ if __name__ == "__main__":
 
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
-    # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
-    # trajectory = RandomJointTrajectory.generate_trajectory(200)
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(200)
+    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
+    trajectory = RandomJointTrajectory.generate_trajectory(50)
+    # trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
 
     log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")

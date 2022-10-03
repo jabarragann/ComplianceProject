@@ -1,3 +1,4 @@
+import json
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -10,7 +11,9 @@ class MLP(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.layers = nn.Sequential(nn.Linear(12, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 3))
+        self.layers = nn.Sequential(
+            nn.Linear(12, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 3)
+        )
 
     def forward(self, x):
         """
@@ -77,3 +80,46 @@ class CustomMLP(nn.Module):
         layers.append(nn.Linear(in_features, 3))
 
         return nn.Sequential(*layers)
+
+
+class JointCorrectionNet(nn.Module):
+    default_architecture = dict(
+        n_layers=1, n_units_l0=140, dropout_l0=0.009299938244271444, n_out=3, output="joints"
+    )
+
+    def __init__(self, model_def: dict = None) -> None:
+        super().__init__()
+
+        if model_def is None:
+            self.model_def = JointCorrectionNet.default_architecture
+        else:
+            self.model_def = model_def
+            # Fill missing entries
+            for k, v in JointCorrectionNet.default_architecture.items():
+                self.model_def.setdefault(k, v)
+
+        # We optimize the number of layers, hidden units and dropout ratio in each layer.
+        n_layers = self.model_def["n_layers"]
+
+        layers = []
+        in_features = 12
+        for i in range(n_layers):
+            out_features = self.model_def["n_units_l{}".format(i)]
+            layers.append(nn.Linear(in_features, out_features))
+            layers.append(nn.ReLU())
+            p = self.model_def["dropout_l{}".format(i)]
+            layers.append(nn.Dropout(p))
+            in_features = out_features
+
+        layers.append(nn.Linear(in_features, self.model_def["n_out"]))
+
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = self.model(x)
+        return out
+
+    def model_def_to_json(self, root):
+        json_str = json.dumps(self.model_def, indent=2)
+        with open(root / "model_def.json", "w") as f:
+            f.write(json_str)

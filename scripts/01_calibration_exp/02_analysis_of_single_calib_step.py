@@ -30,7 +30,14 @@ from kincalib.utils.ExperimentUtils import (
     calculate_midpoints,
     separate_markerandfiducial,
 )
-from kincalib.geometry import Line3D, Circle3D, Plane3D, Plotter3D, Triangle3D, dist_circle3_plane
+from kincalib.Geometry.geometry import (
+    Line3D,
+    Circle3D,
+    Plane3D,
+    Plotter3D,
+    Triangle3D,
+    dist_circle3_plane,
+)
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
 from kincalib.utils.Frame import Frame
@@ -70,7 +77,9 @@ def main():
     # Get pitch and yaw circles
     pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[k]["pitch"])
     # Estimate pitch origin with roll and pitch
-    m1, m2, m3 = calib.calculate_pitch_origin(roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"])
+    m1, m2, m3 = calib.calculate_pitch_origin(
+        roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
+    )
     pitch_orig_est1 = (m1 + m2 + m3) / 3
     pitch_triangle = Triangle3D([m1, m2, m3])
     area = pitch_triangle.calculate_area(scale=1000)
