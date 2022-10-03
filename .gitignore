@@ -1,6 +1,7 @@
 
 # Project especific
-/data2
+data2/
+data3newcalib/
 *.log
 cisstLog.txt
 documents
