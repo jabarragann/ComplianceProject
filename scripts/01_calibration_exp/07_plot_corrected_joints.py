@@ -104,7 +104,7 @@ def main(testid: int):
     # ------------------------------------------------------------
     # Calculate metrics 
     # ------------------------------------------------------------
-    model_path = Path(f"data/deep_learning_data/Studies/TestStudy2")/args.modelname 
+    model_path = Path(args.modelpath) 
     inference_pipeline = InferencePipeline(model_path)
 
     network_df = inference_pipeline.correct_joints(robot_state_df=robot_df)
@@ -217,8 +217,8 @@ if __name__ == "__main__":
                     help="This directory must a registration_results subdir contain a calibration .json file.") 
     parser.add_argument('-t','--test', action='store_true',help="Use test data")
     parser.add_argument('--testid', nargs='*', help='test trajectories to generate', required=True, type=int)
-    parser.add_argument('-m','--modelname', type=str,default=False,required=True \
-                        ,help="Name of deep learning model to use.")
+    parser.add_argument('-m','--modelpath', type=str,default=False,required=True \
+                        ,help="Path to deep learning model.")
     parser.add_argument("--datadir", default = None, type=str, help="Use data in a different directory. Only" 
                             "used with the --testdata option.")
     parser.add_argument( '-l', '--log', type=str, default="DEBUG", help="log level") 

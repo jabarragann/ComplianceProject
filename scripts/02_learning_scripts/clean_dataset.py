@@ -1,33 +1,14 @@
 import argparse
 from dataclasses import dataclass
-import json
-from os import remove
 from pathlib import Path
-import pickle
-import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Torch
-import optuna
-import torch
-import torch.optim as optim
-import torch.nn as nn
-from torch.utils.data import DataLoader
-
 # Custom
-# from kincalib.Learning.Dataset import JointsDataset, JointsRawDataset, Normalizer
-from kincalib.Learning.Dataset2 import JointsDataset1, Normalizer
-from kincalib.Learning.Models import MLP, CustomMLP, JointCorrectionNet
-from kincalib.Learning.Trainer import TrainRegressionNet
-from torchsuite.HyperparameterTuner import OptuneStudyAbstract
-from torchsuite.TrainingBoard import TrainingBoard
 from kincalib.Recording.DataRecord import LearningRecord
 
-from kincalib.utils.CmnUtils import mean_std_str
 from kincalib.utils.Logger import Logger
-import seaborn as sns
 
 
 def remove_outliers(robot_joints, tracker_joints):
@@ -58,7 +39,7 @@ def main(path):
     # Load dataset file
     path = Path(path)
     dataset = pd.read_csv(path)
-    # dataset = dataset.loc[dataset["opt"] < 2.5 / 1000]
+    dataset = dataset.loc[dataset["opt"] < 2.5 / 1000]
 
     robot_joints = dataset[LearningRecord.robot_joints_cols]
     tracker_joints = dataset[LearningRecord.tracker_joints_cols]
@@ -68,7 +49,7 @@ def main(path):
     clean_dataset = dataset.loc[clean_diff.index.to_numpy(), :]
     new_name = path.with_suffix("").name + "_clean.csv"
     new_name = path.parent / new_name
-    
+
     clean_dataset.to_csv(new_name)
 
 
@@ -76,7 +57,7 @@ if __name__ == "__main__":
 
     log = Logger(__name__).log
 
-    default_path = "./data/deep_learning_data/rec20_data_v2.csv"
+    default_path = "icra2023-data/neuralnet/dataset/final_dataset.csv"
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", type=str, default=default_path, help="dataset_path")
     args = parser.parse_args()

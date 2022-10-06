@@ -3,11 +3,7 @@ import json
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import List, Tuple, Set
-from rich.logging import RichHandler
-from rich.progress import track
 
 # ROS and DVRK imports
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils
@@ -15,53 +11,40 @@ from kincalib.Recording.DataRecord import LearningRecord
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.utils.RosbagUtils import RosbagUtils
-from kincalib.utils.Logger import Logger
 
 log = Logger("template").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
-# data_root = Path("data/03_replay_trajectory")
-data_root = Path("data3newcalib/")
-dst_filename = Path("data/deep_learning_data/rec20_data_v3.csv")
-
-# PSM1
-# dataset_def = [
-#     {"path": data_root / "d04-rec-10-traj01", "testid": [4], "type": "random", "flag": "train"},
-#     {"path": data_root / "d04-rec-12-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
-#     {"path": data_root / "d04-rec-12-traj01", "testid": [6], "type": "random", "flag": "valid"},
-#     {"path": data_root / "d04-rec-13-traj01", "testid": [4, 5], "type": "random", "flag": "train"},
-#     {"path": data_root / "d04-rec-13-traj01", "testid": [6], "type": "random", "flag": "valid"},
-#     {"path": data_root / "d04-rec-13-traj01", "testid": [7, 8], "type": "random", "flag": "test"},
-#     {"path": data_root / "d04-rec-14-traj02", "testid": [4], "type": "random", "flag": "train"},
-# ]
-# # PSM2
-# dataset_def = [
-#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [4], "type": "random", "flag": "train"},
-#     {"path": data_root / "d04-rec-18-trajsoft", "testid": [5], "type": "random", "flag": "valid"},
-# ]
-# fmt:off
-# dataset_def = [
-#     { "path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
-#     { "path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
-#     {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
-#     {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
-# ]
-
-# dataset_def = [
-#     {"path": data_root / "d04-rec-23-trajrand", "testid": [1, 2, 3], "type": "recorded", "flag": "train"},
-#     {"path": data_root / "d04-rec-23-trajrand", "testid": [4, 5 ], "type": "random", "flag": "train"},
-#     {"path": data_root / "d04-rec-23-trajrand", "testid": [6, 7], "type": "random", "flag": "valid"},
-# ]
+data_root = Path("icra2023-data")
+dst_filename = data_root / "neuralnet/dataset/final_dataset.csv"
 
 dataset_def = [
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [1, 2], "type": "recorded", "flag": "train"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [4, 5, 6], "type": "random", "flag": "train"},
+    {
+        "path": data_root / "d04-rec-20-trajsoft",
+        "testid": [1, 2],
+        "type": "recorded",
+        "flag": "train",
+    },
+    {
+        "path": data_root / "d04-rec-20-trajsoft",
+        "testid": [4, 5, 6],
+        "type": "random",
+        "flag": "train",
+    },
     {"path": data_root / "d04-rec-20-trajsoft", "testid": [3], "type": "recorded", "flag": "valid"},
     {"path": data_root / "d04-rec-20-trajsoft", "testid": [7], "type": "random", "flag": "valid"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [20,21,22,24,25], "type": "recorded", "flag": "valid"},
-    {"path": data_root / "d04-rec-20-trajsoft", "testid": [23,26], "type": "random", "flag": "valid"},
+    {
+        "path": data_root / "d04-rec-20-trajsoft",
+        "testid": [20, 21, 22, 24, 25],
+        "type": "recorded",
+        "flag": "valid",
+    },
+    {
+        "path": data_root / "d04-rec-20-trajsoft",
+        "testid": [23, 26],
+        "type": "random",
+        "flag": "valid",
+    },
 ]
 # fmt:on
 

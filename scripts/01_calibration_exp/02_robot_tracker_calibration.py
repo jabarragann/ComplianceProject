@@ -516,7 +516,7 @@ parser = argparse.ArgumentParser()
 # fmt:off
 parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-11-traj01", 
                 help="root dir") 
-parser.add_argument( "--reset", action='store_true',default=False,  help="Re calculate error metrics") 
+parser.add_argument( "--reset", action='store_true',default=False,  help="Re calculate calibration values") 
 parser.add_argument( "-l", "--log", type=str, default="DEBUG", 
                 help="log level") 
 parser.add_argument('--dstdir', default=None, help='directory to save results')

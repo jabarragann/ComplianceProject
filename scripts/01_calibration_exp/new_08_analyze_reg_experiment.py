@@ -159,7 +159,7 @@ def calculate_reg_residual_error(path, inference_pipeline):
 
 def main(args):
     # Load correction model
-    model_path = Path(f"data/deep_learning_data/Studies/TestStudy2") / args.modelname
+    model_path = Path(args.modelpath)
     inference_pipeline = InferencePipeline(model_path)
 
     # Calculate all residual errors
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
                     help="This directory must a registration_results subdir contain a calibration .json file.") 
-    parser.add_argument('-m','--modelname', default="best_model9_6er",type=str \
-                        ,help="Name of deep learning model to use.")
+    parser.add_argument('-m','--modelpath', default="best_model9_6er",type=str \
+                        ,help="Path of deep learning model to use.")
 
     # fmt:on
     args = parser.parse_args()
