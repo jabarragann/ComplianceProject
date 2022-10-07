@@ -1,19 +1,21 @@
-# Compliance and Kinematic error repository
+# Improving the Accuracy of Minimally-Invasive Surgical Robots 
 
-### Paper | [Video](https://youtu.be/NmkAzrD-UCo)
+### Paper (UNDER REVIEW) | [Video](https://youtu.be/NmkAzrD-UCo)
 
-UNDER CONSTRUCTION
 
-## Project overview
-
-This repository contains the code implementation and data for a novel joint estimation algorithm to improve the kinematic accuracy of surgical robots. The proposed solution is divided into 3 main steps: (1) calibration, (2) calculation of corrected joints and (3) neural network correction. These steps can be followed by using the sampled data and scripts below.
-
+This repository contains the code implementation and data for a novel joint estimation algorithm to improve the kinematic accuracy of surgical robots. The goal of the joint estimation algorithm is to convert the location of optical markers attached to the robot into a new set of joint values that better describe the robot pose. Lastly, neural networks trained on this new set of joints can be trained to improve the robot accuracy. For more details, please refer to the paper.
 ## Installation instructions
 
 All the main functions from this project were organized into a python module which you can install with 
 
 ```
+pip install -r requirements.txt
 pip install -e .
+```
+
+or by creating a new conda environment with 
+```
+conda env create -f environment.yml
 ```
 
 After installing the module, open a python terminal and write 
@@ -23,9 +25,32 @@ import kincalib
 ```
 
 to ensure the module was correctly installed.
+
+### Training of neural networks (Optional)
+To train the neural networks with the code provided you will need to additionally install the module [Torch-suite](https://github.com/jabarragann/torch-suite) with
+
+```
+git clone https://github.com/jabarragann/torch-suite.git --recursive
+cd torch-suite
+git checkout ff68b04
+pip install -e .
+pip install -e ./pytorch-checkpoint/
+```
+## Data download
+
+The data for this project is publicly available in a Kaggel dataset. To download it, we recommend using the official kaggle-api ([link](https://github.com/Kaggle/kaggle-api))
+
+```
+kaggle datasets download -d juanantoniobarragan/kinematic-calibration-of-surgical-robots
+unzip kinematic-calibration-of-surgical-robots.zip
+```
+
 ## Code overview
+The proposed solution is divided into 3 main steps: (1) calibration, (2) calculation of corrected joints and (3) neural network correction. These steps can be followed by using the sampled data and scripts below.
 
 ### Calibration script
+
+The goal of the calibration step is to find the location of the optical markers with respect to the robot kinematic frames and the transformation between the robot and the tracker.
 
 ```
 python scripts/01_calibration_exp/02_robot_tracker_calibration.py -r icra2023-data/d04-rec-20-trajsoft/ --reset
@@ -38,12 +63,13 @@ Output of calibration script
 
 ### Calculation of corrected joints 
 
-Re calculate the corrected joint values for all the test trajectories. 
+Calculate the corrected joint values for all the test trajectories. Corrected joint values have already been provided in the dataset. 
+
 ```
 python scripts/01_calibration_exp/04_calculate_ground_truth_jp.py -r icra2023-data/d04-rec-20-trajsoft/ -t --testid 1 2 3 4 5 6 7 20 21 22 23 24 25 26 --reset
 ```
 
-This script is not fully optimize, and therefore recalculating all the values will take around an hour. To only visualize the results of the new joint values execute the previous script without the `--reset` flag. The sample output from the script
+This script is not fully optimize, so calculating all the corrected joint values for all the test trajectories will take around an hour. Summary statistics of the new joint values can be observed with the previous script without the `--reset` flag. The sample output from the script is
 
 ```
 **Evaluation report for test trajectory 1 in registration_results**
@@ -73,7 +99,7 @@ python scripts/02_learning_scripts/clean_dataset.py
 
 The previous to script will generate two csv files with the necessary data to train the neural networks model. For training, use the clean dataset file. To find more information about what each column of the dataset file mean refer to the LearningRecord class documentation in [link](https://github.com/jabarragann/ComplianceProject/blob/540cc2947f3824fadca0260b0b9aa5c9c0de7d3f/kincalib/Recording/DataRecord.py#L309-L329).
 
-**Neural network trainingi**
+**Neural network training**
 ```
 python scripts/02_learning_scripts/train_simple_model.py
 ```
@@ -85,14 +111,14 @@ This script will generate a directory with the weights, normalization values, an
 
 ## Reproducing paper results 
 
-**Reproducing Freespace results**
+**Reproducing freespace results**
 
 To reproduce the freespace results run the script below.
 ```
 python3 scripts/01_calibration_exp/07_plot_corrected_joints.py -r ./icra2023-data/d04-rec-20-trajsoft/ --testid 3 7 26 -t -m ./icra2023-data/neuralnet/model
 ```
 
-which will results in the following output.
+which results in the following output
 
 ```
 **Evaluation report for test trajectory 3 in d04-rec-20-trajsoft**
