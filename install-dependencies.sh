@@ -3,7 +3,7 @@
 #Install kaggle api and download data
 pip install kaggle
 kaggle datasets download -d juanantoniobarragan/kinematic-calibration-of-surgical-robots
-unzip kinematic-calibration-of-surgical-robots.zip
+unzip -q kinematic-calibration-of-surgical-robots.zip
 #Install deep learning dependencies
 pip install -r requirements_torch.txt 
 git clone https://github.com/jabarragann/torch-suite.git --recursive
