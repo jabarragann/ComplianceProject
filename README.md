@@ -27,9 +27,10 @@ import kincalib
 to ensure the module was correctly installed.
 
 ### Training of neural networks (Optional)
-To train the neural networks with the code provided you will need to additionally install the module [Torch-suite](https://github.com/jabarragann/torch-suite) with
+To train the neural networks with the code provided you will need to additionally install the [Torch-suite](https://github.com/jabarragann/torch-suite) module and pytorch dependencies with
 
 ```
+pip install -r requirements_torch.txt
 git clone https://github.com/jabarragann/torch-suite.git --recursive
 cd torch-suite
 git checkout ff68b04
