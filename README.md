@@ -3,7 +3,7 @@
 ### Paper (UNDER REVIEW) | [Video](https://youtu.be/NmkAzrD-UCo)
 
 
-This repository contains the code implementation and data for a novel joint estimation algorithm to improve the kinematic accuracy of surgical robots. The goal of the joint estimation algorithm is to convert the location of optical markers attached to the robot into a new set of joint values that better describe the robot pose. Lastly, neural networks trained on this new set of joints can be trained to improve the robot accuracy. For more details, please refer to the paper.
+This repository contains the code implementation and data for a joint estimation and calibration algorithm used to improve the kinematic accuracy of surgical robots . The goal of the joint estimation algorithm is to convert the location of optical markers attached to the robot into a new set of joint values that better describe the robot pose. Using this new set of joints, a neural network model can be then trained to improve the robot accuracy. For more details, please refer to the paper.
 ## Installation instructions
 
 All the main functions from this project were organized into a python module which you can install with 
