@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #Create python virtual env
 git checkout icra-2023 
 conda env create -f environment.yml 
