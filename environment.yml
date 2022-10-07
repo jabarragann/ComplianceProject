@@ -1,4 +1,4 @@
-name: roboenv
+name: kincalibenv
 channels:
   - conda-forge
 dependencies:

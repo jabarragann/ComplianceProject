@@ -24,7 +24,8 @@ After installing the module, open a python terminal and write
 import kincalib
 ```
 
-to ensure the module was correctly installed.
+to ensure the module was correctly installed. To facilitate the installation process the `install-dependencies.sh` is provided.
+
 
 ### Training of neural networks (Optional)
 To train the neural networks with the code provided you will need to additionally install the [Torch-suite](https://github.com/jabarragann/torch-suite) module and pytorch dependencies with
