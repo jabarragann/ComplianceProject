@@ -1,9 +1,5 @@
 #!/bin/bash
 
-#Create python virtual env
-git checkout icra-2023 
-conda env create -f environment.yml 
-conda activate kincalibenv
 #Install kaggle api and download data
 pip install kaggle
 kaggle datasets download -d juanantoniobarragan/kinematic-calibration-of-surgical-robots
