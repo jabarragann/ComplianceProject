@@ -12,6 +12,14 @@ from numpy import linalg, cross, dot
 np.set_printoptions(precision=3, suppress=True)
 
 
+def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Required to avoid weird issue with numpy cross product and pylance.
+
+    https://github.com/microsoft/pylance-release/issues/3277#issuecomment-1237782014
+    """
+    return np.cross(a, b)
+
+
 def dist_circle3_plane(circle: Circle3D, plane: Plane3D) -> np.ndarray:
     """
     Return closest point to plane that lies in circle.
@@ -63,7 +71,7 @@ def rodrigues_rot(P, n0, n1):
     # Get vector of rotation k and angle theta
     n0 = n0 / linalg.norm(n0)
     n1 = n1 / linalg.norm(n1)
-    k = cross(n0, n1)
+    k = cross_product(n1, n1)
     k = k / linalg.norm(k)
     theta = np.arccos(dot(n0, n1))
 
@@ -71,7 +79,9 @@ def rodrigues_rot(P, n0, n1):
     P_rot = np.zeros((len(P), 3))
     for i in range(len(P)):
         P_rot[i] = (
-            P[i] * cos(theta) + cross(k, P[i]) * sin(theta) + k * dot(k, P[i]) * (1 - cos(theta))
+            P[i] * cos(theta)
+            + cross_product(k, P[i]) * sin(theta)
+            + k * dot(k, P[i]) * (1 - cos(theta))
         )
 
     return P_rot
@@ -148,22 +158,18 @@ class Circle3D:
             radius (_type_): _description_
             samples (_type_, optional): Data used to solve the lstsq problem. Defaults to None.
         """
-        self.center = center
+        self.center = center.squeeze()
         self.radius = radius
-        self.normal = normal / norm(normal)
-        self.samples = samples.T
+        self.normal = normal.squeeze() / norm(normal)
 
-        # Orthogonal vectors to n
-        s = 0.5
-        t = 0.5
-        self.a = t * np.array([-self.normal[2] / self.normal[0], 0, 1]) + s * np.array(
-            [-self.normal[1] / self.normal[0], 1, 0]
-        )
-        self.a /= norm(self.a)
+        if samples is not None:
+            self.samples = samples.T
+
+        # Orthogonal vectors to n (Used to generate sample points)
+        random_vect = np.array([self.normal[2], self.normal[0], self.normal[1]])
+        self.a = cross_product(random_vect, self.normal)
+        self.a = self.a / norm(self.a)
         self.b = np.cross(self.a, self.normal)
-
-        # a is orthogonal to n
-        # l = self.normal.dot(self.a)
 
     def __call__(self, theta):
         pts = self.center.T + self.radius * (cos(theta) * self.a + sin(theta) * self.b)
@@ -182,6 +188,31 @@ class Circle3D:
         theta = np.linspace(0, 2 * pi, N).reshape(-1, 1)
         pts = self.center.T + self.radius * cos(theta) * self.a + self.radius * sin(theta) * self.b
         pts = pts.T
+        return pts
+
+    def sample_circle(self, theta: np.ndarray, deg=False) -> np.ndarray:
+        """Sample circle at specific angles
+
+        Parameters
+        ----------
+        theta : np.ndarray
+            1D array containing all the angles to sample.
+        deg : bool
+            Sample angles are provided in deg
+
+        Returns
+        -------
+        np.ndarray
+            array of sample points
+        """
+
+        if deg:
+            # convert to radians
+            theta = theta * np.pi / 180
+        theta = theta.reshape(-1, 1)
+        pts = self.center.T + self.radius * cos(theta) * self.a + self.radius * sin(theta) * self.b
+        pts = pts.T
+
         return pts
 
     @classmethod
@@ -222,7 +253,7 @@ class Circle3D:
         C = C.flatten()
 
         # Select a consistent normal direction. (This will only work if the points are ordered)
-        correct_normal = np.cross(samples[0] - C, samples[-1] - C)
+        correct_normal = np.cross_product(samples[0] - C, samples[-1] - C)
         correct_normal = correct_normal / np.linalg.norm(correct_normal)
         if np.dot(correct_normal, plane.normal) < 0:
             plane.normal = -plane.normal
@@ -282,18 +313,18 @@ class Plane3D:
 
         # Calculate 2 base vectors on the plane
         temp = self.normal + np.array([0.0, 0.0, 0.5])
-        d1 = np.cross(self.normal, temp)
+        d1 = cross_product(self.normal, temp)
         d1_l = np.linalg.norm(d1)
         if np.isclose(d1_l, 0.0):
             temp = self.normal + np.array([0.0, 0.5, 0.0])
-            d1 = np.cross(self.normal, temp)
+            d1 = cross_product(self.normal, temp)
             d1_l = np.linalg.norm(d1)
             if np.isclose(d1_l, 0.0):
                 temp = self.normal + np.array([0.5, 0.0, 0.0])
                 d1 = np.cross(self.normal, temp)
                 d1_l = np.linalg.norm(d1)
 
-        d1 = np.cross(self.normal, temp)
+        d1 = cross_product(self.normal, temp)
         d1 = d1 / np.linalg.norm(d1)
         angle = 45 * np.pi / 180
         d2 = self.rotate_around_normal(d1, angle)

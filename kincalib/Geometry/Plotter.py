@@ -45,5 +45,5 @@ class Plotter3D:
         if title is not None:
             self.ax.set_title(title)
 
-    def plot():
+    def plot(self):
         plt.show()
