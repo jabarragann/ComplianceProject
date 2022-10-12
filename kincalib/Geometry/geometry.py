@@ -8,6 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from kincalib.utils.Logger import Logger
 import pandas as pd
 from numpy import linalg, cross, dot
+from kincalib.Geometry.Circle2D import Circle2d
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -71,7 +72,7 @@ def rodrigues_rot(P, n0, n1):
     # Get vector of rotation k and angle theta
     n0 = n0 / linalg.norm(n0)
     n1 = n1 / linalg.norm(n1)
-    k = cross_product(n1, n1)
+    k = cross_product(n0, n1)
     k = k / linalg.norm(k)
     theta = np.arccos(dot(n0, n1))
 
@@ -218,7 +219,7 @@ class Circle3D:
         Returns
         -------
         np.ndarray
-            array of sample points
+            array of sample points with the shape (3,N) where N is the number of samples.
         """
 
         if self.a is None or self.b is None:
@@ -232,10 +233,6 @@ class Circle3D:
         pts = pts.T
 
         return pts
-
-    def ransac_fit(self, pts: np.ndarray):
-
-        pass
 
     def dist_pt2circle(self, pts: np.ndarray) -> list[float]:
         """Calculated euclidean distance from set of points to the circle 3D model.
@@ -276,11 +273,54 @@ class Circle3D:
         )
         # (3) Calculate distance
         dist_pt = np.sqrt(np.square(dist_circle2proj) + np.square(dist_pt2plane))
+
         return dist_pt
 
     @classmethod
     def empty_constructor(cls) -> Circle3D:
         return Circle3D(None, None, None, None)
+
+    @classmethod
+    def three_pt_fit(cls, pts1: np.ndarray, pts2: np.ndarray, pts3: np.ndarray) -> Circle3D:
+        """Fit 3D circle using 3 points
+
+        Parameters
+        ----------
+        pts : np.ndarray
+            Column vector of shape (3,). Three points are needed
+        """
+
+        pts1 = pts1.reshape((3, 1))
+        pts2 = pts2.reshape((3, 1))
+        pts3 = pts3.reshape((3, 1))
+
+        pt_samples = np.hstack((pts1, pts2, pts3))
+        P_mean = pt_samples.mean(axis=1).reshape((-1, 1))
+        P_centered = pt_samples - P_mean
+
+        vecA = pts2 - pts1
+        vecA_norm = vecA / np.linalg.norm(vecA)
+        vecB = pts3 - pts1
+        vecB_norm = vecB / np.linalg.norm(vecB)
+
+        # Now we compute the cross product of vecA and vecB to get vecC which is normal to the plane
+        vecC = np.cross(vecA_norm.squeeze(), vecB_norm.squeeze())
+        vecC = vecC / np.linalg.norm(vecC)
+
+        # Calculate plane eq
+        k = -np.sum(np.multiply(vecC, pt_samples[:, 0]))
+        plane = Plane3D(normal=vecC, d=k)
+        # Project points to coords X-Y in 2D plane
+        # rodrigues_rot method receives a numpy a array where each row is the vector
+        P_xy = rodrigues_rot(P_centered.T, plane.normal, [0, 0, 1])
+        # Fit 2D circle
+        circle2d = Circle2d.from_three_pts(P_xy.T)
+        center, radius = circle2d.center, circle2d.radius
+        # Go back to 3D
+        C = rodrigues_rot(center.T, [0, 0, 1], plane.normal) + P_mean.squeeze()
+        C = C.flatten()
+
+        return Circle3D(C, plane.normal, radius, samples=pt_samples.T)
 
     @classmethod
     def from_lstsq_fit(cls, samples: np.ndarray) -> Circle3D:
@@ -320,7 +360,7 @@ class Circle3D:
         C = C.flatten()
 
         # Select a consistent normal direction. (This will only work if the points are ordered)
-        correct_normal = np.cross_product(samples[0] - C, samples[-1] - C)
+        correct_normal = np.cross(samples[0] - C, samples[-1] - C)
         correct_normal = correct_normal / np.linalg.norm(correct_normal)
         if np.dot(correct_normal, plane.normal) < 0:
             plane.normal = -plane.normal

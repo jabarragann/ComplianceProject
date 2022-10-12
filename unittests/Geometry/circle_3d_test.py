@@ -2,6 +2,51 @@ import numpy as np
 from kincalib.Geometry.geometry import Circle3D
 
 
+def create_random_circle():
+    pass
+
+
+def create_sample_circle1():
+    center1 = np.array([5, -2, 1])
+    normal = np.array([54, 6, 6])
+    normal = normal / np.linalg.norm(normal)
+    rad1 = 10
+    circle = Circle3D(center1, normal, rad1)
+
+    return circle
+
+
+def test_least_square_fit():
+    """Test fitting a circle with three points"""
+    circle = create_sample_circle1()
+
+    sample_pts = circle.generate_pts(20)
+
+    est_circle = Circle3D.from_lstsq_fit(sample_pts.T)
+
+    assert np.isclose(est_circle.radius, circle.radius)
+    assert all(np.isclose(est_circle.normal, circle.normal))
+    assert all(np.isclose(est_circle.center, circle.center))
+
+
+def test_fit_with_3pt():
+    """Test fitting a circle with three points"""
+    circle = create_sample_circle1()
+    theta = np.array([45, 120, 95, 54])
+    sample_pts = circle.sample_circle(theta, deg=True)
+
+    est_circle = Circle3D.three_pt_fit(sample_pts[:, 0], sample_pts[:, 1], sample_pts[:, 2])
+
+    print(sample_pts)
+    assert np.isclose(est_circle.radius, circle.radius)
+    assert all(np.isclose(est_circle.normal, circle.normal))
+    assert all(np.isclose(est_circle.center, circle.center))
+
+
+def test_fit_with_3pt_random():
+    pass
+
+
 def test_dist_pt2circle():
     """Test distance to circle using a test circle to generate sample points"""
 

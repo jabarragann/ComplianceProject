@@ -1,6 +1,5 @@
 from __future__ import annotations
 import numpy as np
-from kincalib.Geometry.geometry import Circle3D
 from kincalib.utils.Logger import Logger
 
 log = Logger(__name__).log
@@ -23,7 +22,7 @@ class Circle2d:
         ----------
         pts : np.ndarray
             Numpy array of shape (N,3) containing the three reference points. N can be either 2 or 3 since the z-component
-            is ignored in the calculations
+            is ignored in the calculations. Each point is column vector of shape (N,1)
 
         Returns
         -------
@@ -132,6 +131,8 @@ class Circle2d:
 
 
 if __name__ == "__main__":
+
+    from kincalib.Geometry.geometry import Circle3D
 
     # Random test
     np.random.seed(0)
