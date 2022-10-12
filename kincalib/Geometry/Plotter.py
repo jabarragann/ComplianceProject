@@ -9,6 +9,12 @@ np.set_printoptions(precision=3, suppress=True)
 
 
 class Plotter3D:
+    """Plotter util
+
+    TODO: ADD plot_circle method
+    self.plot_circle(circle:Circle3D)
+    """
+
     def __init__(self, title: str = None) -> None:
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(projection="3d")

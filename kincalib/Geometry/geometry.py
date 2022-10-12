@@ -180,6 +180,15 @@ class Circle3D:
         self.a = self.a / norm(self.a)
         self.b = np.cross(self.a, self.normal)
 
+    def __str__(
+        self,
+    ):
+        s1 = ""
+        s1 += f"radius {self.radius: 0.4f} "
+        s1 += f"center {np.array2string(self.center)} "
+        s1 += f"normal {np.array2string(self.normal)} "
+        return s1
+
     def __call__(self, theta):
         if self.a is None or self.b is None:
             self.init_parametric_vect()
@@ -196,7 +205,12 @@ class Circle3D:
         return b1 and b2 and b3
 
     def get_plane(self) -> Plane3D:
+        # TODO: Is this correct?
         return Plane3D(self.normal, self(0))
+
+    def get_ray(self) -> Line3D:
+        """Return a 3D line that passes through the circle's center and follows the normal direction"""
+        return Line3D(self.center, self.normal)
 
     def generate_pts(self, N):
         """Generate `N` sample point from the parametric representation of the 3D circle
