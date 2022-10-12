@@ -158,12 +158,20 @@ class Circle3D:
             radius (_type_): _description_
             samples (_type_, optional): Data used to solve the lstsq problem. Defaults to None.
         """
-        self.center = center.squeeze()
-        self.radius = radius
-        self.normal = normal.squeeze() / norm(normal)
-
         if samples is not None:
             self.samples = samples.T
+
+        if center is not None and normal is not None and radius is not None:
+            self.center = center.squeeze()
+            self.radius = radius
+            self.normal = normal.squeeze() / norm(normal)
+
+            self.init_parametric_vect()
+
+    def init_parametric_vect(self):
+
+        if self.normal is None:
+            raise Exception("Circle parameters not initilized")
 
         # Orthogonal vectors to n (Used to generate sample points)
         random_vect = np.array([self.normal[2], self.normal[0], self.normal[1]])
@@ -172,6 +180,9 @@ class Circle3D:
         self.b = np.cross(self.a, self.normal)
 
     def __call__(self, theta):
+        if self.a is None or self.b is None:
+            self.init_parametric_vect()
+
         pts = self.center.T + self.radius * (cos(theta) * self.a + sin(theta) * self.b)
         return pts
 
@@ -185,6 +196,10 @@ class Circle3D:
         Returns:
             [type]: [description]
         """
+
+        if self.a is None or self.b is None:
+            self.init_parametric_vect()
+
         theta = np.linspace(0, 2 * pi, N).reshape(-1, 1)
         pts = self.center.T + self.radius * cos(theta) * self.a + self.radius * sin(theta) * self.b
         pts = pts.T
@@ -206,6 +221,9 @@ class Circle3D:
             array of sample points
         """
 
+        if self.a is None or self.b is None:
+            self.init_parametric_vect()
+
         if deg:
             # convert to radians
             theta = theta * np.pi / 180
@@ -214,6 +232,55 @@ class Circle3D:
         pts = pts.T
 
         return pts
+
+    def ransac_fit(self, pts: np.ndarray):
+
+        pass
+
+    def dist_pt2circle(self, pts: np.ndarray) -> list[float]:
+        """Calculated euclidean distance from set of points to the circle 3D model.
+
+        Algorithm described in
+        https://math.stackexchange.com/questions/31049/distance-from-a-point-to-circles-closest-point
+
+        Parameters
+        ----------
+        pts : np.ndarray
+            3D point cloud as a numpy array (3,N)
+
+        Returns
+        -------
+        dist_vect : List[float]
+            distance from point to circle
+
+        Raises
+        ------
+        Exception
+            _description_
+        """
+
+        if self.radius is None or self.center is None:
+            raise Exception("No available parameters. Fit the model first.")
+
+        # (1) Calculate distance to circle's plane
+        d = -np.sum(np.multiply(self.normal, self.center))
+        circle_plane = Plane3D(self.normal, d)
+        dist_pt2plane = circle_plane.dist2point(pts)
+        # (2) Calculate distance of projected points to circle
+        # https://stackoverflow.com/questions/9605556/how-to-project-a-point-onto-a-plane-in-3d
+        v = pts - self.center.reshape((3, 1))
+        scales = self.normal.reshape((1, 3)) @ v
+        projected_pt = pts - scales * self.normal.reshape((3, 1))
+        dist_circle2proj = (
+            np.linalg.norm(self.center.reshape((3, 1)) - projected_pt, axis=0) - self.radius
+        )
+        # (3) Calculate distance
+        dist_pt = np.sqrt(np.square(dist_circle2proj) + np.square(dist_pt2plane))
+        return dist_pt
+
+    @classmethod
+    def empty_constructor(cls) -> Circle3D:
+        return Circle3D(None, None, None, None)
 
     @classmethod
     def from_lstsq_fit(cls, samples: np.ndarray) -> Circle3D:
@@ -282,9 +349,58 @@ class Circle3D:
 
 
 class Plane3D:
-    def __init__(self, normal, d):
+    def __init__(self, normal: np.ndarray, d: float):
+        """Create a plane with its normal representation
+
+        Plane normal representation
+        <n, (x-p0)>     = 0
+        <n,x> - <n,p0>  = 0
+        <n,x> + d = 0
+
+        Parameters
+        ----------
+        normal : np.ndarray
+            Plane normal vector
+        d : float
+            Dot product of normal and any point (p0) in the plane. d=-<n,p0>
+        """
         self.normal = normal / np.linalg.norm(normal)
         self.d = d
+
+    # Additional constructors
+    @classmethod
+    def from_coefficients(cls, a: float, b: float, c: float, d: float) -> Plane3D:
+        """Create planes from coefficients
+        http://www.easy-math.net/transforming-between-plane-forms/
+
+        General plane equation
+        ax + by + cz + d =  0
+
+        Parameters
+        ----------
+        a : float
+        b : float
+        c : float
+        d : float
+
+        Returns
+        -------
+        Plane3D
+           Plane
+        """
+
+        normal = np.array([a, b, c])
+        normal = normal / norm(normal)
+        # Find any point on the plane
+        if not np.isclose(c, 0):
+            p0 = np.array([0, 0, -d / c])
+        elif not np.isclose(b, 0.0):
+            p0 = np.array([0.0, -d / b, 0.0])
+        elif not np.isclose(a, 0.0):
+            p0 = np.array([-d / a, 0.0, 0.0])
+
+        d = -np.dot(p0, normal)
+        return Plane3D(normal, d)
 
     def generate_pts(self, N, l1_lim=(-50, 50), l2_lim=(-50, 50), noise_std=0):
         """Generate point cloud of shape (N,3) from the plane parameters
@@ -346,21 +462,24 @@ class Plane3D:
         )
         return d2
 
-    def dist2point(self, x0: np.ndarray) -> float:
-        """_summary_
+    def dist2point(self, pt: np.ndarray) -> float:
+        """Calculate the distance from a set points to the plane
 
         Parameters
         ----------
-        x0 : np.ndarray
-            numpy array of shape (3,)
+        pt : np.ndarray
+            numpy array of shape (3,N) where `N` is the number of points.
 
         Returns
         -------
         float
             distance from point to plane
         """
+        # Vectorized version
+        dist = abs(self.normal.reshape(1, 3) @ pt + self.d) / np.linalg.norm(self.normal)
+        return dist.squeeze()
 
-        return (np.dot(self.normal, x0) + self.d) / np.linalg.norm(self.normal)
+        # return (np.dot(self.normal, x0) + self.d) / np.linalg.norm(self.normal)
 
     def point_cloud_dist(self, pt_cloud: np.ndarray) -> np.ndarray:
         """Calculate the distance to the plane for each point in the point cloud

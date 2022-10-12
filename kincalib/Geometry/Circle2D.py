@@ -9,7 +9,7 @@ log = Logger(__name__).log
 class Circle2d:
     """Circle in the xy plane."""
 
-    def __init__(self, radius: float, center: np.ndarray) -> None:
+    def __init__(self, radius: float = None, center: np.ndarray = None) -> None:
         self.radius = radius
         self.center = center.squeeze()
 
