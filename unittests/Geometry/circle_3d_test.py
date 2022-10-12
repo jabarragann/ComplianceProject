@@ -27,7 +27,7 @@ def test_dist_pt2circle():
 
 def test_dist_pt2circle_random():
 
-    np.random.seed(0)
+    # np.random.seed(0)
     for i in range(100):
         center1 = np.random.random(3)
         normal = np.random.random(3)
