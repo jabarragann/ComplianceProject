@@ -187,6 +187,14 @@ class Circle3D:
         pts = self.center.T + self.radius * (cos(theta) * self.a + sin(theta) * self.b)
         return pts
 
+    def __eq__(self, other: Circle3D):
+        b1 = np.isclose(self.radius, other.radius)
+        # Take abs of normal. Normal can have two directions but is still the same circle
+        b2 = all(np.isclose(abs(self.normal), abs(other.normal)))
+        b3 = all(np.isclose(self.center, other.center))
+
+        return b1 and b2 and b3
+
     def get_plane(self) -> Plane3D:
         return Plane3D(self.normal, self(0))
 
@@ -208,6 +216,8 @@ class Circle3D:
 
     def sample_circle(self, theta: np.ndarray, deg=False) -> np.ndarray:
         """Sample circle at specific angles
+
+        # TODO: This is a redundant function. __call__ should be taking care of this.
 
         Parameters
         ----------
