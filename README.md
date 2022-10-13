@@ -117,6 +117,11 @@ https://www.statology.org/how-to-find-iqr-of-box-plot/
 * https://www.weiy.city/2021/06/calculate-the-signed-angle-between-two-vectors/
 [DOES USING TWO DIFFERENT PITCH AXIS FOR THE CALCULATION OF THE PITCH ORIGIN IS REALLY HELPING? INVESTIGATE WHETHER USING TWO PITCH AXIS IMPROVES THE REGISTRATION ERROR]
 
+## Geometry useful links 
+* 3D line equations - [link](https://math.stackexchange.com/questions/404440/what-is-the-equation-for-a-3d-line)
+* Implicit vs Explicit functions - [link](http://groups.csail.mit.edu/graphics/classes/6.838/S98/meetings/m7/impexplicit.html)
+* 
+
 Midpoint of shortest segment
 
 # Improvements

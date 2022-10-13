@@ -1,7 +1,9 @@
 from doctest import OutputChecker
 from pathlib import Path
+from unittest import result
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pandas as pd
 from kincalib.Geometry.Plotter import Plotter3D
 from kincalib.Geometry.geometry import Circle3D, Line3D
@@ -32,8 +34,12 @@ def outer_axis_analysis(path: Path, plot=False):
     # Fit circle to data
     pitch_circle = Circle3D.from_lstsq_fit(pt_pitch)
     pitch_axis = pitch_circle.get_ray()
+    pitch_residual_error = pitch_circle.dist_pt2circle(pt_pitch.T)
+
     yaw_circle = Circle3D.from_lstsq_fit(pt_yaw)
     yaw_axis = yaw_circle.get_ray()
+    yaw_residual_error = yaw_circle.dist_pt2circle(pt_yaw.T)
+
     params = []
     perp_line = Line3D.perpendicular_to_skew(pitch_axis, yaw_axis, params)
     params = params[0].squeeze()
@@ -51,25 +57,59 @@ def outer_axis_analysis(path: Path, plot=False):
         plotter = Plotter3D()
         plotter.scatter_3d(pt_pitch.T, label="outer_pitch")
         plotter.scatter_3d(pt_yaw.T, label="outer_yaw")
+        plotter.plot_circle(pitch_circle)
+        plotter.plot_circle(yaw_circle)
         plotter.plot()
 
     # print(pt_pitch.shape)
+    return angle, perp_dist, pitch_residual_error, yaw_residual_error
 
 
-def main():
+def main1():
     path = Path("./data/03_replay_trajectory/")
 
+    results_dict = {"angle": [], "dist": []}
+    pitch_error_dict = {"mean": [], "std": [], "max": [], "min": []}
+    yaw_error_dict = {"mean": [], "std": [], "max": [], "min": []}
     for p in path.glob("*/outer_mov"):
         log.info(p)
-        outer_axis_analysis(p)
+        angle, perp_dist, pitch_error, yaw_error = outer_axis_analysis(p)
+        pitch_error *= 1000
+        yaw_error *= 1000
+        results_dict["angle"].append(angle)
+        results_dict["dist"].append(perp_dist)
+
+        pitch_error_dict["mean"].append(pitch_error.mean())
+        pitch_error_dict["std"].append(pitch_error.std())
+        pitch_error_dict["max"].append(pitch_error.max())
+        pitch_error_dict["min"].append(pitch_error.min())
+
+        yaw_error_dict["mean"].append(yaw_error.mean())
+        yaw_error_dict["std"].append(yaw_error.std())
+        yaw_error_dict["max"].append(yaw_error.max())
+        yaw_error_dict["min"].append(yaw_error.min())
+
+    results_df = pd.DataFrame(results_dict)
+    pitch_error_df = pd.DataFrame(pitch_error_dict)
+    yaw_error_df = pd.DataFrame(yaw_error_dict)
+
+    # results_df = results_df.melt(value_vars=["angle", "dist"], var_name="type", value_name="value")
+    # print(results_df)
+    fig, ax = plt.subplots(1, 2)
+    sns.boxplot(data=results_df, y="angle", ax=ax[0])
+    sns.swarmplot(data=results_df, y="angle", ax=ax[0], color="black")
+    sns.boxplot(data=results_df, y="dist", ax=ax[1])
+    sns.swarmplot(data=results_df, y="dist", ax=ax[1], color="black")
+    plt.show()
 
 
-# def main():
-#     # Perfect case to debug ransac!
-#     path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
-#     outer_axis_analysis(path, plot=True)
+def main2():
+    # Perfect case to debug ransac!
+    # path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
+    path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
+    outer_axis_analysis(path, plot=True)
 
 
 if __name__ == "__main__":
 
-    main()
+    main2()

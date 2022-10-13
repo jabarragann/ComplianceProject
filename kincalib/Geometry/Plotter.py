@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from kincalib.utils.Logger import Logger
+from kincalib.Geometry.geometry import Circle3D
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -50,6 +51,12 @@ class Plotter3D:
         self.ax.legend()
         if title is not None:
             self.ax.set_title(title)
+
+    def plot_circle(self, circle: Circle3D):
+        pts = circle.generate_pts(50)
+        self.ax.plot(pts[0, :], pts[1, :], pts[2, :], "gray")
+
+        return self.ax
 
     def plot(self):
         plt.show()
