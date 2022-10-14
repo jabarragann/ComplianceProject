@@ -9,7 +9,7 @@ import pandas as pd
 from kincalib.Geometry.Plotter import Plotter3D
 from kincalib.Geometry.geometry import Circle3D, Line3D
 from kincalib.utils.Logger import Logger
-
+from kincalib.Geometry.Ransac import Ransac, RansacCircle3D
 
 log = Logger("outer").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
@@ -36,11 +36,20 @@ def outer_axis_analysis(path: Path, plot=False):
     # outer_yaw_df.to_csv("./temp/data_ransac2.csv", index=False)
 
     # Fit circle to data
-    pitch_circle = Circle3D.from_lstsq_fit(pt_pitch)
+    pitch_circle: Circle3D = None
+    yaw_circle: Circle3D = None
+
+    pitch_circle, inliers_idx = Ransac.ransac(
+        pt_pitch, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=True
+    )
+    # pitch_circle = Circle3D.from_lstsq_fit(pt_pitch)
     pitch_axis = pitch_circle.get_ray()
     pitch_residual_error = pitch_circle.dist_pt2circle(pt_pitch.T)
 
-    yaw_circle = Circle3D.from_lstsq_fit(pt_yaw)
+    yaw_circle, inliers_idx = Ransac.ransac(
+        pt_yaw, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=True
+    )
+    # yaw_circle = Circle3D.from_lstsq_fit(pt_yaw)
     yaw_axis = yaw_circle.get_ray()
     yaw_residual_error = yaw_circle.dist_pt2circle(pt_yaw.T)
 
@@ -117,4 +126,4 @@ def main2():
 
 if __name__ == "__main__":
 
-    main2()
+    main1()
