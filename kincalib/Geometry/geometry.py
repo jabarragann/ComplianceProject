@@ -180,9 +180,7 @@ class Circle3D:
         self.a = self.a / norm(self.a)
         self.b = np.cross(self.a, self.normal)
 
-    def __str__(
-        self,
-    ):
+    def __str__(self):
         s1 = ""
         s1 += f"radius {self.radius: 0.4f} "
         s1 += f"center {np.array2string(self.center)} "
@@ -199,7 +197,9 @@ class Circle3D:
     def __eq__(self, other: Circle3D):
         b1 = np.isclose(self.radius, other.radius)
         # Take abs of normal. Normal can have two directions but is still the same circle
-        b2 = all(np.isclose(abs(self.normal), abs(other.normal)))
+        b2 = all(np.isclose(self.normal, other.normal)) or all(
+            np.isclose(self.normal, -other.normal)
+        )
         b3 = all(np.isclose(self.center, other.center))
 
         return b1 and b2 and b3
