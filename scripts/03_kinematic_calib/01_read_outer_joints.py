@@ -1,4 +1,5 @@
 from doctest import OutputChecker
+import os
 from pathlib import Path
 from unittest import result
 import numpy as np
@@ -30,6 +31,9 @@ def outer_axis_analysis(path: Path, plot=False):
 
     pt_pitch = outer_pitch_df.to_numpy()
     pt_yaw = outer_yaw_df.to_numpy()
+
+    # outer_pitch_df.to_csv("./temp/data_ransac1.csv", index=False)
+    # outer_yaw_df.to_csv("./temp/data_ransac2.csv", index=False)
 
     # Fit circle to data
     pitch_circle = Circle3D.from_lstsq_fit(pt_pitch)
@@ -105,9 +109,10 @@ def main1():
 
 def main2():
     # Perfect case to debug ransac!
-    # path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
-    path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
+    path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
+    # path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
     outer_axis_analysis(path, plot=True)
+    plt.show()
 
 
 if __name__ == "__main__":
