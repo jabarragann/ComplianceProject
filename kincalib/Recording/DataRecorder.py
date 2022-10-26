@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 
 # Python
 from pathlib import Path
@@ -15,6 +16,62 @@ from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
 
 log = Logger(__name__).log
+
+
+@dataclass
+class DataRecorderV2:
+    replay_device: ReplayDevice
+    ftk_handler: ftk_500
+    expected_markers: int
+    root: Path
+    marker_name: str
+    mode: str
+    test_id: int
+    description: str = None
+
+    def __post_init__(self):
+        pass
+
+    def __call__(self, **kwargs):
+        pass
+
+    def record(self, index=None):
+        if index is None:
+            log.error("index not specified checkout the recording class")
+            exit(0)
+        self.collect_data(index)
+        self.save_data()
+
+    def collect_data(self, index):
+        log.info("record data")
+        marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
+            self.expected_markers, t=200, sample_time=15
+        )
+        # Measure
+        jp = self.replay_device.measured_jp()
+        jaw_jp = self.replay_device.jaw.measured_jp()[0]
+        # Check if marker is visible add sensor data
+        if marker_pose is not None:
+            self.calibration_record.create_new_sensor_entry(index, jp, jaw_jp)
+        # Always add robot data
+        self.calibration_record.create_new_robot_entry(index, jp, jaw_jp)
+
+        self.calibration_record.to_csv(safe_save=False)
+
+        # Read atracsys data: sphere fiducials and tools frames
+        # Sensor_vals will have several measurements of the static fiducials
+        mean_frame, mean_value = self.ftk_handler.obtain_processed_measurement(
+            self.expected_markers, t=500, sample_time=15
+        )
+
+        js = self.robot_handler.measured_js()
+        jp_s = self.robot_handler.setpoint_js()[0]  # jp setpoints
+        jp = js[0]  # joint pos
+        jt = js[2]  # joint torque
+        jaw_jp = self.robot_handler.jaw_jp()
+
+    def save_data(self):
+        pass
 
 
 class DataRecorder:
@@ -190,6 +247,22 @@ if __name__ == "__main__":
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
-        trajectory_player.replay_trajectory(execute_cb=True)
-    else:
-        exit(0)
+        trajector
+    trajectory = SoftRandomJointTrajectory.generate_trajectory(50, samples_per_step=20)
+
+    log.info(f"Initial pt {trajectory.setpoints[0].position}")
+    log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
+    log.info(f"number of points {len(trajectory)}")
+
+    arm_namespace = "PSM2"
+    arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
+    arm.home_device()
+
+    # Sensors
+    # ftk_handler = ftk_500("marker_12")
+    ftk_handler = FTKDummy()
+
+    # Setup calibration callbacks
+    outer_js_calib_cb = OuterJointsCalibrationRecorder(
+        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
+    )

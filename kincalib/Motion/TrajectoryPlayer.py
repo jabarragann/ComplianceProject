@@ -56,7 +56,7 @@ class TrajectoryPlayer:
         self.after_motion_cb = after_motion_cb
         self.before_motion_loop_cb = before_motion_loop_cb
 
-    def replay_trajectory(self, execute_cb: bool = True):
+    def replay_trajectory(self, execute_cb: bool = True, delay=0.005):
 
         start_time = time.time()
         last_bag_time = self.trajectory[0].header.stamp.to_sec()
@@ -77,7 +77,7 @@ class TrajectoryPlayer:
             log.info(f"Executed step {index}")
             log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
             self.replay_device.move_jp(numpy.array(new_js.position)).wait()  # wait until motion is finished
-            time.sleep(0.005)
+            time.sleep(delay)
 
             # After motion callbacks
             if execute_cb:

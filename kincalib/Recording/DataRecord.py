@@ -102,16 +102,12 @@ class CalibrationRecord(Record):
             jp_filename = self.test_files / ("robot_jp.txt")
 
             if cp_filename.exists() or jp_filename.exists():
-                n = input(
-                    f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. "
-                )
+                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
                 if not (n == "y" or n == "Y"):
                     log.info("exiting the script")
                     exit(0)
         # Create records
-        self.cp_record = RobotSensorCartesianRecord(
-            robot_handler, ftk_handler, expected_markers, cp_filename
-        )
+        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
         self.jp_record = JointRecord(robot_handler, jp_filename)
 
         self.create_paths()
@@ -227,46 +223,43 @@ class RobotCartesianRecord(Record):
 
 
 class AtracsysCartesianRecord(Record):
-    def __init__(self, ftk_handler, expected_markers, filename: Path) -> None:
+    def __init__(self, filename: Path) -> None:
         super().__init__(CartesianRecord.df_cols, filename)
-        self.ftk_handler = ftk_handler
-        self.expected_markers = expected_markers
 
-    def create_new_entry(self, idx, joints: List[float], q7):
+    def create_new_entry(self, idx, fid_cp_array, tool_cp, jp_s: List[float], jaw_jp: float):
 
-        if isinstance(joints, np.ndarray):
-            joints = joints.squeeze().tolist()
+        if isinstance(jp_s, np.ndarray):
+            jp_s = jp_s.squeeze().tolist()
 
-        # Read atracsys data: sphere fiducials and tools frames
-        # Sensor_vals will have several measurements of the static fiducials
-        mean_frame, mean_value = self.ftk_handler.obtain_processed_measurement(
-            self.expected_markers, t=500, sample_time=15
-        )
         df_vals = pd.DataFrame(columns=self.df_cols)
 
-        # Add fiducials to dataframe
-        if mean_value is not None:
-            for mid, k in enumerate(range(mean_value.shape[0])):
-                # fmt:off
-                d = [ idx]+joints+ [q7, "f", mid, mean_value[k, 0], mean_value[k, 1], mean_value[k, 2], 0.0, 0.0, 0.0, 1 ]
-                # fmt:on
+        # Add fiducials
+        if fid_cp_array is not None:
+            for mid, k in enumerate(range(fid_cp_array.shape[0])):
+                d = [idx]
+                d += jp_s + [jaw_jp, "f", mid]
+                # position of fiducials
+                d += [fid_cp_array[k, 0], fid_cp_array[k, 1], fid_cp_array[k, 2]]
+                # orientation of fiducials
+                d += [0.0, 0.0, 0.0, 1]
                 d = np.array(d).reshape((1, self.cols_len))
                 new_pt = pd.DataFrame(d, columns=self.df_cols)
                 df_vals = df_vals.append(new_pt)
         else:
-            log.warning("No fiducial found")
-        # Add marker pose to dataframe
-        if mean_frame is not None:
-            p = list(mean_frame.p)
-            q = mean_frame.M.GetQuaternion()
-            d = [idx] + joints + [q7, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
+            log.warning("No fiducials found")
+
+        # Add tool pose
+        if tool_cp is not None:
+            p = list(tool_cp.p)
+            q = tool_cp.M.GetQuaternion()
+            d = [idx] + jp_s + [jaw_jp, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
             d = np.array(d).reshape((1, self.cols_len))
             new_pt = pd.DataFrame(d, columns=self.df_cols)
             df_vals = df_vals.append(new_pt)
         else:
             log.warning("No markers found")
 
-        if mean_frame is not None or mean_value is not None:
+        if fid_cp_array is not None or tool_cp is not None:
             self.df = self.df.append(df_vals)
 
 
@@ -285,16 +278,10 @@ class JointRecord(Record):
                        "s1", "s2", "s3", "s4", "s5", "s6"]
 
     # fmt: on
-    def __init__(self, robot_handler, filename: Path):
+    def __init__(self, filename: Path):
         super().__init__(JointRecord.df_cols, filename)
-        self.robot_handler = robot_handler
 
-    def create_new_entry(self, idx):
-        js = self.robot_handler.measured_js()
-        jp_s = self.robot_handler.setpoint_js()[0]  # jp setpoints
-        jp = js[0]  # joint pos
-        jt = js[2]  # joint torque
-        jaw_jp = self.robot_handler.jaw_jp()
+    def create_new_entry(self, idx, jp, jt, jp_s, jaw_jp):
         jp = (
             [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
             + [jt[0], jt[1], jt[2], jt[3], jt[4], jt[5]]
@@ -333,10 +320,10 @@ class LearningRecord(Record):
 
     df_cols = (
         ["step", "root", "testid", "type", "flag"]
-        + robot_joints_cols 
+        + robot_joints_cols
         + ["rt1", "rt2", "rt3", "rt4", "rt5", "rt6"]
         + ["rs1", "rs2", "rs3", "rs4", "rs5", "rs6"]
-        + tracker_joints_cols 
+        + tracker_joints_cols
         + ["opt"]
         + ["rcx", "rcy", "rcz"]
         + ["tcx", "tcy", "tcz"]
