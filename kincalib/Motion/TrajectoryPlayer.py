@@ -216,6 +216,34 @@ class Trajectory:
             setpoint_cp_t=setpoint_cp_t,
         )
 
+    @classmethod
+    def from_numpy(cls, joint_array: np.ndarray, sampling_factor: int = 1) -> Trajectory:
+        """Create a trajectory from a numpy array of joint values
+
+        Parameters
+        ----------
+        joint_array : np.ndarray
+            Numpy array of shape (N,6) where N is the number of points in the trajectory
+        sampling_factor : int, optional
+            Sample points in joint_array every `sampling_factor`, by default 1
+
+        Returns
+        -------
+        Trajectory
+        """
+
+        if joint_array.shape[1] != 6:
+            raise ValueError("Joint array must have shape (N,6)")
+
+        setpoints = []
+        for i in range(joint_array.shape[0]):
+            setpoint = JointState()
+            setpoint.name = ["q1", "q2", "q3", "q4", "q5", "q6"]
+            setpoint.position = joint_array[i, :]
+            setpoints.append(setpoint)
+
+        return Trajectory(sampling_factor=sampling_factor, setpoints=setpoints)
+
 
 @dataclass
 class RandomJointTrajectory(Trajectory):
