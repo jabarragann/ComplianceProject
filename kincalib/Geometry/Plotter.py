@@ -10,11 +10,7 @@ np.set_printoptions(precision=3, suppress=True)
 
 
 class Plotter3D:
-    """Plotter util
-
-    TODO: ADD plot_circle method
-    self.plot_circle(circle:Circle3D)
-    """
+    """Plotter util class"""
 
     def __init__(self, title: str = None) -> None:
         self.fig = plt.figure()
@@ -57,6 +53,13 @@ class Plotter3D:
         self.ax.plot(pts[0, :], pts[1, :], pts[2, :], "gray")
 
         return self.ax
+
+    def scatter_3d_inliers_outliers(self, points: np.ndarray, inliers_idx: np.ndarray, label: str):
+        outliers_idx = np.delete(np.arange(points.shape[1]), inliers_idx)
+        inliers = points[:, inliers_idx]
+        outliers = points[:, outliers_idx]
+        self.scatter_3d(inliers, label=label)
+        self.scatter_3d(outliers, label="outliers", marker="x", color="red")
 
     def plot(self):
         plt.show()

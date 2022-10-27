@@ -1,6 +1,7 @@
 from doctest import OutputChecker
 import os
 from pathlib import Path
+from re import I
 from unittest import result
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,9 +11,58 @@ from kincalib.Geometry.Plotter import Plotter3D
 from kincalib.Geometry.geometry import Circle3D, Line3D
 from kincalib.utils.Logger import Logger
 from kincalib.Geometry.Ransac import Ransac, RansacCircle3D
+from dataclasses import dataclass
 
 log = Logger("outer").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
+
+
+class dh_param_estimation:
+    def __init__(self) -> None:
+        self.pt
+
+    def robust_circle_fitting():
+        pass
+
+
+@dataclass
+class AxisEstimator:
+    """Axis estimator
+
+    Estimate the rotation axis of joint
+
+    Parameters
+    ----------
+    pt : np.ndarray
+        Points used in ransac fitting
+    jp : np.ndarray
+        Joint angles
+
+    """
+
+    pt: np.ndarray
+    jp: np.ndarray
+
+    def estimate_axis(self):
+
+        self.circle: Circle3D = None
+        self.axis: Line3D = None
+
+        _, self.inliers_idx = Ransac.ransac(
+            self.pt, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=False
+        )
+        self.circle = Circle3D.from_lstsq_fit(
+            self.pt[self.inliers_idx]
+        )  # fit again with ordered points
+
+        self.axis = self.circle.get_ray()
+        self.residual_error = self.circle.dist_pt2circle(self.pt.T)
+
+    def plot_circle(self, plotter: Plotter3D):
+        pass
+
+    def plot_error(self, ax: plt.Axes):
+        ax.plot(self.jp, self.residual_error)
 
 
 def outer_axis_analysis(path: Path, plot=False):
@@ -26,11 +76,14 @@ def outer_axis_analysis(path: Path, plot=False):
     outer_yaw_df = pd.read_csv(path / "outer_yaw.txt")
 
     # Get only the marker origin positions
-    outer_pitch_df = outer_pitch_df.loc[outer_pitch_df["m_t"] == "m"][["px", "py", "pz"]]
-    outer_yaw_df = outer_yaw_df.loc[outer_yaw_df["m_t"] == "m"][["px", "py", "pz"]]
+    outer_yaw_df = outer_yaw_df.loc[outer_yaw_df["m_t"] == "m"][["q1", "px", "py", "pz"]]
+    outer_pitch_df = outer_pitch_df.loc[outer_pitch_df["m_t"] == "m"][["q2", "px", "py", "pz"]]
 
-    pt_pitch = outer_pitch_df.to_numpy()
-    pt_yaw = outer_yaw_df.to_numpy()
+    c_q1_yaw = outer_yaw_df.to_numpy()[:, 0]
+    pt_yaw = outer_yaw_df.to_numpy()[:, 1:]
+
+    c_q2_pitch = outer_pitch_df.to_numpy()[:, 0]
+    pt_pitch = outer_pitch_df.to_numpy()[:, 1:]
 
     # outer_pitch_df.to_csv("./temp/data_ransac1.csv", index=False)
     # outer_yaw_df.to_csv("./temp/data_ransac2.csv", index=False)
@@ -39,17 +92,20 @@ def outer_axis_analysis(path: Path, plot=False):
     pitch_circle: Circle3D = None
     yaw_circle: Circle3D = None
 
-    pitch_circle, inliers_idx = Ransac.ransac(
-        pt_pitch, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=True
+    pitch_circle, pitch_inliers_idx = Ransac.ransac(
+        pt_pitch, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=False
     )
-    # pitch_circle = Circle3D.from_lstsq_fit(pt_pitch)
+    pitch_circle = Circle3D.from_lstsq_fit(
+        pt_pitch[pitch_inliers_idx]
+    )  # fit again with ordered points
+
     pitch_axis = pitch_circle.get_ray()
     pitch_residual_error = pitch_circle.dist_pt2circle(pt_pitch.T)
 
-    yaw_circle, inliers_idx = Ransac.ransac(
-        pt_yaw, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=True
+    yaw_circle, yaw_inliers_idx = Ransac.ransac(
+        pt_yaw, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=False
     )
-    # yaw_circle = Circle3D.from_lstsq_fit(pt_yaw)
+    yaw_circle = Circle3D.from_lstsq_fit(pt_yaw[yaw_inliers_idx])
     yaw_axis = yaw_circle.get_ray()
     yaw_residual_error = yaw_circle.dist_pt2circle(pt_yaw.T)
 
@@ -68,11 +124,20 @@ def outer_axis_analysis(path: Path, plot=False):
     # Plot data
     if plot:
         plotter = Plotter3D()
-        plotter.scatter_3d(pt_pitch.T, label="outer_pitch")
-        plotter.scatter_3d(pt_yaw.T, label="outer_yaw")
+        plotter.scatter_3d_inliers_outliers(pt_pitch.T, pitch_inliers_idx, label="outer_pitch")
+        plotter.scatter_3d_inliers_outliers(pt_yaw.T, yaw_inliers_idx, label="outer_yaw")
         plotter.plot_circle(pitch_circle)
         plotter.plot_circle(yaw_circle)
         plotter.plot()
+
+        # Plot error vs command joint position
+        fig, ax = plt.subplots(2)
+        ax[0].plot(c_q1_yaw, yaw_residual_error * 1000, "-bo")
+        ax[0].set_xlabel("outer yaw (q1)")
+        ax[1].plot(c_q2_pitch, pitch_residual_error * 1000, "-ro")
+        ax[1].set_xlabel("outer pitch (q2)")
+        [(a.grid(), a.set_ylabel("dist (mm)")) for a in ax]
+        plt.show()
 
     # print(pt_pitch.shape)
     return angle, perp_dist, pitch_residual_error, yaw_residual_error
@@ -118,9 +183,34 @@ def main1():
 
 def main2():
     # Perfect case to debug ransac!
-    path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
-    # path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
+    # path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
+    path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
     outer_axis_analysis(path, plot=True)
+
+
+def main3():
+    # path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
+    path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
+    angle_list = []
+    dist_list = []
+    for i in range(10):
+        print(i)
+        angle, dist, _, _ = outer_axis_analysis(path, plot=False)
+        angle_list.append(angle)
+        dist_list.append(dist)
+
+    # print(angle_list)
+    # print(dist_list)
+
+    fig, ax = plt.subplots(1)
+    sns.histplot(x=angle_list, ax=ax, bins=50)
+    ax.set_title("Angle distributions")
+    ax.set_xlabel("degree")
+
+    fig, ax = plt.subplots(1)
+    sns.histplot(x=dist_list, ax=ax, bins=50)
+    ax.set_title("distance distributions")
+    ax.set_xlabel("mm")
     plt.show()
 
 

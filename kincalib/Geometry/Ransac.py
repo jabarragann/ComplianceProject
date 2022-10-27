@@ -119,6 +119,7 @@ class Ransac:
         if bestfit is None:
             raise ValueError("did not meet fit acceptance criteria")
         else:
+            best_inlier_idxs.sort()  # inplace sorting of indices
             return bestfit, best_inlier_idxs
 
     @staticmethod
@@ -129,4 +130,3 @@ class Ransac:
         idxs1 = all_idxs[:n]
         idxs2 = all_idxs[n:]
         return idxs1, idxs2
-
