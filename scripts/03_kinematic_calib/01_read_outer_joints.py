@@ -3,6 +3,7 @@ from doctest import OutputChecker
 import os
 from pathlib import Path
 from re import I
+from typing import Callable, List
 from unittest import result
 import numpy as np
 import matplotlib.pyplot as plt
@@ -82,13 +83,12 @@ class AxisEstimator:
         return ax
 
 
-def outer_axis_analysis(path: Path, plot=False):
-    outer_pitch_df = pd.read_csv(path / "outer_pitch.txt")
-    outer_yaw_df = pd.read_csv(path / "outer_yaw.txt")
+def outer_axis_analysis(outer_yaw_df, outer_pitch_df, plot=False):
 
-    # Get  marker origin position and commanded joint
-    outer_yaw_df = outer_yaw_df.loc[outer_yaw_df["m_t"] == "m"][["q1", "px", "py", "pz"]]
-    outer_pitch_df = outer_pitch_df.loc[outer_pitch_df["m_t"] == "m"][["q2", "px", "py", "pz"]]
+    # fmt:off
+    assert all(outer_yaw_df.columns == ["cmd_q", "px", "py", "pz"]), "outer yaw df have wrong columns"
+    assert all(outer_pitch_df.columns == [ "cmd_q", "px", "py", "pz" ]), "outer pitch df have wrong columns"
+    # fmt: on
 
     c_q1_yaw = outer_yaw_df.to_numpy()[:, 0]
     pt_yaw = outer_yaw_df.to_numpy()[:, 1:]
@@ -124,15 +124,57 @@ def outer_axis_analysis(path: Path, plot=False):
     )
 
 
-def main1():
-    path = Path("./data/03_replay_trajectory/")
+def extract_data_fmt1(path):
+
+    outer_pitch_df = pd.read_csv(path / "outer_pitch.txt")
+    outer_yaw_df = pd.read_csv(path / "outer_yaw.txt")
+
+    # Get  marker origin position and commanded joint
+    outer_yaw_df = outer_yaw_df.loc[outer_yaw_df["m_t"] == "m"][["q1", "px", "py", "pz"]]
+    outer_pitch_df = outer_pitch_df.loc[outer_pitch_df["m_t"] == "m"][["q2", "px", "py", "pz"]]
+
+    outer_yaw_df.rename(columns={"q1": "cmd_q"}, inplace=True)
+    outer_pitch_df.rename(columns={"q2": "cmd_q"}, inplace=True)
+
+    return outer_yaw_df, outer_pitch_df
+
+
+def extract_data_fmt2(path):
+    robot_cp_df = pd.read_csv(path / "robot_cp.txt")
+    robot_jp_df = pd.read_csv(path / "robot_jp.txt")
+
+    yaw_steps = robot_jp_df.loc[robot_jp_df["s2"] == 0.0]  # outer yaw - q1
+    pitch_steps = robot_jp_df.loc[robot_jp_df["s1"] == 0.0]  # outer pitch - q2
+
+    # filter yaw values
+    outer_yaw_df = robot_cp_df.loc[
+        (robot_cp_df["step"].isin(yaw_steps.step)) & (robot_cp_df["m_t"] == "m")
+    ]
+    outer_yaw_df = outer_yaw_df[["q1", "px", "py", "pz"]]
+    # filter pitch values
+    outer_pitch_df = robot_cp_df.loc[
+        (robot_cp_df["step"].isin(pitch_steps.step)) & (robot_cp_df["m_t"] == "m")
+    ]
+    outer_pitch_df = outer_pitch_df[["q2", "px", "py", "pz"]]
+
+    outer_yaw_df.rename(columns={"q1": "cmd_q"}, inplace=True)
+    outer_pitch_df.rename(columns={"q2": "cmd_q"}, inplace=True)
+
+    return outer_yaw_df, outer_pitch_df
+
+
+def aggregate_analysis(path_list: List[Path], extract_data: Callable):
 
     results_dict = {"angle": [], "dist": []}
     pitch_error_dict = {"mean": [], "std": [], "max": [], "min": []}
     yaw_error_dict = {"mean": [], "std": [], "max": [], "min": []}
-    for p in path.glob("*/outer_mov"):
+
+    for p in path_list:
         log.info(p)
-        angle, perp_dist, pitch_error, yaw_error = outer_axis_analysis(p)
+        outer_yaw_df, outer_pitch_df = extract_data(p)
+        angle, perp_dist, pitch_error, yaw_error = outer_axis_analysis(
+            outer_yaw_df, outer_pitch_df, plot=False
+        )
         pitch_error *= 1000
         yaw_error *= 1000
         results_dict["angle"].append(angle)
@@ -162,6 +204,16 @@ def main1():
     plt.show()
 
 
+def main1():
+    # path = Path("./data/03_replay_trajectory/")
+    # path_list = list(path.glob("*/outer_mov"))
+    # aggregate_analysis(path_list, extract_data_fmt1)
+
+    path = Path("./data/05_calib_data/test_trajectories")
+    path_list = list(path.glob("*"))
+    aggregate_analysis(path_list, extract_data_fmt2)
+
+
 def main2():
     # Perfect case to debug ransac!
     # path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
@@ -171,7 +223,9 @@ def main2():
 
 def main3():
     # path = Path("./data/03_replay_trajectory/d04-rec-08-traj02/outer_mov")
-    path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
+    # path = Path("./data/03_replay_trajectory/d04-rec-11-traj01/outer_mov")
+    path = Path("data/03_replay_trajectory/d04-rec-23-trajrand/outer_mov")
+
     angle_list = []
     dist_list = []
     for i in range(10):
