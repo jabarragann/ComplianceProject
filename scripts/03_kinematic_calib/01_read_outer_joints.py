@@ -1,3 +1,4 @@
+from __future__ import annotations
 from doctest import OutputChecker
 import os
 from pathlib import Path
@@ -17,12 +18,21 @@ log = Logger("outer").log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
-class dh_param_estimation:
-    def __init__(self) -> None:
-        self.pt
+@dataclass
+class DhParamEstimator:
+    axis1: AxisEstimator
+    axis2: AxisEstimator
 
-    def robust_circle_fitting():
-        pass
+    def __post_init__(self):
+        params = []
+        perp_line = Line3D.perpendicular_to_skew(self.axis1.axis, self.axis2.axis, params)
+        params = params[0].squeeze()
+        assert perp_line.intersect(self.axis1.axis), "no intersection error"
+
+        self.angle = np.arccos(self.axis1.circle.normal.dot(self.axis2.circle.normal)) * 180 / np.pi
+        self.perp_dist = (
+            np.linalg.norm(self.axis1.axis(params[0]) - self.axis2.axis(params[1])) * 1000
+        )
 
 
 @dataclass
@@ -43,6 +53,9 @@ class AxisEstimator:
     pt: np.ndarray
     jp: np.ndarray
 
+    def __post_init__(self):
+        self.estimate_axis()
+
     def estimate_axis(self):
 
         self.circle: Circle3D = None
@@ -58,89 +71,57 @@ class AxisEstimator:
         self.axis = self.circle.get_ray()
         self.residual_error = self.circle.dist_pt2circle(self.pt.T)
 
-    def plot_circle(self, plotter: Plotter3D):
-        pass
+    def plot_circle(self, plotter: Plotter3D, label: str):
+        plotter.scatter_3d_inliers_outliers(self.pt.T, self.inliers_idx, label=label)
+        plotter.plot_circle(self.circle)
 
-    def plot_error(self, ax: plt.Axes):
-        ax.plot(self.jp, self.residual_error)
+    def plot_error(self, ax: plt.Axes, label: str):
+        ax.plot(self.jp, self.residual_error * 1000, "-bo")
+        ax.set_xlabel(label)
+        ax.set_ylabel("dist (mm)")
+        return ax
 
 
 def outer_axis_analysis(path: Path, plot=False):
-    # ------------------------------------------------------------
-    # plot outer joint motions
-    # ------------------------------------------------------------
-
-    # path = Path("data/03_replay_trajectory/d04-rec-23-trajrand/outer_mov/")
-    # path = Path("data/03_replay_trajectory/d04-rec-20-trajsoft/outer_mov/")
     outer_pitch_df = pd.read_csv(path / "outer_pitch.txt")
     outer_yaw_df = pd.read_csv(path / "outer_yaw.txt")
 
-    # Get only the marker origin positions
+    # Get  marker origin position and commanded joint
     outer_yaw_df = outer_yaw_df.loc[outer_yaw_df["m_t"] == "m"][["q1", "px", "py", "pz"]]
     outer_pitch_df = outer_pitch_df.loc[outer_pitch_df["m_t"] == "m"][["q2", "px", "py", "pz"]]
 
     c_q1_yaw = outer_yaw_df.to_numpy()[:, 0]
     pt_yaw = outer_yaw_df.to_numpy()[:, 1:]
-
     c_q2_pitch = outer_pitch_df.to_numpy()[:, 0]
     pt_pitch = outer_pitch_df.to_numpy()[:, 1:]
 
-    # outer_pitch_df.to_csv("./temp/data_ransac1.csv", index=False)
-    # outer_yaw_df.to_csv("./temp/data_ransac2.csv", index=False)
+    # Estimate parameters
+    pitch_axis = AxisEstimator(pt_pitch, c_q2_pitch)
+    yaw_axis = AxisEstimator(pt_yaw, c_q1_yaw)
+    parameter_est = DhParamEstimator(pitch_axis, yaw_axis)
 
-    # Fit circle to data
-    pitch_circle: Circle3D = None
-    yaw_circle: Circle3D = None
-
-    pitch_circle, pitch_inliers_idx = Ransac.ransac(
-        pt_pitch, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=False
-    )
-    pitch_circle = Circle3D.from_lstsq_fit(
-        pt_pitch[pitch_inliers_idx]
-    )  # fit again with ordered points
-
-    pitch_axis = pitch_circle.get_ray()
-    pitch_residual_error = pitch_circle.dist_pt2circle(pt_pitch.T)
-
-    yaw_circle, yaw_inliers_idx = Ransac.ransac(
-        pt_yaw, model=RansacCircle3D(), n=3, k=500 * 2, t=0.5 / 1000, d=8, debug=False
-    )
-    yaw_circle = Circle3D.from_lstsq_fit(pt_yaw[yaw_inliers_idx])
-    yaw_axis = yaw_circle.get_ray()
-    yaw_residual_error = yaw_circle.dist_pt2circle(pt_yaw.T)
-
-    params = []
-    perp_line = Line3D.perpendicular_to_skew(pitch_axis, yaw_axis, params)
-    params = params[0].squeeze()
-    assert perp_line.intersect(pitch_axis), "no intersection"
-
-    # log.info(pitch_circle)
-    # log.info(yaw_circle)
-    angle = np.arccos(pitch_circle.normal.dot(yaw_circle.normal)) * 180 / np.pi
-    perp_dist = np.linalg.norm(pitch_axis(params[0]) - yaw_axis(params[1])) * 1000
-    log.info(f"Angle between normals {angle:0.3f} (deg)")
-    log.info(f"Perpendicular distance between axis {perp_dist:0.3f} mm")
+    log.info(f"Angle between normals {parameter_est.angle:0.3f} (deg)")
+    log.info(f"Perpendicular distance between axis {parameter_est.perp_dist:0.3f} mm")
 
     # Plot data
     if plot:
         plotter = Plotter3D()
-        plotter.scatter_3d_inliers_outliers(pt_pitch.T, pitch_inliers_idx, label="outer_pitch")
-        plotter.scatter_3d_inliers_outliers(pt_yaw.T, yaw_inliers_idx, label="outer_yaw")
-        plotter.plot_circle(pitch_circle)
-        plotter.plot_circle(yaw_circle)
+        pitch_axis.plot_circle(plotter, "outer_pitch")
+        yaw_axis.plot_circle(plotter, "outer_yaw")
         plotter.plot()
-
         # Plot error vs command joint position
         fig, ax = plt.subplots(2)
-        ax[0].plot(c_q1_yaw, yaw_residual_error * 1000, "-bo")
-        ax[0].set_xlabel("outer yaw (q1)")
-        ax[1].plot(c_q2_pitch, pitch_residual_error * 1000, "-ro")
-        ax[1].set_xlabel("outer pitch (q2)")
-        [(a.grid(), a.set_ylabel("dist (mm)")) for a in ax]
+        pitch_axis.plot_error(ax[0], "outer_pitch (deg)")
+        yaw_axis.plot_error(ax[1], "outer_yaw(deg)")
+
         plt.show()
 
-    # print(pt_pitch.shape)
-    return angle, perp_dist, pitch_residual_error, yaw_residual_error
+    return (
+        parameter_est.angle,
+        parameter_est.perp_dist,
+        pitch_axis.residual_error,
+        yaw_axis.residual_error,
+    )
 
 
 def main1():
