@@ -5,11 +5,11 @@ from pathlib import Path
 import time
 import numpy as np
 from typing import List
+
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
 from kincalib.Motion.ReplayDevice import ReplayDevice
-from kincalib.Motion.Trajectory import RandomJointTrajectory,SoftRandomJointTrajectory, Trajectory
 
 
 log = Logger(__name__).log
@@ -92,6 +92,12 @@ class TrajectoryPlayer:
 
 
 if __name__ == "__main__":
+
+    from kincalib.Motion.Trajectory import (
+        RandomJointTrajectory,
+        SoftRandomJointTrajectory,
+        Trajectory,
+    )
 
     rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
     rosbag_handle = RosbagUtils(rosbag_path)
