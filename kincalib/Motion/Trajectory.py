@@ -111,7 +111,7 @@ class Trajectory:
                     out_of_order_counter = out_of_order_counter + 1
                 else:
                     # keep track of workspace
-                    position = numpy.array(
+                    position = np.array(
                         [
                             bag_message.pose.position.x,
                             bag_message.pose.position.y,
@@ -122,8 +122,8 @@ class Trajectory:
                         bbmin = position
                         bmax = position
                     else:
-                        bbmin = numpy.minimum(bbmin, position)
-                        bbmax = numpy.maximum(bbmax, position)
+                        bbmin = np.minimum(bbmin, position)
+                        bbmax = np.maximum(bbmax, position)
             elif bag_topic == setpoint_js_t:
                 # check order of timestamps, drop if out of order
                 transform_time = bag_message.header.stamp.to_sec()
