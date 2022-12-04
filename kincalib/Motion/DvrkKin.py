@@ -24,6 +24,16 @@ def my_trnorm(a) -> np.ndarray:
     return trnorm(a)
 
 
+def extract_cartesian_xyz(cartesian_t: np.ndarray):
+    """Extract xyz position from a list of poses"""
+    cartesian_t = cartesian_t.data
+    position_list = []
+    for i in range(len(cartesian_t)):
+        position_list.append(cartesian_t[i][:3, 3])
+
+    return np.array(position_list)
+
+
 class DvrkPsmKin(DHRobot):
     lrcc = 0.4318
     ltool = 0.4162
@@ -64,6 +74,11 @@ class DvrkPsmKin(DHRobot):
         )
 
     def fkine(self, q, **kwargs) -> SE3:
+        """Returns spatialmath.pose3d.SE3
+
+        To convert SE3 to numpy type `SE3.data`
+
+        """
         return super().fkine(q, **kwargs)
 
     def fkine_chain(self, q, ignore_base=False, **kwargs) -> Frame:
