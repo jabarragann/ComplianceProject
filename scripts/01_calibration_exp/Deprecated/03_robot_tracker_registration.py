@@ -23,7 +23,7 @@ from sensor_msgs.msg import JointState
 import matplotlib.pyplot as plt
 
 # kincalib module imports
-from kincalib.utils.Frame import Frame
+from kincalib.Entities.Frame import Frame
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils

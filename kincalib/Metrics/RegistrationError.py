@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import spatialmath
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial
-from kincalib.utils.Frame import Frame
+from kincalib.Entities.Frame import Frame
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 

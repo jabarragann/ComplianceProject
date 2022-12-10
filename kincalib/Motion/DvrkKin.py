@@ -10,7 +10,7 @@ import numpy as np
 
 # Custom
 from kincalib.utils.Logger import Logger
-from kincalib.utils.Frame import Frame
+from kincalib.Entities.Frame import Frame
 
 log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")

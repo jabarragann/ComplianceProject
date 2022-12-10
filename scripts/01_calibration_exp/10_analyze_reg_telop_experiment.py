@@ -25,7 +25,7 @@ from kincalib.Learning.Models import CustomMLP
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
 from kincalib.utils.IcpSolver import icp
-from kincalib.utils.Frame import Frame
+from kincalib.Entities.Frame import Frame
 from kincalib.utils.Logger import Logger
 from pytorchcheckpoint.checkpoint import CheckpointHandler
 import optuna 
