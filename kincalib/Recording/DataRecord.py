@@ -1,4 +1,3 @@
-from fileinput import filename
 from pathlib import Path
 import pandas as pd
 from abc import ABC, abstractclassmethod
@@ -9,6 +8,7 @@ from typing import List
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
+from kincalib.Entities.Msgs import MyJointState, MyPoseStamped
 
 log = Logger(__name__).log
 
@@ -49,105 +49,109 @@ class Record(ABC):
             self.df.to_csv(self.filename, index=None)
 
 
-class CalibrationRecord(Record):
-    def __init__(
-        self,
-        ftk_handler,
-        robot_handler,
-        expected_markers,
-        root_dir,
-        mode: str = "calib",
-        test_id: int = None,
-        description: str = None,
-    ) -> None:
-        """_summary_
+# class CalibrationRecord(Record):
+#     def __init__(
+#         self,
+#         ftk_handler,
+#         robot_handler,
+#         expected_markers,
+#         root_dir,
+#         mode: str = "calib",
+#         test_id: int = None,
+#         description: str = None,
+#     ) -> None:
+#         """_summary_
 
-        Parameters
-        ----------
-        ftk_handler : _type_
-            _description_
-        robot_handler : _type_
-            _description_
-        expected_markers : _type_
-            _description_
-        root_dir : _type_
-            _description_
-        mode : str, optional
-            Operation mode, by default "calib". Needs to be either 'calib' or 'test'
-        test_id : int, optional
-            _description_, by default None
-        description: str, optional
-            one line experiment description
-        """
+#         Parameters
+#         ----------
+#         ftk_handler : _type_
+#             _description_
+#         robot_handler : _type_
+#             _description_
+#         expected_markers : _type_
+#             _description_
+#         root_dir : _type_
+#             _description_
+#         mode : str, optional
+#             Operation mode, by default "calib". Needs to be either 'calib' or 'test'
+#         test_id : int, optional
+#             _description_, by default None
+#         description: str, optional
+#             one line experiment description
+#         """
 
-        assert mode in ["calib", "test"], "mode needs to be calib or test"
-        self.ftk_handler = ftk_handler
-        self.robot_handler = robot_handler
-        self.description = description
+#         assert mode in ["calib", "test"], "mode needs to be calib or test"
+#         self.ftk_handler = ftk_handler
+#         self.robot_handler = robot_handler
+#         self.description = description
 
-        # Create paths
-        self.root_dir = root_dir
-        self.robot_files = root_dir / "robot_mov"
-        self.mode = mode
-        if mode == "test":
-            assert test_id is not None, "undefined test id"
-            self.test_files = root_dir / f"test_trajectories/{test_id:02d}"
+#         # Create paths
+#         self.root_dir = root_dir
+#         self.robot_files = root_dir / "robot_mov"
+#         self.mode = mode
+#         if mode == "test":
+#             assert test_id is not None, "undefined test id"
+#             self.test_files = root_dir / f"test_trajectories/{test_id:02d}"
 
-        # Filenames for the records
-        if mode == "calib":
-            cp_filename = self.robot_files / ("robot_cp.txt")
-            jp_filename = self.robot_files / ("robot_jp.txt")
-        elif mode == "test":
-            cp_filename = self.test_files / ("robot_cp.txt")
-            jp_filename = self.test_files / ("robot_jp.txt")
+#         # Filenames for the records
+#         if mode == "calib":
+#             cp_filename = self.robot_files / ("robot_cp.txt")
+#             jp_filename = self.robot_files / ("robot_jp.txt")
+#         elif mode == "test":
+#             cp_filename = self.test_files / ("robot_cp.txt")
+#             jp_filename = self.test_files / ("robot_jp.txt")
 
-            if cp_filename.exists() or jp_filename.exists():
-                n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
-                if not (n == "y" or n == "Y"):
-                    log.info("exiting the script")
-                    exit(0)
-        # Create records
-        self.cp_record = RobotSensorCartesianRecord(robot_handler, ftk_handler, expected_markers, cp_filename)
-        self.jp_record = JointRecord(robot_handler, jp_filename)
+#             if cp_filename.exists() or jp_filename.exists():
+#                 n = input(
+#                     f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. "
+#                 )
+#                 if not (n == "y" or n == "Y"):
+#                     log.info("exiting the script")
+#                     exit(0)
+#         # Create records
+#         self.cp_record = RobotSensorCartesianRecord(
+#             robot_handler, ftk_handler, expected_markers, cp_filename
+#         )
+#         self.jp_record = JointRecord(robot_handler, jp_filename)
 
-        self.create_paths()
+#         self.create_paths()
 
-    def create_paths(self):
-        if not self.root_dir.exists():
-            self.root_dir.mkdir(parents=True)
-        if not self.robot_files.exists():
-            self.robot_files.mkdir(parents=True)
-        if self.mode == "test":
-            if not self.test_files.exists():
-                self.test_files.mkdir(parents=True)
+#     def create_paths(self):
+#         if not self.root_dir.exists():
+#             self.root_dir.mkdir(parents=True)
+#         if not self.robot_files.exists():
+#             self.robot_files.mkdir(parents=True)
+#         if self.mode == "test":
+#             if not self.test_files.exists():
+#                 self.test_files.mkdir(parents=True)
 
-        # Create description file
-        if self.description is not None:
-            description_path = self.robot_files if self.mode == "calib" else self.test_files
-            with open(description_path / "description.txt", "w") as f:
-                f.write(self.description)
+#         # Create description file
+#         if self.description is not None:
+#             description_path = self.robot_files if self.mode == "calib" else self.test_files
+#             with open(description_path / "description.txt", "w") as f:
+#                 f.write(self.description)
 
-    def create_new_entry(self, idx, joints, q7):
-        self.cp_record.create_new_entry(idx, joints, q7)
-        self.jp_record.create_new_entry(idx)
+#     def create_new_entry(self, idx, joints, q7):
+#         self.cp_record.create_new_entry(idx, joints, q7)
+#         self.jp_record.create_new_entry(idx)
 
-    def create_new_robot_entry(self, idx, joints, q7):
-        self.jp_record.create_new_entry(idx)
-        self.cp_record.create_new_robot_entry(idx, joints, q7)
+#     def create_new_robot_entry(self, idx, joints, q7):
+#         self.jp_record.create_new_entry(idx)
+#         self.cp_record.create_new_robot_entry(idx, joints, q7)
 
-    def create_new_sensor_entry(self, idx, joints, q7):
-        self.cp_record.create_new_sensor_entry(idx, joints, q7)
+#     def create_new_sensor_entry(self, idx, joints, q7):
+#         self.cp_record.create_new_sensor_entry(idx, joints, q7)
 
-    def to_csv(self, safe_save=True):
-        self.cp_record.to_csv(safe_save)
-        self.jp_record.to_csv(safe_save)
+#     def to_csv(self, safe_save=True):
+#         self.cp_record.to_csv(safe_save)
+#         self.jp_record.to_csv(safe_save)
 
 
-class CartesianRecord:
+class CartesianRecord(Record):
     """Data collection formats
 
     step: step in the trajectory
-    qi:   Joint value
+    set_qi:   Setpoint joint position
     m_t: type of object. This can be 'm' (marker), 'f' (fiducial) or 'r' (robot)
     m_id: obj id. This is only meaningful for markers and fiducials
     px,py,pz: position of frame
@@ -155,112 +159,131 @@ class CartesianRecord:
 
     """
 
-    # fmt:off
-    df_cols = ["step","q1" ,"q2" ,"q3" , "q4", "q5", "q6", "q7", 
-                "m_t", "m_id",
-                "px", "py", "pz", "qx", "qy", "qz", "qw"] 
-    # fmt:on
+    df_setpoint_cols = ["set_q1", "set_q2", "set_q3", "set_q4", "set_q5", "set_q6"]
+    df_info_cols = ["m_t", "m_id"]
+    df_position_cols = ["px", "py", "pz"]
+    df_orientation_cols = ["qx", "qy", "qz", "qw"]
 
+    df_cols = ["step"] + df_setpoint_cols + df_info_cols + df_position_cols + df_orientation_cols
 
-class RobotSensorCartesianRecord(Record):
-    def __init__(self, robot_handler, ftk_handler, expected_markers, filename: Path) -> None:
-        super().__init__(CartesianRecord.df_cols, filename)
-        self.robot_record = RobotCartesianRecord(robot_handler, None)
-        self.sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers, None)
-
-    def create_new_entry(self, idx, joints, q7):
-        self.robot_record.create_new_entry(idx, joints, q7)
-        self.sensor_record.create_new_entry(idx, joints, q7)
-
-    def create_new_robot_entry(self, idx, joints, q7):
-        self.robot_record.create_new_entry(idx, joints, q7)
-
-    def create_new_sensor_entry(self, idx, joints, q7):
-        self.sensor_record.create_new_entry(idx, joints, q7)
-
-    def to_csv(self, safe_save=True):
-        combined_df = pd.concat((self.sensor_record.df, self.robot_record.df))
-        self.df = combined_df
-        super().to_csv(safe_save)
-
-        # if not self.filename.parent.exists():
-        #     log.warning(f"Parent directory not found. Creating path {self.filename.parent}")
-        #     self.filename.parent.mkdir(parents=True)
-        # if safe_save:
-        #     save_without_overwritting(combined_df, self.filename)
-        # else:
-        #     self.combined_df.to_csv(self.filename)
-
-
-class RobotCartesianRecord(Record):
-    def __init__(self, robot_handler, filename: Path) -> None:
-        super().__init__(CartesianRecord.df_cols, filename)
-        self.robot_handler = robot_handler
-
-    def create_new_entry(self, idx, joints: List[float], q7):
-        """Create a df with the robot end-effector cartesian position. Use this functions for
-         data collectons
-
-        Args:
-            robot_handler (ReplayDevice): robot handler
-            idx ([type]): Step of the trajectory
-            joints (List[float]): List containing the commanded joints values of the robot.
-
-        Returns:
-            - pd.DataFrame with cp of the robot.
-        """
-        if isinstance(joints, np.ndarray):
-            joints = joints.squeeze().tolist()
-
-        robot_frame = self.robot_handler.measured_cp()
-        r_p = list(robot_frame.p)
-        r_q = robot_frame.M.GetQuaternion()
-        d = [idx] + joints + [q7, "r", 11, r_p[0], r_p[1], r_p[2], r_q[0], r_q[1], r_q[2], r_q[3]]
-        d = np.array(d).reshape((1, self.cols_len))
-        new_pt = pd.DataFrame(d, columns=self.df_cols)
-
-        self.df = self.df.append(new_pt)
-
-
-class AtracsysCartesianRecord(Record):
-    def __init__(self, filename: Path) -> None:
+    def __init__(self, filename: Path):
         super().__init__(CartesianRecord.df_cols, filename)
 
-    def create_new_entry(self, idx, fid_cp_array, tool_cp, jp_s: List[float], jaw_jp: float):
+    def create_new_entry(
+        self, idx, obj_type: str, obj_id: str, measured_cp: MyPoseStamped, setpoint_jp: MyJointState
+    ):
+        data = (
+            [idx]
+            + setpoint_jp.position.tolist()
+            + [obj_type, obj_id]
+            + measured_cp.position.tolist()
+            + measured_cp.orientation.tolist()
+        )
+        data = np.array(data).reshape((1, self.cols_len))
+        new_pt = pd.DataFrame(data, columns=self.df_cols)
 
-        if isinstance(jp_s, np.ndarray):
-            jp_s = jp_s.squeeze().tolist()
+        self.df = np.concatenate((self.df, new_pt))
 
-        df_vals = pd.DataFrame(columns=self.df_cols)
 
-        # Add fiducials
-        if fid_cp_array is not None:
-            for mid, k in enumerate(range(fid_cp_array.shape[0])):
-                d = [idx]
-                d += jp_s + [jaw_jp, "f", mid]
-                # position of fiducials
-                d += [fid_cp_array[k, 0], fid_cp_array[k, 1], fid_cp_array[k, 2]]
-                # orientation of fiducials
-                d += [0.0, 0.0, 0.0, 1]
-                d = np.array(d).reshape((1, self.cols_len))
-                new_pt = pd.DataFrame(d, columns=self.df_cols)
-                df_vals = df_vals.append(new_pt)
-        else:
-            log.warning("No fiducials found")
+# class RobotSensorCartesianRecord(Record):
+#     def __init__(self, robot_handler, ftk_handler, expected_markers, filename: Path) -> None:
+#         super().__init__(CartesianRecord.df_cols, filename)
+#         self.robot_record = RobotCartesianRecord(robot_handler, None)
+#         self.sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers, None)
 
-        # Add tool pose
-        if tool_cp is not None:
-            p = list(tool_cp.p)
-            q = tool_cp.M.GetQuaternion()
-            d = [idx] + jp_s + [jaw_jp, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
-            d = np.array(d).reshape((1, self.cols_len))
-            new_pt = pd.DataFrame(d, columns=self.df_cols)
-            df_vals = df_vals.append(new_pt)
-        else:
-            log.warning("No markers found")
+#     def create_new_entry(self, idx, joints, q7):
+#         self.robot_record.create_new_entry(idx, joints, q7)
+#         self.sensor_record.create_new_entry(idx, joints, q7)
 
-        if fid_cp_array is not None or tool_cp is not None:
-            self.df = self.df.append(df_vals)
+#     def create_new_robot_entry(self, idx, joints, q7):
+#         self.robot_record.create_new_entry(idx, joints, q7)
+
+#     def create_new_sensor_entry(self, idx, joints, q7):
+#         self.sensor_record.create_new_entry(idx, joints, q7)
+
+#     def to_csv(self, safe_save=True):
+#         combined_df = pd.concat((self.sensor_record.df, self.robot_record.df))
+#         self.df = combined_df
+#         super().to_csv(safe_save)
+
+#         # if not self.filename.parent.exists():
+#         #     log.warning(f"Parent directory not found. Creating path {self.filename.parent}")
+#         #     self.filename.parent.mkdir(parents=True)
+#         # if safe_save:
+#         #     save_without_overwritting(combined_df, self.filename)
+#         # else:
+#         #     self.combined_df.to_csv(self.filename)
+
+
+# class RobotCartesianRecord(Record):
+#     def __init__(self, robot_handler, filename: Path) -> None:
+#         super().__init__(CartesianRecord.df_cols, filename)
+#         self.robot_handler = robot_handler
+
+#     def create_new_entry(self, idx, joints: List[float], q7):
+#         """Create a df with the robot end-effector cartesian position. Use this functions for
+#          data collectons
+
+#         Args:
+#             robot_handler (ReplayDevice): robot handler
+#             idx ([type]): Step of the trajectory
+#             joints (List[float]): List containing the commanded joints values of the robot.
+
+#         Returns:
+#             - pd.DataFrame with cp of the robot.
+#         """
+#         if isinstance(joints, np.ndarray):
+#             joints = joints.squeeze().tolist()
+
+#         robot_frame = self.robot_handler.measured_cp()
+#         r_p = list(robot_frame.p)
+#         r_q = robot_frame.M.GetQuaternion()
+#         d = [idx] + joints + [q7, "r", 11, r_p[0], r_p[1], r_p[2], r_q[0], r_q[1], r_q[2], r_q[3]]
+#         d = np.array(d).reshape((1, self.cols_len))
+#         new_pt = pd.DataFrame(d, columns=self.df_cols)
+
+#         self.df = self.df.append(new_pt)
+
+
+# class AtracsysCartesianRecord(Record):
+#     def __init__(self, filename: Path) -> None:
+#         super().__init__(CartesianRecord.df_cols, filename)
+
+#     def create_new_entry(self, idx, fid_cp_array, tool_cp, jp_s: List[float], jaw_jp: float):
+
+#         if isinstance(jp_s, np.ndarray):
+#             jp_s = jp_s.squeeze().tolist()
+
+#         df_vals = pd.DataFrame(columns=self.df_cols)
+
+#         # Add fiducials
+#         if fid_cp_array is not None:
+#             for mid, k in enumerate(range(fid_cp_array.shape[0])):
+#                 d = [idx]
+#                 d += jp_s + [jaw_jp, "f", mid]
+#                 # position of fiducials
+#                 d += [fid_cp_array[k, 0], fid_cp_array[k, 1], fid_cp_array[k, 2]]
+#                 # orientation of fiducials
+#                 d += [0.0, 0.0, 0.0, 1]
+#                 d = np.array(d).reshape((1, self.cols_len))
+#                 new_pt = pd.DataFrame(d, columns=self.df_cols)
+#                 df_vals = df_vals.append(new_pt)
+#         else:
+#             log.warning("No fiducials found")
+
+#         # Add tool pose
+#         if tool_cp is not None:
+#             p = list(tool_cp.p)
+#             q = tool_cp.M.GetQuaternion()
+#             d = [idx] + jp_s + [jaw_jp, "m", 112, p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
+#             d = np.array(d).reshape((1, self.cols_len))
+#             new_pt = pd.DataFrame(d, columns=self.df_cols)
+#             df_vals = df_vals.append(new_pt)
+#         else:
+#             log.warning("No markers found")
+
+#         if fid_cp_array is not None or tool_cp is not None:
+#             self.df = self.df.append(df_vals)
 
 
 class JointRecord(Record):
@@ -272,25 +295,25 @@ class JointRecord(Record):
     si:   Joint position setpoint
     """
 
-    # fmt: off
-    df_cols = ["step", "q1", "q2", "q3", "q4", "q5", "q6", "q7",
-                       "t1", "t2", "t3", "t4", "t5", "t6",
-                       "s1", "s2", "s3", "s4", "s5", "s6"]
+    df_joint_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
+    df_torque_cols = ["t1", "t2", "t3", "t4", "t5", "t6"]
+    df_setpoint_cols = ["s1", "s2", "s3", "s4", "s5", "s6"]
+    df_cols = ["step"] + df_joint_cols + df_torque_cols + df_setpoint_cols
 
-    # fmt: on
     def __init__(self, filename: Path):
         super().__init__(JointRecord.df_cols, filename)
 
-    def create_new_entry(self, idx, jp, jt, jp_s, jaw_jp):
-        jp = (
-            [idx, jp[0], jp[1], jp[2], jp[3], jp[4], jp[5], jaw_jp]
-            + [jt[0], jt[1], jt[2], jt[3], jt[4], jt[5]]
-            + [jp_s[0], jp_s[1], jp_s[2], jp_s[3], jp_s[4], jp_s[5]]
+    def create_new_entry(self, idx, measure_jp: MyJointState, setpoint_jp: MyJointState):
+        data = (
+            [idx]
+            + measure_jp.position.tolist()
+            + measure_jp.effort.tolist()
+            + setpoint_jp.position.tolist()
         )
-        jp = np.array(jp).reshape((1, self.cols_len))
-        new_pt = pd.DataFrame(jp, columns=self.df_cols)
+        data = np.array(data).reshape((1, self.cols_len))
+        new_pt = pd.DataFrame(data, columns=self.df_cols)
 
-        self.df = self.df.append(new_pt)
+        self.df = np.concatenate((self.df, new_pt))
 
 
 class LearningRecord(Record):

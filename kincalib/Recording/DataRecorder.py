@@ -3,128 +3,211 @@ from dataclasses import dataclass
 
 # Python
 from pathlib import Path
-from typing import Any
+from typing import Any, List
+from kincalib.Entities.Msgs import MyJointState, MyPoseStamped
 
 # ros
 from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory
 
 # Custom
-from kincalib.Recording.DataRecord import CalibrationRecord
+from kincalib.Recording.DataRecord import CalibrationRecord, CartesianRecord, JointRecord
 from kincalib.utils.Logger import Logger
 from kincalib.Sensors.ftk_500_api import FTKDummy, ftk_500
 from kincalib.Motion.CalibrationMotions import CalibrationMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
+from kincalib.Entities.RosConversions import RosConversion
 
 log = Logger(__name__).log
 
 
 @dataclass
-class DataRecorderV2:
+class DataRecorder:
     replay_device: ReplayDevice
+    record_collection: ExperimentRecordCollection
     ftk_handler: ftk_500
     expected_markers: int
-    root: Path
     marker_name: str
-    mode: str
-    test_id: int
-    description: str = None
-
-    def __post_init__(self):
-        pass
 
     def __call__(self, **kwargs):
-        pass
+        self.record(**kwargs)
 
     def record(self, index=None):
         if index is None:
-            log.error("index not specified checkout the recording class")
+            log.error("index not specified")
             exit(0)
         self.collect_data(index)
         self.save_data()
 
     def collect_data(self, index):
         log.info("record data")
+
+        # quickly check the sensor to see if tool and fiducial are observable
         marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
-            self.expected_markers, t=200, sample_time=15
+            self.expected_markers, t=100, sample_time=15
         )
-        # Measure
-        jp = self.replay_device.measured_jp()
-        jaw_jp = self.replay_device.jaw.measured_jp()[0]
-        # Check if marker is visible add sensor data
+
+        # Get robot data
+        setpoint_js = MyJointState.from_ros_msg(self.replay_device.setpoint_js())
+        measured_js = MyJointState.from_ros_msg(self.replay_device.measured_js())
+        measured_cp = MyPoseStamped.from_ros_msg(self.replay_device.measured_cp())
+        self.record_collection.add_new_robot_data(index, measured_js, setpoint_js, measured_cp)
+
         if marker_pose is not None:
-            self.calibration_record.create_new_sensor_entry(index, jp, jaw_jp)
-        # Always add robot data
-        self.calibration_record.create_new_robot_entry(index, jp, jaw_jp)
+            mean_tool_frame, fiducial_positions = self.ftk_handler.obtain_processed_measurement(
+                self.expected_markers, t=500, sample_time=15
+            )
+            tool_cp = RosConversion.pykdl_to_myposestamped("tool", mean_tool_frame)
+            fiducial_cp = MyPoseStamped.from_array_of_positions(fiducial_positions)
 
-        self.calibration_record.to_csv(safe_save=False)
-
-        # Read atracsys data: sphere fiducials and tools frames
-        # Sensor_vals will have several measurements of the static fiducials
-        mean_frame, mean_value = self.ftk_handler.obtain_processed_measurement(
-            self.expected_markers, t=500, sample_time=15
-        )
-
-        js = self.robot_handler.measured_js()
-        jp_s = self.robot_handler.setpoint_js()[0]  # jp setpoints
-        jp = js[0]  # joint pos
-        jt = js[2]  # joint torque
-        jaw_jp = self.robot_handler.jaw_jp()
+            self.record_collection.add_new_sensor_data(
+                index, setpoint_js, fiducial_cp, [tool_cp], [self.ftk_handler.marker_name]
+            )
 
     def save_data(self):
-        pass
+        self.record_collection.save_data()
 
 
-class DataRecorder:
-    """
-    Callable data class to record data from robot and sensor.
-    """
-
+class ExperimentRecordCollection:
     def __init__(
         self,
-        replay_device,
-        ftk_handler: ftk_500,
-        expected_markers: int,
-        root: Path,
-        marker_name: str,
-        mode: str,
-        test_id: int,
-        description: str = None,
+        root_dir: Path,
+        mode: str = "calib",
+        test_id: int = None,
+        description: str = "",
+    ) -> None:
+        """_summary_
+
+        Parameters
+        ----------
+        root_dir : _type_
+            _description_
+        mode : str, optional
+            Operation mode, by default "calib". Needs to be either 'calib' or 'test'
+        test_id : int, optional
+            _description_, by default None
+        description: str, optional
+            one line experiment description
+        """
+
+        assert mode in ["calib", "test"], "mode needs to be calib or test"
+        self.description = description
+        self.root_dir = root_dir
+        self.mode = mode
+        self.test_id = test_id
+
+        self.create_paths()
+        self.cp_filename, self.jp_filename = self.obtain_filenames_for_records()
+
+        self.joint_record = JointRecord(self.jp_filename)
+        self.pose_record = CartesianRecord(self.cp_filename)
+
+    def obtain_filenames_for_records(self):
+        if self.mode == "calib":
+            cp_filename = self.robot_files / ("robot_cp.csv")
+            jp_filename = self.robot_files / ("robot_jp.csv")
+        elif self.mode == "test":
+            cp_filename = self.test_files / ("robot_cp.csv")
+            jp_filename = self.test_files / ("robot_jp.csv")
+
+        if cp_filename.exists() or jp_filename.exists():
+            n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
+            if not (n == "y" or n == "Y"):
+                log.info("exiting the script")
+                exit(0)
+        return cp_filename, jp_filename
+
+    def create_paths(self):
+        self.root_dir.mkdir(parents=True, exist_ok=True)
+        if self.mode == "calib":
+            self.robot_files = self.root_dir / "robot_mov"
+            self.robot_files.mkdir(parents=True, exist_ok=True)
+
+        if self.mode == "test":
+            assert self.test_id is not None, "undefined test id"
+            self.test_files = self.root_dir / f"test_trajectories/{self.test_id:02d}"
+            self.test_files.mkdir(parents=True, exist_ok=True)
+
+        description_path = self.robot_files if self.mode == "calib" else self.test_files
+        with open(description_path / "description.txt", "w") as f:
+            f.write(self.description)
+
+    def add_new_robot_data(
+        self, step, measured_js: MyJointState, setpoint_js: MyJointState, robot_cp: MyPoseStamped
     ):
+        self.joint_record.create_new_entry(step, measured_js, setpoint_js)
+        self.pose_record.create_new_entry(step, "robot", "-1", robot_cp, setpoint_js)
 
-        self.replay_device = replay_device
-        self.expected_markers = expected_markers
-        self.ftk_handler = ftk_handler
-        self.calibration_record = CalibrationRecord(
-            ftk_handler=self.ftk_handler,
-            robot_handler=self.replay_device,
-            expected_markers=expected_markers,
-            root_dir=root,
-            mode=mode,
-            test_id=test_id,
-            description=description,
-        )
+    def add_new_sensor_data(
+        self,
+        step,
+        setpoint_js: MyJointState,
+        fiducials_cp: List[MyPoseStamped],
+        tools_cp: List[MyPoseStamped],
+        tools_id_list: List[str],
+    ):
+        for fid_cp in fiducials_cp:
+            self.pose_record.create_new_entry(step, "fiducial", "-1", fid_cp, setpoint_js)
+        for tool_cp, id in zip(tools_cp, tools_id_list):
+            self.pose_record.create_new_entry(step, "fiducial", id, tool_cp, setpoint_js)
 
-    def __call__(self, **kwargs):
-        self.collect_data(**kwargs)
+    def save_data(self, safe_save=False):
+        self.joint_record.to_csv(safe_save=safe_save)
+        self.pose_record.to_csv(safe_save=safe_save)
 
-    def collect_data(self, index=None):
-        if index is None:
-            log.error("specify index WristJointsCalibrationRecorder")
-            exit(0)
-        log.info("record data")
-        marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
-            self.expected_markers, t=200, sample_time=15
-        )
-        # Measure
-        jp = self.replay_device.measured_jp()
-        jaw_jp = self.replay_device.jaw.measured_jp()[0]
-        # Check if marker is visible add sensor data
-        if marker_pose is not None:
-            self.calibration_record.create_new_sensor_entry(index, jp, jaw_jp)
-        # Always add robot data
-        self.calibration_record.create_new_robot_entry(index, jp, jaw_jp)
 
-        self.calibration_record.to_csv(safe_save=False)
+####################OLD
+
+# class DataRecorder:
+#     """
+#     Callable data class to record data from robot and sensor.
+#     """
+
+#     def __init__(
+#         self,
+#         replay_device,
+#         ftk_handler: ftk_500,
+#         expected_markers: int,
+#         root: Path,
+#         marker_name: str,
+#         mode: str,
+#         test_id: int,
+#         description: str = None,
+#     ):
+
+#         self.replay_device = replay_device
+#         self.expected_markers = expected_markers
+#         self.ftk_handler = ftk_handler
+#         self.calibration_record = CalibrationRecord(
+#             ftk_handler=self.ftk_handler,
+#             robot_handler=self.replay_device,
+#             expected_markers=expected_markers,
+#             root_dir=root,
+#             mode=mode,
+#             test_id=test_id,
+#             description=description,
+#         )
+
+#     def __call__(self, **kwargs):
+#         self.collect_data(**kwargs)
+
+#     def collect_data(self, index=None):
+#         if index is None:
+#             log.error("specify index WristJointsCalibrationRecorder")
+#             exit(0)
+#         log.info("record data")
+#         marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
+#             self.expected_markers, t=200, sample_time=15
+#         )
+#         # Measure
+#         jp = self.replay_device.measured_jp()
+#         jaw_jp = self.replay_device.jaw.measured_jp()[0]
+#         # Check if marker is visible add sensor data
+#         if marker_pose is not None:
+#             self.calibration_record.create_new_sensor_entry(index, jp, jaw_jp)
+#         # Always add robot data
+#         self.calibration_record.create_new_robot_entry(index, jp, jaw_jp)
+
+#         self.calibration_record.to_csv(safe_save=False)
 
 
 class OuterJointsCalibrationRecorder:
@@ -225,10 +308,20 @@ if __name__ == "__main__":
 
     # Setup calibration callbacks
     outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm,
+        ftk_handler=ftk_handler,
+        save=False,
+        expected_markers=4,
+        root=Path("."),
+        marker_name="none",
     )
     wrist_js_calib_cb = WristJointsCalibrationRecorder(
-        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm,
+        ftk_handler=ftk_handler,
+        save=False,
+        expected_markers=4,
+        root=Path("."),
+        marker_name="none",
     )
     data_recorder_cb = DataRecorder(
         arm, ftk_handler, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11
@@ -245,7 +338,9 @@ if __name__ == "__main__":
         after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
     )
 
-    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    ans = input(
+        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
+    )
     if ans == "y":
         trajector
     trajectory = SoftRandomJointTrajectory.generate_trajectory(50, samples_per_step=20)
@@ -264,5 +359,10 @@ if __name__ == "__main__":
 
     # Setup calibration callbacks
     outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm, ftk_handler=ftk_handler, save=False, expected_markers=4, root=Path("."), marker_name="none"
+        replay_device=arm,
+        ftk_handler=ftk_handler,
+        save=False,
+        expected_markers=4,
+        root=Path("."),
+        marker_name="none",
     )

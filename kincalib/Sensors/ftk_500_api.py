@@ -280,7 +280,7 @@ def clean_avg_measurements(measurements, expected_markers=1):
 
 class FTKDummy(ftk_500):
     def __init__(self) -> None:
-        
+
         pass
 
     def obtain_processed_measurement(
