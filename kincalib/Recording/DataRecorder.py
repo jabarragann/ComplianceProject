@@ -312,7 +312,8 @@ if __name__ == "__main__":
     time.sleep(0.1)
 
     home = os.path.expanduser("~")
-    root = Path(f"{home}/temp/test_rec/rec04")
+
+    root = Path(f"{home}/temp/test_rec/rec06")
     # Sensors
     # ftk_handler = ftk_500("marker_12")
     ftk_handler = FTKDummy("marker_12")
@@ -328,28 +329,6 @@ if __name__ == "__main__":
     wrist_joints_recorder = DataRecorder(arm, None, ftk_handler, 4, "none")
     wrist_js_calib_cb = WristCalibrationRoutine(arm, ftk_handler, wrist_joints_recorder, save=True, root=root)
 
-    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
-    #     replay_device=arm,
-    #     ftk_handler=ftk_handler,
-    #     save=False,
-    #     expected_markers=4,
-    #     root=Path("."),
-    #     marker_name="none",
-    # )
-
-    # wrist_js_calib_cb = WristJointsCalibrationRecorder(
-    #     replay_device=arm,
-    #     ftk_handler=ftk_handler,
-    #     save=False,
-    #     expected_markers=4,
-    #     root=Path("."),
-    #     marker_name="none",
-    # )
-
-    # Create trajectory player with cb
-    # trajectory_player = TrajectoryPlayer(
-    #     arm, trajectory, before_motion_cb=[outer_js_calib_cb], after_motion_cb=[wrist_js_calib_cb]
-    # )
     trajectory_player = TrajectoryPlayer(
         arm,
         trajectory,
@@ -364,21 +343,3 @@ if __name__ == "__main__":
     log.info(f"Initial pt {trajectory.setpoints[0].position}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
     log.info(f"number of points {len(trajectory)}")
-
-    # arm_namespace = "PSM2"
-    # arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
-    # arm.home_device()
-
-    # # Sensors
-    # # ftk_handler = ftk_500("marker_12")
-    # ftk_handler = FTKDummy()
-
-    # # Setup calibration callbacks
-    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
-    #     replay_device=arm,
-    #     ftk_handler=ftk_handler,
-    #     save=False,
-    #     expected_markers=4,
-    #     root=Path("."),
-    #     marker_name="none",
-    # )
