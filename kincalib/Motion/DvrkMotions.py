@@ -71,17 +71,17 @@ class DvrkMotions:
     # - outer_pitch_yaw_motion
     # ------------------------------------------------------------
     @staticmethod
-    def outer_yaw_trajectory():
+    def outer_yaw_trajectory(init_jp):
         outer_roll = -0.1589
         outer_yaw_trajectory = DvrkMotions.generate_outer_yaw()
-        outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [outer_roll], [0.0], [0.0], [0.0]))
+        outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [init_jp[2]], [outer_roll], [0.0], [0.0]))
         return np.array(outer_yaw_trajectory)
 
     @staticmethod
-    def outer_pitch_trajectory():
+    def outer_pitch_trajectory(init_jp):
         outer_roll = -0.1589
         outer_pitch_trajectory = DvrkMotions.generate_outer_pitch()
-        outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [outer_roll], [0.0], [0.0], [0.0]))
+        outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [init_jp[2]], [outer_roll], [0.0], [0.0]))
 
         return np.array(outer_pitch_trajectory)
 

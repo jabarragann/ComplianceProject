@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, List
 
 # ros
-from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory, TrajectoryPlayer
+from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory, Trajectory, TrajectoryPlayer
 
 # Custom
 from kincalib.utils.Logger import Logger
@@ -41,8 +41,9 @@ class OuterJointsCalibrationRoutine:
         self.pitch_record_collection = self.RecordCollection(self.root, "outer_pitch")
         self.yaw_record_collection = self.RecordCollection(self.root, "yaw_pitch")
 
-        self.outer_pitch_traj = DvrkMotions.outer_pitch_trajectory()
-        self.outer_yaw_traj = DvrkMotions.outer_yaw_trajectory()
+        init_jp = self.replay_device.measured_jp()
+        self.outer_pitch_traj = Trajectory.from_numpy(DvrkMotions.outer_pitch_trajectory(init_jp))
+        self.outer_yaw_traj = Trajectory.from_numpy(DvrkMotions.outer_yaw_trajectory(init_jp))
 
     def outer_yaw_calib(self):
         self.data_recorder_cb.record_collection = self.yaw_record_collection

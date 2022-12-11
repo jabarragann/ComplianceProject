@@ -87,7 +87,7 @@ class RecordCollectionTemplate:
         for fid_cp in fiducials_cp:
             self.pose_record.create_new_entry(step, "fiducial", "-1", fid_cp, setpoint_js)
         for tool_cp, id in zip(tools_cp, tools_id_list):
-            self.pose_record.create_new_entry(step, "fiducial", id, tool_cp, setpoint_js)
+            self.pose_record.create_new_entry(step, "tool", id, tool_cp, setpoint_js)
 
     def save_data(self, safe_save=False):
         self.joint_record.to_csv(safe_save=safe_save)
@@ -136,7 +136,7 @@ class ExperimentRecordCollection(RecordCollectionTemplate):
             jp_filename = self.test_files / ("robot_jp.csv")
 
         if cp_filename.exists() or jp_filename.exists():
-            n = input(f"Data was found in directory {self.test_files}. Press (y/Y) to overwrite. ")
+            n = input(f"Data was found in directory {cp_filename.parent}. Press (y/Y) to overwrite. ")
             if not (n == "y" or n == "Y"):
                 log.info("exiting the script")
                 exit(0)
@@ -290,6 +290,7 @@ if __name__ == "__main__":
     from kincalib.Motion.TrajectoryPlayer import Trajectory, TrajectoryPlayer
     from kincalib.Calibration.CalibrationRoutines import OuterJointsCalibrationRoutine
     import os
+    import time
 
     # Test calibration motions
 
@@ -306,6 +307,7 @@ if __name__ == "__main__":
     arm_namespace = "PSM2"
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
     arm.home_device()
+    time.sleep(0.1)
 
     home = os.path.expanduser("~")
     root = Path(f"{home}/temp/test_rec/rec01")
@@ -346,7 +348,7 @@ if __name__ == "__main__":
     trajectory_player = TrajectoryPlayer(
         arm,
         trajectory,
-        before_motion_loop_cb=[],
+        before_motion_loop_cb=[outer_js_calib_cb],
         after_motion_cb=[data_recorder_cb],
     )
 
