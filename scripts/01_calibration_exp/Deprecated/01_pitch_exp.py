@@ -9,7 +9,7 @@ import argparse
 import sys
 from pathlib import Path
 import time
-from kincalib.Motion.CalibrationMotions import CalibrationMotions
+from kincalib.Motion.DvrkMotions import DvrkMotions
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
 
     # Move wrist pitch axis of the robot
     filename = Path("./data/02_pitch_experiment/d03-pitch_exp11.txt")
-    CalibrationMotions.pitch_experiment(
+    DvrkMotions.pitch_experiment(
         init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     )
 

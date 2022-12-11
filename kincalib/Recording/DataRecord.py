@@ -169,9 +169,7 @@ class CartesianRecord(Record):
     def __init__(self, filename: Path):
         super().__init__(CartesianRecord.df_cols, filename)
 
-    def create_new_entry(
-        self, idx, obj_type: str, obj_id: str, measured_cp: MyPoseStamped, setpoint_jp: MyJointState
-    ):
+    def create_new_entry(self, idx, obj_type: str, obj_id: str, measured_cp: MyPoseStamped, setpoint_jp: MyJointState):
         data = (
             [idx]
             + setpoint_jp.position.tolist()
@@ -182,7 +180,7 @@ class CartesianRecord(Record):
         data = np.array(data).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(data, columns=self.df_cols)
 
-        self.df = np.concatenate((self.df, new_pt))
+        self.df = pd.concat((self.df, new_pt))
 
 
 # class RobotSensorCartesianRecord(Record):
@@ -304,16 +302,11 @@ class JointRecord(Record):
         super().__init__(JointRecord.df_cols, filename)
 
     def create_new_entry(self, idx, measure_jp: MyJointState, setpoint_jp: MyJointState):
-        data = (
-            [idx]
-            + measure_jp.position.tolist()
-            + measure_jp.effort.tolist()
-            + setpoint_jp.position.tolist()
-        )
+        data = [idx] + measure_jp.position.tolist() + measure_jp.effort.tolist() + setpoint_jp.position.tolist()
         data = np.array(data).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(data, columns=self.df_cols)
 
-        self.df = np.concatenate((self.df, new_pt))
+        self.df = pd.concat((self.df, new_pt))
 
 
 class LearningRecord(Record):

@@ -37,6 +37,16 @@ class MyJointState:
 
         return joint_state
 
+    @classmethod
+    def from_crtk_js(cls, data: np.ndarray):
+        joint_state = MyJointState()
+        joint_state.ts = data[-1]
+        joint_state.position = np.array(data[0])
+        joint_state.velocity = np.array(data[1])
+        joint_state.effort = np.array(data[2])
+
+        return joint_state
+
 
 @dataclass
 class MyPoseStamped:
@@ -61,9 +71,7 @@ class MyPoseStamped:
     def from_ros_msg(cls, name, msg: PoseStamped):
         pose_stamped = MyPoseStamped()
         pose_stamped.name = name
-        pose_stamped.position = np.array(
-            [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
-        )
+        pose_stamped.position = np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z])
         pose_stamped.orientation = np.array(
             [
                 msg.pose.orientation.x,
@@ -92,7 +100,7 @@ class MyPoseStamped:
         assert arr.shape[1] == 3, "Incorrect shape for `arr`"
         result = []
         for k in range(arr.shape[0]):
-            pose = MyPoseStamped(name, position=arr[k, :].squeeze())
+            pose = MyPoseStamped(name, position=arr[k, :].squeeze(), orientation=np.zeros(4))
             result.append(pose)
         return result
 

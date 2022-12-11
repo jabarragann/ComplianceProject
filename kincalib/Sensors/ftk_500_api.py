@@ -25,9 +25,10 @@ log = Logger(__name__).log
 
 
 class ftk_500:
-    def __init__(self, marker_name: str = None) -> None:
+    def __init__(self, marker_name: str = None, expected_markers: str = None) -> None:
         # Init variables
         self.marker_name = None
+        self.expected_markers = expected_markers
 
         # Create node
         if not rospy.get_node_uri():
@@ -67,9 +68,7 @@ class ftk_500:
             )
         self.poses_arr = record
 
-    def collect_measurements_raw(
-        self, m: int, t: float = 1000, sample_time: float = 50
-    ) -> List[List[float]]:
+    def collect_measurements_raw(self, m: int, t: float = 1000, sample_time: float = 50) -> List[List[float]]:
         """Collectect measurements from `m` fiducials for a specific amount of time.
         Marker pose will also be collected if it is provided when initializing the class.
 
@@ -117,9 +116,7 @@ class ftk_500:
             "markers_dropped": markers_dropped,
         }
 
-    def obtain_processed_measurement(
-        self, m: int, t: float = 1000, sample_time: float = 50
-    ) -> dict:
+    def obtain_processed_measurement(self, m: int, t: float = 1000, sample_time: float = 50) -> dict:
         """_summary_
 
         Parameters
@@ -250,9 +247,7 @@ class ftk_500:
         orientation_std = np.array(orientation).std(axis=0)
         orientation_mean = orientation_mean / np.linalg.norm(orientation_mean)
 
-        mean_frame = PyKDL.Frame(
-            PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean)
-        )
+        mean_frame = PyKDL.Frame(PyKDL.Rotation.Quaternion(*orientation_mean), PyKDL.Vector(*position_mean))
         return mean_frame, position_std, orientation_std
 
 
@@ -279,13 +274,10 @@ def clean_avg_measurements(measurements, expected_markers=1):
 
 
 class FTKDummy(ftk_500):
-    def __init__(self) -> None:
+    def __init__(self, marker_name) -> None:
+        self.marker_name = marker_name
 
-        pass
-
-    def obtain_processed_measurement(
-        self, m: int, t: float = 1000, sample_time: float = 50
-    ) -> dict:
+    def obtain_processed_measurement(self, m: int, t: float = 1000, sample_time: float = 50) -> dict:
 
         init_time = time.time()
         while time.time() - init_time < t / 1000:
@@ -360,7 +352,5 @@ if __name__ == "__main__":
     # ------------------------------------------------------------
     # Obtain processed measurements
     # ------------------------------------------------------------
-    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(
-        expected_markers, t=500, sample_time=15
-    )
+    mean_frame, mean_value = ftk_handler.obtain_processed_measurement(expected_markers, t=500, sample_time=15)
     log.debug(f"Mean value shape {mean_value.shape}")

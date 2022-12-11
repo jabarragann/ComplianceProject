@@ -26,7 +26,7 @@ from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.Motion.TrajectoryPlayer import TrajectoryPlayer, Trajectory, RandomJointTrajectory
-from kincalib.Motion.CalibrationMotions import CalibrationMotions
+from kincalib.Motion.DvrkMotions import DvrkMotions
 
 
 log = Logger("collection").log
@@ -36,7 +36,7 @@ marker_name = "custom_marker_112"
 
 
 def go_and_come_back(joint_values):
-    joint_values = CalibrationMotions.generate_pitch_motion()
+    joint_values = DvrkMotions.generate_pitch_motion()
     joint_values_rev = joint_values.copy()
     joint_values_rev = np.flip(joint_values_rev, axis=0)
     joint_values = np.concatenate((joint_values, joint_values_rev[1:]))
@@ -51,7 +51,7 @@ def roll_hysteresis(arm_handler, root, save, init_jp):
     init_yaw = init_jp[5]
 
     # Create hysteresis motion
-    roll_traj = CalibrationMotions.generate_roll_motion()
+    roll_traj = DvrkMotions.generate_roll_motion()
     roll_traj = go_and_come_back(roll_traj)
     roll_traj = list(product(roll_traj, [init_pitch], [init_yaw]))
 
@@ -66,7 +66,7 @@ def pitch_hysteresis(arm_handler, root, save, init_jp):
     init_yaw = init_jp[5]
 
     # Create hysteresis motion
-    pitch_traj = CalibrationMotions.generate_pitch_motion()
+    pitch_traj = DvrkMotions.generate_pitch_motion()
     pitch_traj = go_and_come_back(pitch_traj)
     pitch_traj = list(product([init_roll], pitch_traj, [init_yaw]))
 
@@ -84,7 +84,7 @@ def yaw_hysteresis(arm_handler, root, save, init_jp):
     # init_yaw = init_jp[5]
 
     # Create hysteresis motion
-    yaw_traj = CalibrationMotions.generate_yaw_motion()
+    yaw_traj = DvrkMotions.generate_yaw_motion()
     yaw_traj = go_and_come_back(yaw_traj)
     yaw_traj = list(product([init_roll], [init_pitch], yaw_traj))
 
@@ -115,7 +115,7 @@ def hysteresis_collection(
         needs to specify q4, q5 and q6.
     """
 
-    pitch_trajectory = CalibrationMotions.generate_pitch_motion()
+    pitch_trajectory = DvrkMotions.generate_pitch_motion()
     roll_trajectory = [0.2, -0.3]
     total = len(roll_trajectory) * len(pitch_trajectory)
 

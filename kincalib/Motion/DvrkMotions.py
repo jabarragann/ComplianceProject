@@ -15,12 +15,13 @@ from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.utils.Logger import Logger
-from kincalib.Recording.DataRecord import AtracsysCartesianRecord
+
+# from kincalib.Recording.DataRecord import AtracsysCartesianRecord
 
 log = Logger(__name__).log
 
 
-class CalibrationMotions:
+class DvrkMotions:
     # ------------------------------------------------------------
     # Generate trajectories for each of the robot joints
     # - Outer yaw   (j1)
@@ -66,13 +67,32 @@ class CalibrationMotions:
         return trajectory
 
     # ------------------------------------------------------------
+    # DVRK joint-space trajectories
+    # - outer_pitch_yaw_motion
+    # ------------------------------------------------------------
+    @staticmethod
+    def outer_yaw_trajectory():
+        outer_roll = -0.1589
+        outer_yaw_trajectory = DvrkMotions.generate_outer_yaw()
+        outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [outer_roll], [0.0], [0.0], [0.0]))
+        return np.array(outer_yaw_trajectory)
+
+    @staticmethod
+    def outer_pitch_trajectory():
+        outer_roll = -0.1589
+        outer_pitch_trajectory = DvrkMotions.generate_outer_pitch()
+        outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [outer_roll], [0.0], [0.0], [0.0]))
+
+        return np.array(outer_pitch_trajectory)
+
+    # ------------------------------------------------------------
     # DVRK calibration motion
     # - pitch_roll_independent_motion
     # - pitch_roll_together_motion
     # - pitch_motion
     # - roll_motion
     # ------------------------------------------------------------
-    def outer_pitch_yaw_motion(
+    def outer_pitch_yaw_motion_old(
         init_jp,
         psm_handler,
         ftk_handler: ftk_500,
@@ -83,10 +103,10 @@ class CalibrationMotions:
         # Init outer roll(Shaft)
         init_jp[3] = -0.1589
         # Generate outer yaw trajectory
-        outer_yaw_trajectory = CalibrationMotions.generate_outer_yaw()
+        outer_yaw_trajectory = DvrkMotions.generate_outer_yaw()
         outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [init_jp[2]]))
         # Generate outer pitch trajectory
-        outer_pitch_trajectory = CalibrationMotions.generate_outer_pitch()
+        outer_pitch_trajectory = DvrkMotions.generate_outer_pitch()
         outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [init_jp[2]]))
 
         outer_yaw_file = root / "outer_yaw.txt"
@@ -95,7 +115,7 @@ class CalibrationMotions:
         # Outer yaw trajectory (q1)
         init_jp[0] = 0.0
         init_jp[1] = 0.0
-        CalibrationMotions.outer_joints_motion(
+        DvrkMotions.outer_joints_motion(
             init_jp,
             psm_handler,
             expected_markers,
@@ -106,7 +126,7 @@ class CalibrationMotions:
         # Outer pitch trajectory (q2)
         init_jp[0] = 0.0
         init_jp[1] = 0.0
-        CalibrationMotions.outer_joints_motion(
+        DvrkMotions.outer_joints_motion(
             init_jp,
             psm_handler,
             expected_markers,
@@ -138,15 +158,15 @@ class CalibrationMotions:
             filename (Path, optional): [description]. Defaults to None.
 
         """
-        pitch_trajectory = CalibrationMotions.generate_pitch_motion()
-        roll_trajectory = CalibrationMotions.generate_roll_motion()
+        pitch_trajectory = DvrkMotions.generate_pitch_motion()
+        roll_trajectory = DvrkMotions.generate_roll_motion()
 
         pitch_file = filename.parent / (filename.with_suffix("").name + "_pitch.txt")
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
         #DvrkMotions.pitch_motion( init_jp, psm_handler, log, expected_markers, save, pitch_file, trajectory=pitch_trajectory)
-        CalibrationMotions.pitch_roll_together_motion( init_jp, psm_handler,ftk_handler, log, expected_markers, save, pitch_file)
-        CalibrationMotions.roll_motion(  init_jp, psm_handler,ftk_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
+        DvrkMotions.pitch_roll_together_motion( init_jp, psm_handler,ftk_handler, log, expected_markers, save, pitch_file)
+        DvrkMotions.roll_motion(  init_jp, psm_handler,ftk_handler, log, expected_markers, save, roll_file, trajectory=roll_trajectory)
         # fmt:on
 
     @staticmethod
@@ -172,29 +192,27 @@ class CalibrationMotions:
 
         """
 
-        pitch_trajectory = CalibrationMotions.generate_pitch_motion()
-        yaw_trajectory = CalibrationMotions.generate_yaw_motion()
+        pitch_trajectory = DvrkMotions.generate_pitch_motion()
+        yaw_trajectory = DvrkMotions.generate_yaw_motion()
         pitch_yaw_traj = []
         roll_v = [0.2, -0.3]
         for r in roll_v:
-            pitch_yaw_traj += list(product([r], pitch_trajectory, [0.0])) + list(
-                product([r], [0.0], yaw_trajectory)
-            )
-        roll_traj = CalibrationMotions.generate_roll_motion()
+            pitch_yaw_traj += list(product([r], pitch_trajectory, [0.0])) + list(product([r], [0.0], yaw_trajectory))
+        roll_traj = DvrkMotions.generate_roll_motion()
         roll_traj = list(product(roll_traj, [0], [0]))
         pitch_yaw_file = filename.parent / (filename.with_suffix("").name + "_pitch_yaw.txt")
         roll_file = filename.parent / (filename.with_suffix("").name + "_roll.txt")
         # fmt:off
         # roll trajectory
-        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, ftk_handler, expected_markers, save,
+        DvrkMotions.wrist_joints_motion( init_jp, psm_handler, ftk_handler, expected_markers, save,
                                  filename=roll_file, trajectory=roll_traj)
         # pitch trajectory
-        CalibrationMotions.wrist_joints_motion( init_jp, psm_handler, ftk_handler, expected_markers, save,
+        DvrkMotions.wrist_joints_motion( init_jp, psm_handler, ftk_handler, expected_markers, save,
                                                 filename=pitch_yaw_file,trajectory=pitch_yaw_traj)
         # fmt:on
 
     # ------------------------------------------------------------
-    # DVRK core motion functions
+    # DVRK compound motion functions
     # - Outer_joints_motion
     # - Wrist_joints_motion
     # ------------------------------------------------------------
@@ -229,9 +247,7 @@ class CalibrationMotions:
         # ftk_handler = ftk_500("custom_marker_112")
 
         # Create record to store the measured data
-        sensor_record = AtracsysCartesianRecord(
-            ftk_handler, expected_markers=expected_markers, filename=filename
-        )
+        sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
@@ -282,16 +298,14 @@ class CalibrationMotions:
         if filename is None:
             raise Exception("filename not give")
 
-        pitch_trajectory = CalibrationMotions.generate_pitch_motion()
+        pitch_trajectory = DvrkMotions.generate_pitch_motion()
         roll_trajectory = [0.2, -0.3]
         total = len(roll_trajectory) * len(pitch_trajectory)
 
         # ftk_handler = ftk_500("custom_marker_112")
 
         # Create record to store the measured data
-        sensor_record = AtracsysCartesianRecord(
-            ftk_handler, expected_markers=expected_markers, filename=filename
-        )
+        sensor_record = AtracsysCartesianRecord(ftk_handler, expected_markers=expected_markers, filename=filename)
         # Move to initial position
         psm_handler.move_jp(init_jp).wait()
         time.sleep(1)
@@ -353,9 +367,7 @@ if __name__ == "__main__":
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     # )
 
-    CalibrationMotions.outer_pitch_yaw_motion(
-        init_jp, psm_handler=psm_handler, expected_markers=4, save=False, root=filename
-    )
+    DvrkMotions.outer_pitch_yaw_motion(init_jp, psm_handler=psm_handler, expected_markers=4, save=False, root=filename)
 
     # DvrkMotions.pitch_yaw_roll_independent_motion(
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=False, filename=filename

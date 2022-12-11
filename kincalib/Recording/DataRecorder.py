@@ -10,10 +10,10 @@ from kincalib.Entities.Msgs import MyJointState, MyPoseStamped
 from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory
 
 # Custom
-from kincalib.Recording.DataRecord import CalibrationRecord, CartesianRecord, JointRecord
+from kincalib.Recording.DataRecord import CartesianRecord, JointRecord
 from kincalib.utils.Logger import Logger
 from kincalib.Sensors.ftk_500_api import FTKDummy, ftk_500
-from kincalib.Motion.CalibrationMotions import CalibrationMotions
+from kincalib.Motion.DvrkMotions import DvrkMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.Entities.RosConversions import RosConversion
 
@@ -47,9 +47,9 @@ class DataRecorder:
         )
 
         # Get robot data
-        setpoint_js = MyJointState.from_ros_msg(self.replay_device.setpoint_js())
-        measured_js = MyJointState.from_ros_msg(self.replay_device.measured_js())
-        measured_cp = MyPoseStamped.from_ros_msg(self.replay_device.measured_cp())
+        setpoint_js = MyJointState.from_crtk_js(self.replay_device.setpoint_js())
+        measured_js = MyJointState.from_crtk_js(self.replay_device.measured_js())
+        measured_cp = RosConversion.pykdl_to_myposestamped("psm2", self.replay_device.measured_cp())
         self.record_collection.add_new_robot_data(index, measured_js, setpoint_js, measured_cp)
 
         if marker_pose is not None:
@@ -57,7 +57,7 @@ class DataRecorder:
                 self.expected_markers, t=500, sample_time=15
             )
             tool_cp = RosConversion.pykdl_to_myposestamped("tool", mean_tool_frame)
-            fiducial_cp = MyPoseStamped.from_array_of_positions(fiducial_positions)
+            fiducial_cp = MyPoseStamped.from_array_of_positions("fiducial", fiducial_positions)
 
             self.record_collection.add_new_sensor_data(
                 index, setpoint_js, fiducial_cp, [tool_cp], [self.ftk_handler.marker_name]
@@ -67,7 +67,34 @@ class DataRecorder:
         self.record_collection.save_data()
 
 
-class ExperimentRecordCollection:
+class RecordCollectionTemplate:
+    def __init__(self, jp_filename: Path, cp_filename: Path) -> None:
+        self.joint_record = JointRecord(jp_filename)
+        self.pose_record = CartesianRecord(cp_filename)
+
+    def add_new_robot_data(self, step, measured_js: MyJointState, setpoint_js: MyJointState, robot_cp: MyPoseStamped):
+        self.joint_record.create_new_entry(step, measured_js, setpoint_js)
+        self.pose_record.create_new_entry(step, "robot", "-1", robot_cp, setpoint_js)
+
+    def add_new_sensor_data(
+        self,
+        step,
+        setpoint_js: MyJointState,
+        fiducials_cp: List[MyPoseStamped],
+        tools_cp: List[MyPoseStamped],
+        tools_id_list: List[str],
+    ):
+        for fid_cp in fiducials_cp:
+            self.pose_record.create_new_entry(step, "fiducial", "-1", fid_cp, setpoint_js)
+        for tool_cp, id in zip(tools_cp, tools_id_list):
+            self.pose_record.create_new_entry(step, "fiducial", id, tool_cp, setpoint_js)
+
+    def save_data(self, safe_save=False):
+        self.joint_record.to_csv(safe_save=safe_save)
+        self.pose_record.to_csv(safe_save=safe_save)
+
+
+class ExperimentRecordCollection(RecordCollectionTemplate):
     def __init__(
         self,
         root_dir: Path,
@@ -98,8 +125,7 @@ class ExperimentRecordCollection:
         self.create_paths()
         self.cp_filename, self.jp_filename = self.obtain_filenames_for_records()
 
-        self.joint_record = JointRecord(self.jp_filename)
-        self.pose_record = CartesianRecord(self.cp_filename)
+        super().__init__(self.jp_filename, self.cp_filename)
 
     def obtain_filenames_for_records(self):
         if self.mode == "calib":
@@ -130,29 +156,6 @@ class ExperimentRecordCollection:
         description_path = self.robot_files if self.mode == "calib" else self.test_files
         with open(description_path / "description.txt", "w") as f:
             f.write(self.description)
-
-    def add_new_robot_data(
-        self, step, measured_js: MyJointState, setpoint_js: MyJointState, robot_cp: MyPoseStamped
-    ):
-        self.joint_record.create_new_entry(step, measured_js, setpoint_js)
-        self.pose_record.create_new_entry(step, "robot", "-1", robot_cp, setpoint_js)
-
-    def add_new_sensor_data(
-        self,
-        step,
-        setpoint_js: MyJointState,
-        fiducials_cp: List[MyPoseStamped],
-        tools_cp: List[MyPoseStamped],
-        tools_id_list: List[str],
-    ):
-        for fid_cp in fiducials_cp:
-            self.pose_record.create_new_entry(step, "fiducial", "-1", fid_cp, setpoint_js)
-        for tool_cp, id in zip(tools_cp, tools_id_list):
-            self.pose_record.create_new_entry(step, "fiducial", id, tool_cp, setpoint_js)
-
-    def save_data(self, safe_save=False):
-        self.joint_record.to_csv(safe_save=safe_save)
-        self.pose_record.to_csv(safe_save=safe_save)
 
 
 ####################OLD
@@ -234,7 +237,7 @@ class OuterJointsCalibrationRecorder:
             self.outer_js_files.mkdir(parents=True)
 
     def __call__(self) -> Any:
-        CalibrationMotions.outer_pitch_yaw_motion(
+        DvrkMotions.outer_pitch_yaw_motion(
             self.replay_device.measured_jp(),
             psm_handler=self.replay_device,
             ftk_handler=self.ftk_handler,
@@ -272,7 +275,7 @@ class WristJointsCalibrationRecorder:
             log.error("specify index WristJointsCalibrationRecorder")
             exit(0)
         log.info("calibration")
-        CalibrationMotions.pitch_yaw_roll_independent_motion(
+        DvrkMotions.pitch_yaw_roll_independent_motion(
             self.replay_device.measured_jp(),
             psm_handler=self.replay_device,
             ftk_handler=self.ftk_handler,
@@ -285,6 +288,8 @@ class WristJointsCalibrationRecorder:
 if __name__ == "__main__":
 
     from kincalib.Motion.TrajectoryPlayer import Trajectory, TrajectoryPlayer
+    from kincalib.Calibration.CalibrationRoutines import OuterJointsCalibrationRoutine
+    import os
 
     # Test calibration motions
 
@@ -302,19 +307,29 @@ if __name__ == "__main__":
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
     arm.home_device()
 
+    home = os.path.expanduser("~")
+    root = Path(f"{home}/temp/test_rec/rec01")
     # Sensors
     # ftk_handler = ftk_500("marker_12")
-    ftk_handler = FTKDummy()
+    ftk_handler = FTKDummy("marker_12")
+
+    # Main recording loop
+    experiment_record_collection = ExperimentRecordCollection(root, mode="calib", description="test calib")
+    data_recorder_cb = DataRecorder(arm, experiment_record_collection, ftk_handler, 4, marker_name="test")
 
     # Setup calibration callbacks
-    outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm,
-        ftk_handler=ftk_handler,
-        save=False,
-        expected_markers=4,
-        root=Path("."),
-        marker_name="none",
-    )
+    outer_joints_recorder = DataRecorder(arm, None, ftk_handler, 4, "none")
+    outer_js_calib_cb = OuterJointsCalibrationRoutine(arm, ftk_handler, outer_joints_recorder, save=True, root=root)
+
+    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
+    #     replay_device=arm,
+    #     ftk_handler=ftk_handler,
+    #     save=False,
+    #     expected_markers=4,
+    #     root=Path("."),
+    #     marker_name="none",
+    # )
+
     wrist_js_calib_cb = WristJointsCalibrationRecorder(
         replay_device=arm,
         ftk_handler=ftk_handler,
@@ -322,9 +337,6 @@ if __name__ == "__main__":
         expected_markers=4,
         root=Path("."),
         marker_name="none",
-    )
-    data_recorder_cb = DataRecorder(
-        arm, ftk_handler, 4, root=Path("~/temp"), marker_name="test", mode="calib", test_id=11
     )
 
     # Create trajectory player with cb
@@ -335,34 +347,31 @@ if __name__ == "__main__":
         arm,
         trajectory,
         before_motion_loop_cb=[],
-        after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
+        after_motion_cb=[data_recorder_cb],
     )
 
-    ans = input(
-        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
-    )
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
-        trajector
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(50, samples_per_step=20)
+        trajectory_player.replay_trajectory(delay=0.005)
 
     log.info(f"Initial pt {trajectory.setpoints[0].position}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
     log.info(f"number of points {len(trajectory)}")
 
-    arm_namespace = "PSM2"
-    arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
-    arm.home_device()
+    # arm_namespace = "PSM2"
+    # arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
+    # arm.home_device()
 
-    # Sensors
-    # ftk_handler = ftk_500("marker_12")
-    ftk_handler = FTKDummy()
+    # # Sensors
+    # # ftk_handler = ftk_500("marker_12")
+    # ftk_handler = FTKDummy()
 
-    # Setup calibration callbacks
-    outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm,
-        ftk_handler=ftk_handler,
-        save=False,
-        expected_markers=4,
-        root=Path("."),
-        marker_name="none",
-    )
+    # # Setup calibration callbacks
+    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
+    #     replay_device=arm,
+    #     ftk_handler=ftk_handler,
+    #     save=False,
+    #     expected_markers=4,
+    #     root=Path("."),
+    #     marker_name="none",
+    # )

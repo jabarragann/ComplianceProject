@@ -5,7 +5,7 @@ import argparse
 import sys
 import numpy as np
 from pathlib import Path
-from kincalib.Motion.CalibrationMotions import CalibrationMotions
+from kincalib.Motion.DvrkMotions import DvrkMotions
 from kincalib.Motion.ReplayDevice import ReplayDevice
 
 # ROS and DVRK imports
@@ -21,8 +21,8 @@ log = Logger("collection").log
 
 
 def outer_joint_calibration(q3, q4, q5, q6, reverse: bool = True) -> Trajectory:
-    outer_yaw_trajectory = CalibrationMotions.generate_outer_yaw(steps=25)
-    outer_pitch_trajectory = CalibrationMotions.generate_outer_pitch(steps=25)
+    outer_yaw_trajectory = DvrkMotions.generate_outer_yaw(steps=25)
+    outer_pitch_trajectory = DvrkMotions.generate_outer_pitch(steps=25)
 
     if reverse:
         outer_yaw_trajectory = outer_yaw_trajectory[::-1]
