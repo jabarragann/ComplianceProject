@@ -75,6 +75,7 @@ class DvrkMotions:
         outer_roll = -0.1589
         outer_yaw_trajectory = DvrkMotions.generate_outer_yaw()
         outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [init_jp[2]], [outer_roll], [0.0], [0.0]))
+
         return np.array(outer_yaw_trajectory)
 
     @staticmethod
@@ -84,6 +85,27 @@ class DvrkMotions:
         outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [init_jp[2]], [outer_roll], [0.0], [0.0]))
 
         return np.array(outer_pitch_trajectory)
+
+    @staticmethod
+    def pitch_yaw_trajectory(init_jp):
+        jp = init_jp
+        pitch_trajectory = DvrkMotions.generate_pitch_motion()
+        yaw_trajectory = DvrkMotions.generate_yaw_motion()
+        pitch_yaw_traj = []
+        roll_v = [0.2, -0.3]
+        for r in roll_v:
+            pitch_yaw_traj += list(product([jp[0]], [jp[1]], [jp[2]], [r], pitch_trajectory, [0.0]))
+            pitch_yaw_traj += list(product([jp[0]], [jp[1]], [jp[2]], [r], [0.0], yaw_trajectory))
+
+        return np.array(pitch_yaw_traj)
+
+    @staticmethod
+    def roll_trajectory(init_jp):
+        jp = init_jp
+        roll_traj = DvrkMotions.generate_roll_motion()
+        roll_traj = list(product([jp[0]], [jp[1]], [jp[2]], roll_traj, [0], [0]))
+
+        return np.array(roll_traj)
 
     # ------------------------------------------------------------
     # DVRK calibration motion

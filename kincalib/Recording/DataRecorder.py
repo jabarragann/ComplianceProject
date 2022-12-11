@@ -289,6 +289,8 @@ if __name__ == "__main__":
 
     from kincalib.Motion.TrajectoryPlayer import Trajectory, TrajectoryPlayer
     from kincalib.Calibration.CalibrationRoutines import OuterJointsCalibrationRoutine
+    from kincalib.Calibration.CalibrationRoutines import WristCalibrationRoutine
+
     import os
     import time
 
@@ -310,7 +312,7 @@ if __name__ == "__main__":
     time.sleep(0.1)
 
     home = os.path.expanduser("~")
-    root = Path(f"{home}/temp/test_rec/rec01")
+    root = Path(f"{home}/temp/test_rec/rec04")
     # Sensors
     # ftk_handler = ftk_500("marker_12")
     ftk_handler = FTKDummy("marker_12")
@@ -323,6 +325,9 @@ if __name__ == "__main__":
     outer_joints_recorder = DataRecorder(arm, None, ftk_handler, 4, "none")
     outer_js_calib_cb = OuterJointsCalibrationRoutine(arm, ftk_handler, outer_joints_recorder, save=True, root=root)
 
+    wrist_joints_recorder = DataRecorder(arm, None, ftk_handler, 4, "none")
+    wrist_js_calib_cb = WristCalibrationRoutine(arm, ftk_handler, wrist_joints_recorder, save=True, root=root)
+
     # outer_js_calib_cb = OuterJointsCalibrationRecorder(
     #     replay_device=arm,
     #     ftk_handler=ftk_handler,
@@ -332,14 +337,14 @@ if __name__ == "__main__":
     #     marker_name="none",
     # )
 
-    wrist_js_calib_cb = WristJointsCalibrationRecorder(
-        replay_device=arm,
-        ftk_handler=ftk_handler,
-        save=False,
-        expected_markers=4,
-        root=Path("."),
-        marker_name="none",
-    )
+    # wrist_js_calib_cb = WristJointsCalibrationRecorder(
+    #     replay_device=arm,
+    #     ftk_handler=ftk_handler,
+    #     save=False,
+    #     expected_markers=4,
+    #     root=Path("."),
+    #     marker_name="none",
+    # )
 
     # Create trajectory player with cb
     # trajectory_player = TrajectoryPlayer(
@@ -348,8 +353,8 @@ if __name__ == "__main__":
     trajectory_player = TrajectoryPlayer(
         arm,
         trajectory,
-        before_motion_loop_cb=[outer_js_calib_cb],
-        after_motion_cb=[data_recorder_cb],
+        before_motion_loop_cb=[],
+        after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
     )
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
