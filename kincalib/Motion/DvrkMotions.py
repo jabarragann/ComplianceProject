@@ -1,22 +1,13 @@
-import dvrk
 import time
 import sys
 import numpy as np
 from typing import List
 import rospy
-import pandas as pd
-import tf_conversions.posemath as pm
 from pathlib import Path
 from itertools import product
-from rich.progress import track
 
-from kincalib.Sensors.ftk_500_api import ftk_500
-from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
-from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.utils.Logger import Logger
 
-# from kincalib.Recording.DataRecord import AtracsysCartesianRecord
 
 log = Logger(__name__).log
 
@@ -74,7 +65,9 @@ class DvrkMotions:
     def outer_yaw_trajectory(init_jp):
         outer_roll = -0.1589
         outer_yaw_trajectory = DvrkMotions.generate_outer_yaw()
-        outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [init_jp[2]], [outer_roll], [0.0], [0.0]))
+        outer_yaw_trajectory = list(
+            product(outer_yaw_trajectory, [0.0], [init_jp[2]], [outer_roll], [0.0], [0.0])
+        )
 
         return np.array(outer_yaw_trajectory)
 
@@ -82,7 +75,9 @@ class DvrkMotions:
     def outer_pitch_trajectory(init_jp):
         outer_roll = -0.1589
         outer_pitch_trajectory = DvrkMotions.generate_outer_pitch()
-        outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [init_jp[2]], [outer_roll], [0.0], [0.0]))
+        outer_pitch_trajectory = list(
+            product([0.0], outer_pitch_trajectory, [init_jp[2]], [outer_roll], [0.0], [0.0])
+        )
 
         return np.array(outer_pitch_trajectory)
 
@@ -109,6 +104,8 @@ class DvrkMotions:
 
 
 if __name__ == "__main__":
+    from kincalib.Motion.ReplayDevice import ReplayDevice
+
     log = Logger("utils_log").log
     rospy.init_node("dvrk_bag_replay", anonymous=True)
 
@@ -147,7 +144,9 @@ if __name__ == "__main__":
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=True, filename=filename
     # )
 
-    DvrkMotions.outer_pitch_yaw_motion(init_jp, psm_handler=psm_handler, expected_markers=4, save=False, root=filename)
+    DvrkMotions.outer_pitch_yaw_motion(
+        init_jp, psm_handler=psm_handler, expected_markers=4, save=False, root=filename
+    )
 
     # DvrkMotions.pitch_yaw_roll_independent_motion(
     #     init_jp, psm_handler=psm_handler, expected_markers=4, log=log, save=False, filename=filename
