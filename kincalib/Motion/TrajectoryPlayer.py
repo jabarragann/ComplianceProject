@@ -11,6 +11,7 @@ from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 
 # ros
 from sensor_msgs.msg import JointState
+from kincalib.Motion.DvrkMotions import DvrkMotions
 
 # Custom
 from kincalib.utils.RosbagUtils import RosbagUtils
@@ -316,25 +317,22 @@ class SoftRandomJointTrajectory(RandomJointTrajectory):
 
 if __name__ == "__main__":
 
-    rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
-    rosbag_handle = RosbagUtils(rosbag_path)
-    trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
-    trajectory = RandomJointTrajectory.generate_trajectory(50)
-    # trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
-
-    log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
-    log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
-    log.info(f"number of points {len(trajectory)}")
-
     arm_namespace = "PSM2"
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
     arm.home_device()
 
-    # callback example
-    # outer_js_calib_cb = OuterJointsCalibrationRecorder(
-    #     replay_device=arm, save=False, expected_markers=4, root=Path("."), marker_name="none"
-    # )
-    # trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[outer_js_calib_cb])
+    init_jp = arm.measured_jp()
+
+    # rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
+    # rosbag_handle = RosbagUtils(rosbag_path)
+    # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
+    # trajectory = RandomJointTrajectory.generate_trajectory(50)
+    # trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
+    trajectory = DvrkMotions.insertion_trajectory(init_jp, steps=20)
+
+    log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
+    log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
+    log.info(f"number of points {len(trajectory)}")
 
     trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[])
 
