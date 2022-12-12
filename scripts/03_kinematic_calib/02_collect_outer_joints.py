@@ -21,8 +21,8 @@ log = Logger("collection").log
 
 
 def outer_joint_calibration(q3, q4, q5, q6, reverse: bool = True) -> Trajectory:
-    outer_yaw_trajectory = DvrkMotions.generate_outer_yaw(steps=25)
-    outer_pitch_trajectory = DvrkMotions.generate_outer_pitch(steps=25)
+    outer_yaw_trajectory = DvrkMotions.generate_outer_yaw_motion(steps=25)
+    outer_pitch_trajectory = DvrkMotions.generate_outer_pitch_motion(steps=25)
 
     if reverse:
         outer_yaw_trajectory = outer_yaw_trajectory[::-1]
@@ -109,7 +109,9 @@ def main():
         description="with delay of 100ms - reversed",
     )
 
-    trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[], after_motion_cb=[data_recorder_cb])
+    trajectory_player = TrajectoryPlayer(
+        arm, trajectory, before_motion_loop_cb=[], after_motion_cb=[data_recorder_cb]
+    )
     # trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[], after_motion_cb=[])
 
     # Execute
@@ -118,7 +120,9 @@ def main():
     log.info(f"Save data:         {args.save}")
     log.info(f"Trajectory length: {len(trajectory)}")
 
-    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    ans = input(
+        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
+    )
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True, delay=0.1)
     else:

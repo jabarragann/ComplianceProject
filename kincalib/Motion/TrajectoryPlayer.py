@@ -34,11 +34,14 @@ class TrajectoryPlayer:
         states to replay the trajectory, no cartesian setpoints are used. An additional callback system is used
         to add extra functionalities before the motion loop and after each motion.
 
-        After motion cb will always receive a index parameter input. To use this argument use the sample signature below.
-        ```
+        After motion callbacks will always receive a index parameter input. To use this argument
+        use the sample signature below.
+
+        ```python
         def after_motion_cb(index=None):
             pass
         ```
+
         Parameters
         ----------
         replay_device : ReplayDevice
@@ -49,49 +52,30 @@ class TrajectoryPlayer:
             List of callback functions that will be executed before the motion loop
         after_motion_cb : List, optional
             List of callback functions that will be executed after each motion in the motion loop
-
         """
+
         self.trajectory = trajectory
         self.replay_device = replay_device
         self.after_motion_cb = after_motion_cb
         self.before_motion_loop_cb = before_motion_loop_cb
 
-    def replay_trajectory(self, execute_cb: bool = True, delay=0.005):
+    def replay_trajectory(self, execute_cb: bool = True, delay=0.01):
 
         start_time = time.time()
-        last_bag_time = self.trajectory[0].header.stamp.to_sec()
 
         # Before motion callbacks
         if execute_cb:
             [cb() for cb in self.before_motion_loop_cb]
 
         for index, new_js in enumerate(self.trajectory):
-            # record start time
-            loop_start_time = time.time()
-            # compute expected dt
-            new_bag_time = self.trajectory[index].header.stamp.to_sec()
-            delta_bag_time = new_bag_time - last_bag_time
-            last_bag_time = new_bag_time
-
-            # Move
             log.info(f"Executed step {index}")
             log.info(f"-- Trajectory Progress --> {100*index/len(self.trajectory):0.02f} %")
-            self.replay_device.move_jp(numpy.array(new_js.position)).wait()  # wait until motion is finished
+            self.replay_device.move_jp(numpy.array(new_js.position)).wait()
             time.sleep(delay)
 
             # After motion callbacks
             if execute_cb:
                 [cb(**{"index": index}) for cb in self.after_motion_cb]
-
-            # try to keep motion synchronized
-            loop_end_time = time.time()
-            sleep_time = delta_bag_time - (loop_end_time - loop_start_time)
-            # if process takes time larger than console rate, don't sleep
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            # Safety sleep
-            if loop_end_time - loop_start_time < 0.1:
-                time.sleep(0.1)
 
         log.info("Time to replay trajectory: %f seconds" % (time.time() - start_time))
 
@@ -126,7 +110,9 @@ class Trajectory:
         log.info("Trajectory report:")
         # report out of order setpoints
         if self.out_of_order_counter > 0:
-            self.log.info("-- Found and removed %i out of order setpoints" % (self.out_of_order_counter))
+            self.log.info(
+                "-- Found and removed %i out of order setpoints" % (self.out_of_order_counter)
+            )
 
         # convert to mm
         bbmin = self.bbmin * 1000.0
@@ -137,11 +123,15 @@ class Trajectory:
         )
 
         # compute duration
-        duration = self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
+        duration = (
+            self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
+        )
         self.log.info("-- Duration of trajectory: %f seconds" % (duration))
 
         # Number of poses
-        self.log.info("-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t))
+        self.log.info(
+            "-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t)
+        )
         if len(self.setpoints) == 0:
             self.log.error("-- No trajectory found!")
 
@@ -164,7 +154,9 @@ class Trajectory:
         return int(len(self.setpoints) / self.sampling_factor)
 
     @classmethod
-    def from_ros_bag(cls, rosbag_handle: RosbagUtils, namespace="PSM2", sampling_factor: int = 1) -> Trajectory:
+    def from_ros_bag(
+        cls, rosbag_handle: RosbagUtils, namespace="PSM2", sampling_factor: int = 1
+    ) -> Trajectory:
         bbmin = np.zeros(3)
         bbmax = np.zeros(3)
         last_message_time = 0.0
@@ -346,7 +338,9 @@ if __name__ == "__main__":
 
     trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[])
 
-    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    ans = input(
+        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
+    )
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True)
     else:

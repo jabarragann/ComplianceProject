@@ -5,13 +5,11 @@ import numpy as np
 from typing import List
 
 # Custom
-from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.utils.Logger import Logger
 from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Entities.Msgs import MyJointState, MyPoseStamped
 
 log = Logger(__name__).log
-
 
 class Record(ABC):
     def __init__(self, df_cols, filename: Path) -> None:
@@ -50,7 +48,7 @@ class Record(ABC):
 
 
 class CartesianRecord(Record):
-    """Data collection formats
+    """ Header format
 
     step: step in the trajectory
     set_qi:   Setpoint joint position

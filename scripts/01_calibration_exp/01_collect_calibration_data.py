@@ -1,24 +1,26 @@
 # Python imports
 from pathlib import Path
-import time
 import argparse
 import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import List, Tuple, Set
-from rich.logging import RichHandler
-from rich.progress import track
 
 # ROS and DVRK imports
 import dvrk
-from kincalib.Recording.DataRecorder import DataRecorder, OuterJointsCalibrationRecorder, WristJointsCalibrationRecorder
+from kincalib.Calibration.CalibrationRoutines import (
+    OuterJointsCalibrationRoutine,
+    WristCalibrationRoutine,
+)
+from kincalib.Recording.DataRecorder import DataRecorder
+
 import rospy
+from kincalib.Recording.RecordCollections import ExperimentRecordCollection
+from kincalib.Sensors.ftk_500_api import ftk_500
 
 # kincalib module imports
 from kincalib.utils.Logger import Logger
-from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.Motion.ReplayDevice import ReplayDevice
 from kincalib.Motion.TrajectoryPlayer import (
@@ -51,7 +53,6 @@ def main():
                             help="type of random trajectory")
     parser.add_argument("--traj_size",type=int, default=500,
                             help="Number of samples in random traj")
-        #NUMBER OF SAMPLES ARGS
     args = parser.parse_args()
     # fmt: on
 
@@ -88,7 +89,9 @@ def main():
         if args.traj_type == "random":
             trajectory = RandomJointTrajectory.generate_trajectory(random_size)
         else:
-            trajectory = SoftRandomJointTrajectory.generate_trajectory(random_size, samples_per_step=20)
+            trajectory = SoftRandomJointTrajectory.generate_trajectory(
+                random_size, samples_per_step=20
+            )
 
     log.info(f"Trajectory size {len(trajectory)}")
 
@@ -96,8 +99,8 @@ def main():
     # Get robot ready
     # ------------------------------------------------------------
     arm = ReplayDevice(device_namespace=arm_namespace, expected_interval=0.01)
+    ftk_handler = ftk_500(marker_name, expected_spheres)
 
-    # make sure the arm is powered
     print("-- Enabling arm")
     if not arm.enable(10):
         sys.exit("-- Failed to enable within 10 seconds")
@@ -109,23 +112,24 @@ def main():
     arm.move_jp(np.array(trajectory[0].position)).wait()
 
     # ------------------------------------------------------------
-    # Config trajectory player
+    # Config recording loops
     # ------------------------------------------------------------
-    # Callbacks
-    outer_js_calib_cb = OuterJointsCalibrationRecorder(
-        replay_device=arm, save=args.save, expected_markers=expected_spheres, root=root, marker_name=marker_name
-    )
-    wrist_js_calib_cb = WristJointsCalibrationRecorder(
-        replay_device=arm, save=args.save, expected_markers=expected_spheres, root=root, marker_name=marker_name
+    # Main recording loop
+    experiment_record_collection = ExperimentRecordCollection(
+        root, mode=args.mode, description=args.description
     )
     data_recorder_cb = DataRecorder(
-        arm,
-        expected_markers=expected_spheres,
-        root=root,
-        marker_name=marker_name,
-        mode=args.mode,
-        test_id=testid,
-        description=args.description,
+        arm, experiment_record_collection, ftk_handler, expected_spheres, marker_name
+    )
+    # Setup calibration callbacks
+    outer_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_spheres, marker_name)
+    outer_js_calib_cb = OuterJointsCalibrationRoutine(
+        arm, ftk_handler, outer_joints_recorder, save=True, root=root
+    )
+
+    wrist_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_spheres, marker_name)
+    wrist_js_calib_cb = WristCalibrationRoutine(
+        arm, ftk_handler, wrist_joints_recorder, save=True, root=root
     )
 
     if args.mode == "test":
@@ -139,7 +143,7 @@ def main():
         trajectory_player = TrajectoryPlayer(
             arm,
             trajectory,
-            before_motion_loop_cb=[outer_js_calib_cb],  # [outer_js_calib_cb],
+            before_motion_loop_cb=[outer_js_calib_cb],
             after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
         )
 
@@ -155,7 +159,9 @@ def main():
     log.info(f"Test id:           {testid} ")
     log.info(f"Description:       {args.description}")
 
-    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    ans = input(
+        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
+    )
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True)
     else:

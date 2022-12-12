@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from enum import Enum
 
 # Python
 from pathlib import Path
@@ -53,7 +54,10 @@ class OuterJointsCalibrationRoutine:
             after_motion_cb = [self.data_recorder_cb]
 
         trajectory_player = TrajectoryPlayer(
-            self.replay_device, self.outer_yaw_traj, before_motion_loop_cb=[], after_motion_cb=after_motion_cb
+            self.replay_device,
+            self.outer_yaw_traj,
+            before_motion_loop_cb=[],
+            after_motion_cb=after_motion_cb,
         )
         trajectory_player.replay_trajectory(execute_cb=True, delay=self.delay)
 
@@ -63,7 +67,10 @@ class OuterJointsCalibrationRoutine:
             after_motion_cb = [self.data_recorder_cb]
 
         trajectory_player = TrajectoryPlayer(
-            self.replay_device, self.outer_pitch_traj, before_motion_loop_cb=[], after_motion_cb=after_motion_cb
+            self.replay_device,
+            self.outer_pitch_traj,
+            before_motion_loop_cb=[],
+            after_motion_cb=after_motion_cb,
         )
         trajectory_player.replay_trajectory(execute_cb=True, delay=self.delay)
 
@@ -92,7 +99,9 @@ class WristCalibrationRoutine:
     def create_records(self, step_in_traj):
         self.delay = 0.15
         prefix = f"step{step_in_traj:03d}_wrist_motion_"
-        self.pitch_yaw_record_collection = self.RecordCollection(self.root, prefix + "pitch_yaw", self.save)
+        self.pitch_yaw_record_collection = self.RecordCollection(
+            self.root, prefix + "pitch_yaw", self.save
+        )
         self.roll_record_collection = self.RecordCollection(self.root, prefix + "roll", self.save)
 
         init_jp = self.replay_device.measured_jp()
@@ -105,7 +114,10 @@ class WristCalibrationRoutine:
             after_motion_cb = [self.data_recorder_cb]
 
         trajectory_player = TrajectoryPlayer(
-            self.replay_device, self.pitch_yaw_traj, before_motion_loop_cb=[], after_motion_cb=after_motion_cb
+            self.replay_device,
+            self.pitch_yaw_traj,
+            before_motion_loop_cb=[],
+            after_motion_cb=after_motion_cb,
         )
         trajectory_player.replay_trajectory(execute_cb=True, delay=self.delay)
 
@@ -115,7 +127,10 @@ class WristCalibrationRoutine:
             after_motion_cb = [self.data_recorder_cb]
 
         trajectory_player = TrajectoryPlayer(
-            self.replay_device, self.roll_traj, before_motion_loop_cb=[], after_motion_cb=after_motion_cb
+            self.replay_device,
+            self.roll_traj,
+            before_motion_loop_cb=[],
+            after_motion_cb=after_motion_cb,
         )
         trajectory_player.replay_trajectory(execute_cb=True, delay=self.delay)
 
@@ -126,3 +141,49 @@ class WristCalibrationRoutine:
 
         self.pitch_yaw_record_collection = None
         self.roll_record_collection = None
+
+
+@dataclass
+class DhParamCalibrationRoutine:
+    replay_device: ReplayDevice
+    ftk_handler: ftk_500
+    data_recorder_cb: DataRecorder
+    save: bool
+    root: Path
+
+    class FilePrefixes(Enum):
+        J1 = "j1_outer_yaw"
+        J2 = "j2_outer_pitch"
+        J3 = "j3_insertion"
+        J4 = "j2_roll"
+
+    class RecordCollection(RecordCollectionTemplate):
+        def __init__(self, step: int, root: Path, file_preffix: str, save: bool):
+            if save:
+                dir = root / "dh_calibration/{step}"
+                dir.mkdir(exist_ok=True)
+                jp_filename = dir / (file_preffix + "_jp_record.csv")
+                cp_filename = dir / (file_preffix + "_cp_record.csv")
+                super().__init__(jp_filename, cp_filename)
+
+    def __post_init__(self):
+        self.motions_list = [
+            (self.FilePrefixes.J1, DvrkMotions.outer_yaw_trajectory),
+            (self.FilePrefixes.J2, DvrkMotions.outer_pitch_trajectory),
+            (self.FilePrefixes.J3, DvrkMotions.insertion_trajectory),
+            (self.FilePrefixes.J4, DvrkMotions.roll_trajectory),
+        ]
+
+    def __call__(self, index):
+        prefix: self.FilePrefixes
+        for prefix, traj_generator in self.motions_list:
+            init_jp = self.replay_device.measured_jp()
+            collection = self.RecordCollection(index, self.root, prefix.value, self.save)
+            self.data_recorder_cb.record_collection = collection
+
+            TrajectoryPlayer(
+                self.replay_device,
+                traj_generator(init_jp, steps=22),
+                before_motion_loop_cb=[],
+                after_motion_cb=[self.data_recorder_cb],
+            ).replay_trajectory(execute_cb=True, delay=self.delay)
