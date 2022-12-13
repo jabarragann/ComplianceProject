@@ -31,15 +31,15 @@ class DvrkMotions:
 
     @staticmethod
     def generate_insertion_motion(steps: int = 20) -> np.ndarray:
-        min_insertion = None
-        max_insertion = None
+        min_insertion = 0.04804050
+        max_insertion = 0.21778061
         trajectory = np.linspace(min_insertion, max_insertion, num=steps)
         return trajectory
 
     @staticmethod
-    def generate_roll_motion(steps: int = 24) -> np.ndarray:
-        min_pitch = -0.70
-        max_pitch = 0.55
+    def generate_roll_motion(steps: int = 20) -> np.ndarray:
+        min_pitch = -1.2
+        max_pitch = -0.6
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
 
@@ -62,31 +62,25 @@ class DvrkMotions:
     # ------------------------------------------------------------
     @staticmethod
     def outer_yaw_trajectory(init_jp, steps=20):
-        outer_roll = -0.1589
+        outer_roll = -0.7389
         outer_yaw_trajectory = DvrkMotions.generate_outer_yaw_motion(steps)
-        outer_yaw_trajectory = list(
-            product(outer_yaw_trajectory, [0.0], [init_jp[2]], [outer_roll], [0.0], [0.0])
-        )
+        outer_yaw_trajectory = list(product(outer_yaw_trajectory, [0.0], [init_jp[2]], [outer_roll], [0.0], [0.0]))
 
         return np.array(outer_yaw_trajectory)
 
     @staticmethod
     def outer_pitch_trajectory(init_jp, steps=20):
-        outer_roll = -0.1589
+        outer_roll = -0.7389
         outer_pitch_trajectory = DvrkMotions.generate_outer_pitch_motion(steps)
-        outer_pitch_trajectory = list(
-            product([0.0], outer_pitch_trajectory, [init_jp[2]], [outer_roll], [0.0], [0.0])
-        )
+        outer_pitch_trajectory = list(product([0.0], outer_pitch_trajectory, [init_jp[2]], [outer_roll], [0.0], [0.0]))
 
         return np.array(outer_pitch_trajectory)
 
     @staticmethod
     def insertion_trajectory(init_jp, steps=20):
-        outer_roll = -0.1589
+        outer_roll = -0.7389
         insertion_trajectory = DvrkMotions.generate_insertion_motion(steps)
-        insertion_trajectory = list(
-            product([0.0], [0.0], [insertion_trajectory], [outer_roll], [0.0], [0.0])
-        )
+        insertion_trajectory = list(product([0.0], [0.0], insertion_trajectory, [outer_roll], [0.0], [0.0]))
 
         return np.array(insertion_trajectory)
 
@@ -107,7 +101,7 @@ class DvrkMotions:
         pitch_trajectory = DvrkMotions.generate_pitch_motion()
         yaw_trajectory = DvrkMotions.generate_yaw_motion()
         pitch_yaw_traj = []
-        roll_v = [0.2, -0.3]
+        roll_v = [-0.7, -1.1]
         for r in roll_v:
             pitch_yaw_traj += list(product([jp[0]], [jp[1]], [jp[2]], [r], pitch_trajectory, [0.0]))
             pitch_yaw_traj += list(product([jp[0]], [jp[1]], [jp[2]], [r], [0.0], yaw_trajectory))

@@ -142,14 +142,14 @@ class ftk_500:
         marker_pose = records_dict["markers"]
         marker_dropped = records_dict["markers_dropped"]
 
-        mean_frame, mean_value = None, None
+        mean_frame, mean_fiducials_location = None, None
         # self.log.debug(f"collected samples: {len(sensor_vals)}")
         if len(sensor_vals) >= 2:
             # Sanity check - make sure the fiducials are reported in the same order
             sensor_vals = ftk_500.sort_measurements(sensor_vals)
             sensor_vals = np.array(sensor_vals)
             # Get the average position of each detected fiducial
-            mean_value = sensor_vals.squeeze().mean(axis=0)
+            mean_fiducials_location = sensor_vals.squeeze().mean(axis=0)
             std_value = sensor_vals.squeeze().std(axis=0)
             # log.debug(f"mean value:\n{mean_value}")
             # log.debug(f"std value:\n{std_value}")
@@ -162,7 +162,7 @@ class ftk_500:
         else:
             log.warning(f"Marker not found")
 
-        return mean_frame, mean_value
+        return mean_frame, mean_fiducials_location
 
     @staticmethod
     def sort_measurements(measurement_list: List[List[float]]) -> np.ndarray:

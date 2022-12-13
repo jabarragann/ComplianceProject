@@ -55,8 +55,11 @@ class DataRecorder:
             mean_tool_frame, fiducial_positions = self.ftk_handler.obtain_processed_measurement(
                 self.expected_markers, t=500, sample_time=15
             )
-            tool_cp = RosConversion.pykdl_to_myposestamped("tool", mean_tool_frame)
-            fiducial_cp = MyPoseStamped.from_array_of_positions("fiducial", fiducial_positions)
+
+            if mean_tool_frame is not None:
+                tool_cp = RosConversion.pykdl_to_myposestamped("tool", mean_tool_frame)
+            if fiducial_positions is not None:
+                fiducial_cp = MyPoseStamped.from_array_of_positions("fiducial", fiducial_positions)
 
             self.record_collection.add_new_sensor_data(
                 index, setpoint_js, fiducial_cp, [tool_cp], [self.ftk_handler.marker_name]
@@ -95,29 +98,24 @@ if __name__ == "__main__":
 
     home = os.path.expanduser("~")
 
-    root = Path(f"{home}/temp/test_rec/rec06")
+    root = Path(f"{home}/temp/test_rec/rec07")
     # Sensors
-    # ftk_handler = ftk_500("marker_12")
-    ftk_handler = FTKDummy("marker_12")
+    expected_markers = 5
+    ftk_handler = ftk_500("custom_marker_113", expected_markers)
+    # ftk_handler = FTKDummy("custom_marker_113")
 
     # Main recording loop
-    experiment_record_collection = ExperimentRecordCollection(
-        root, mode="calib", description="test calib"
-    )
+    experiment_record_collection = ExperimentRecordCollection(root, mode="calib", description="test calib")
     data_recorder_cb = DataRecorder(
-        arm, experiment_record_collection, ftk_handler, 4, marker_name="test"
+        arm, experiment_record_collection, ftk_handler, expected_markers, marker_name="test"
     )
 
     # Setup calibration callbacks
-    outer_joints_recorder = DataRecorder(arm, None, ftk_handler, 4, "none")
-    outer_js_calib_cb = OuterJointsCalibrationRoutine(
-        arm, ftk_handler, outer_joints_recorder, save=True, root=root
-    )
+    outer_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_markers, "none")
+    outer_js_calib_cb = OuterJointsCalibrationRoutine(arm, ftk_handler, outer_joints_recorder, save=True, root=root)
 
-    wrist_joints_recorder = DataRecorder(arm, None, ftk_handler, 4, "none")
-    wrist_js_calib_cb = WristCalibrationRoutine(
-        arm, ftk_handler, wrist_joints_recorder, save=True, root=root
-    )
+    wrist_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_markers, "none")
+    wrist_js_calib_cb = WristCalibrationRoutine(arm, ftk_handler, wrist_joints_recorder, save=True, root=root)
 
     trajectory_player = TrajectoryPlayer(
         arm,
@@ -126,9 +124,7 @@ if __name__ == "__main__":
         after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
     )
 
-    ans = input(
-        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
-    )
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
         trajectory_player.replay_trajectory(delay=0.005)
 

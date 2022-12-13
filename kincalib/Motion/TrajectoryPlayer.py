@@ -111,9 +111,7 @@ class Trajectory:
         log.info("Trajectory report:")
         # report out of order setpoints
         if self.out_of_order_counter > 0:
-            self.log.info(
-                "-- Found and removed %i out of order setpoints" % (self.out_of_order_counter)
-            )
+            self.log.info("-- Found and removed %i out of order setpoints" % (self.out_of_order_counter))
 
         # convert to mm
         bbmin = self.bbmin * 1000.0
@@ -124,15 +122,11 @@ class Trajectory:
         )
 
         # compute duration
-        duration = (
-            self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
-        )
+        duration = self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
         self.log.info("-- Duration of trajectory: %f seconds" % (duration))
 
         # Number of poses
-        self.log.info(
-            "-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t)
-        )
+        self.log.info("-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t))
         if len(self.setpoints) == 0:
             self.log.error("-- No trajectory found!")
 
@@ -155,9 +149,7 @@ class Trajectory:
         return int(len(self.setpoints) / self.sampling_factor)
 
     @classmethod
-    def from_ros_bag(
-        cls, rosbag_handle: RosbagUtils, namespace="PSM2", sampling_factor: int = 1
-    ) -> Trajectory:
+    def from_ros_bag(cls, rosbag_handle: RosbagUtils, namespace="PSM2", sampling_factor: int = 1) -> Trajectory:
         bbmin = np.zeros(3)
         bbmax = np.zeros(3)
         last_message_time = 0.0
@@ -245,7 +237,7 @@ class RandomJointTrajectory(Trajectory):
         q1_range = np.array([-0.60, 0.70])
         q2_range = np.array([-0.49, 0.47])
         q3_range = np.array([0.13, 0.22])
-        q4_range = np.array([-0.35, 1.0])
+        q4_range = np.array([-1.25, 0.0])
         q5_range = np.array([-1.34, 1.34])
         q6_range = np.array([-1.34, 1.34])
 
@@ -323,12 +315,14 @@ if __name__ == "__main__":
 
     init_jp = arm.measured_jp()
 
-    # rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_03_test_cropped.bag")
+    # Rosbag trajectory
+    # rosbag_path = Path("data/psm2_trajectories/pitch_exp_traj_01_test_cropped.bag")
     # rosbag_handle = RosbagUtils(rosbag_path)
     # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
+
     # trajectory = RandomJointTrajectory.generate_trajectory(50)
-    # trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
-    trajectory = DvrkMotions.insertion_trajectory(init_jp, steps=20)
+    trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
+    # trajectory = Trajectory.from_numpy(DvrkMotions.insertion_trajectory(init_jp, steps=20))
 
     log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
@@ -336,9 +330,7 @@ if __name__ == "__main__":
 
     trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[])
 
-    ans = input(
-        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
-    )
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True)
     else:
