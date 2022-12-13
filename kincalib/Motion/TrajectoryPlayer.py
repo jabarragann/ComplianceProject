@@ -61,6 +61,10 @@ class TrajectoryPlayer:
         self.before_motion_loop_cb = before_motion_loop_cb
 
     def replay_trajectory(self, execute_cb: bool = True, delay=0.01):
+        """
+        TODO: improve the display messages.
+        When having multiple trajectories nested is not clear the step of the outer traj.
+        """
 
         start_time = time.time()
 

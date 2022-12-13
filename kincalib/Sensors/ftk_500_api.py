@@ -119,6 +119,8 @@ class ftk_500:
     def obtain_processed_measurement(self, m: int, t: float = 1000, sample_time: float = 50) -> dict:
         """_summary_
 
+        TODO: Clean processed_measurements
+
         Parameters
         ----------
         m : int
@@ -209,15 +211,6 @@ class ftk_500:
             sorted_records.append(sorted_record)
 
         return np.array(sorted_records)
-
-        """[summary]
-
-        Args:
-            pose_arr (List[PyKDL.Frame]): [description]
-
-        Returns:
-            Tuple[np.ndarray,np.ndarray,np.ndarray]: mean_frame, position_std, orientation_std
-        """
 
     @staticmethod
     def average_marker_pose(
