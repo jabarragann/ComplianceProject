@@ -64,8 +64,8 @@ def main():
         root.mkdir(parents=True)
         log.info(f"creating root: {root}")
 
-    expected_spheres = 4
-    marker_name = "custom_marker_112"
+    expected_spheres = 5
+    marker_name = "custom_marker_113"
     arm_namespace = "PSM2"
     testid = args.testid if args.mode == "test" else 0
     sampling_factor = 20 if args.mode == "test" else 60
@@ -89,9 +89,7 @@ def main():
         if args.traj_type == "random":
             trajectory = RandomJointTrajectory.generate_trajectory(random_size)
         else:
-            trajectory = SoftRandomJointTrajectory.generate_trajectory(
-                random_size, samples_per_step=20
-            )
+            trajectory = SoftRandomJointTrajectory.generate_trajectory(random_size, samples_per_step=20)
 
     log.info(f"Trajectory size {len(trajectory)}")
 
@@ -115,22 +113,14 @@ def main():
     # Config recording loops
     # ------------------------------------------------------------
     # Main recording loop
-    experiment_record_collection = ExperimentRecordCollection(
-        root, mode=args.mode, description=args.description
-    )
-    data_recorder_cb = DataRecorder(
-        arm, experiment_record_collection, ftk_handler, expected_spheres, marker_name
-    )
+    experiment_record_collection = ExperimentRecordCollection(root, mode=args.mode, description=args.description)
+    data_recorder_cb = DataRecorder(arm, experiment_record_collection, ftk_handler, expected_spheres, marker_name)
     # Setup calibration callbacks
     outer_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_spheres, marker_name)
-    outer_js_calib_cb = OuterJointsCalibrationRoutine(
-        arm, ftk_handler, outer_joints_recorder, save=True, root=root
-    )
+    outer_js_calib_cb = OuterJointsCalibrationRoutine(arm, ftk_handler, outer_joints_recorder, save=True, root=root)
 
     wrist_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_spheres, marker_name)
-    wrist_js_calib_cb = WristCalibrationRoutine(
-        arm, ftk_handler, wrist_joints_recorder, save=True, root=root
-    )
+    wrist_js_calib_cb = WristCalibrationRoutine(arm, ftk_handler, wrist_joints_recorder, save=True, root=root)
 
     if args.mode == "test":
         trajectory_player = TrajectoryPlayer(
@@ -143,7 +133,7 @@ def main():
         trajectory_player = TrajectoryPlayer(
             arm,
             trajectory,
-            before_motion_loop_cb=[outer_js_calib_cb],
+            before_motion_loop_cb=[],
             after_motion_cb=[data_recorder_cb, wrist_js_calib_cb],
         )
 
@@ -159,9 +149,7 @@ def main():
     log.info(f"Test id:           {testid} ")
     log.info(f"Description:       {args.description}")
 
-    ans = input(
-        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
-    )
+    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True)
     else:
