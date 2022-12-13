@@ -113,7 +113,9 @@ def main():
     # Config recording loops
     # ------------------------------------------------------------
     # Main recording loop
-    experiment_record_collection = ExperimentRecordCollection(root, mode=args.mode, description=args.description)
+    experiment_record_collection = ExperimentRecordCollection(
+        root, mode=args.mode, description=args.description, test_id=testid
+    )
     data_recorder_cb = DataRecorder(arm, experiment_record_collection, ftk_handler, expected_spheres, marker_name)
     # Setup calibration callbacks
     outer_joints_recorder = DataRecorder(arm, None, ftk_handler, expected_spheres, marker_name)

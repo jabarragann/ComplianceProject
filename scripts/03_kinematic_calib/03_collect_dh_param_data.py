@@ -88,7 +88,8 @@ def main():
 
     ans = input('Press "y" to start data collection trajectory. Ensure gripper is outsite the cannula. ')
     if ans == "y":
-        dh_param_routine_cb(testid)
+        for i in range(10):
+            dh_param_routine_cb(testid + i)
     else:
         exit(0)
 

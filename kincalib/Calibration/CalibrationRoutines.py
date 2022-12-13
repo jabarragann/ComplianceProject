@@ -154,7 +154,7 @@ class DhParamCalibrationRoutine:
         J1 = "j1_outer_yaw"
         J2 = "j2_outer_pitch"
         J3 = "j3_insertion"
-        J4 = "j2_roll"
+        J4 = "j4_roll"
 
     class RecordCollection(RecordCollectionTemplate):
         def __init__(self, step: int, root: Path, file_preffix: str, save: bool):
