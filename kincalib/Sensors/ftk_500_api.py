@@ -148,9 +148,21 @@ class ftk_500:
             # Sanity check - make sure the fiducials are reported in the same order
             sensor_vals = ftk_500.sort_measurements(sensor_vals)
             sensor_vals = np.array(sensor_vals)
+
             # Get the average position of each detected fiducial
             mean_fiducials_location = sensor_vals.squeeze().mean(axis=0)
             std_value = sensor_vals.squeeze().std(axis=0)
+
+            # Filter far away values
+            rows_to_erase = []
+            for idx in range(mean_fiducials_location.shape[0]):
+                if mean_fiducials_location[idx, 2] < 0.900 or mean_fiducials_location[idx, 2] > 1.700:
+                    rows_to_erase.append(idx)
+            if len(rows_to_erase) > 0:
+                print(rows_to_erase)
+                print(f"removing {mean_fiducials_location[rows_to_erase,:]}")
+                mean_fiducials_location = np.delete(mean_fiducials_location, rows_to_erase, 0)
+
             # log.debug(f"mean value:\n{mean_value}")
             # log.debug(f"std value:\n{std_value}")
         else:
