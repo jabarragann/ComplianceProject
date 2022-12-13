@@ -7,7 +7,7 @@ from typing import Any, List
 from kincalib.Entities.Msgs import MyJointState, MyPoseStamped
 
 # ros
-from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory
+from kincalib.Motion.TrajectoryPlayer import RandomJointTrajectory, SoftRandomJointTrajectory
 
 # Custom
 from kincalib.Recording.RecordCollections import RecordCollectionTemplate
@@ -42,7 +42,7 @@ class DataRecorder:
 
         # quickly check the sensor to see if tool and fiducial are observable
         marker_pose, fiducials_pose = self.ftk_handler.obtain_processed_measurement(
-            self.expected_markers, t=100, sample_time=15
+            self.expected_markers, t=100, sample_time=10
         )
 
         # Get robot data
@@ -53,17 +53,14 @@ class DataRecorder:
 
         if marker_pose is not None:
             mean_tool_frame, fiducial_positions = self.ftk_handler.obtain_processed_measurement(
-                self.expected_markers, t=500, sample_time=15
+                self.expected_markers, t=500, sample_time=10
             )
-
             if mean_tool_frame is not None:
                 tool_cp = RosConversion.pykdl_to_myposestamped("tool", mean_tool_frame)
+                self.record_collection.add_tools_poses(index, setpoint_js, [tool_cp], [self.ftk_handler.marker_name])
             if fiducial_positions is not None:
                 fiducial_cp = MyPoseStamped.from_array_of_positions("fiducial", fiducial_positions)
-
-            self.record_collection.add_new_sensor_data(
-                index, setpoint_js, fiducial_cp, [tool_cp], [self.ftk_handler.marker_name]
-            )
+                self.record_collection.add_fiducials_poses(index, setpoint_js, fiducial_cp)
 
     def save_data(self):
         self.record_collection.save_data()
@@ -85,7 +82,8 @@ if __name__ == "__main__":
     # rosbag_handle = RosbagUtils(rosbag_path)
     # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=60)
 
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(50, samples_per_step=20)
+    # trajectory = SoftRandomJointTrajectory.generate_trajectory(50, samples_per_step=20)
+    trajectory = RandomJointTrajectory.generate_trajectory(50)
 
     log.info(f"Initial pt {trajectory.setpoints[0].position}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")

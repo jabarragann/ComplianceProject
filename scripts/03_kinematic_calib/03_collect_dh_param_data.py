@@ -50,11 +50,11 @@ def main():
         root.mkdir(parents=True)
         log.info(f"creating root: {root}")
 
-    expected_spheres = 4
-    marker_name = "custom_marker_112"
+    expected_spheres = 5
+    marker_name = "custom_marker_113"
     arm_namespace = "PSM2"
-    testid = args.testid if args.mode == "test" else 0
-    sampling_factor = 20 if args.mode == "test" else 60
+    testid = args.testid
+
     rospy.init_node("dvrk_bag_replay", anonymous=True)
 
     # ------------------------------------------------------------
@@ -70,8 +70,6 @@ def main():
     if not arm.home(10):
         sys.exit("-- Failed to home within 10 seconds")
 
-    input('---> Make sure arm is ready to move. Press "Enter" to move to start position')
-
     # arm.move_jp(np.array(trajectory[0].position)).wait()
 
     # ------------------------------------------------------------
@@ -79,26 +77,18 @@ def main():
     # ------------------------------------------------------------
     # Setup calibration callbacks
     dh_param_recorder = DataRecorder(arm, None, ftk_handler, expected_spheres, marker_name)
-    dh_param_routine_cb = DhParamCalibrationRoutine(
-        arm, ftk_handler, dh_param_recorder, save=True, root=root
-    )
+    dh_param_routine_cb = DhParamCalibrationRoutine(arm, ftk_handler, dh_param_recorder, save=True, root=root)
 
     # Execute
     log.info("Collection information")
     log.info(f"Data root dir:     {args.root}")
-    log.info(f"Trajectory name:   {args.rosbag}")
     log.info(f"Save data:         {args.save}")
-    if args.rosbag is None:
-        log.info(f"Random Trajectory: {args.traj_type}")
-    log.info(f"Mode:              {args.mode} ")
     log.info(f"Test id:           {testid} ")
     log.info(f"Description:       {args.description}")
 
-    ans = input(
-        'Press "y" to start data collection trajectory. Ensure gripper is outsite the cannula. '
-    )
+    ans = input('Press "y" to start data collection trajectory. Ensure gripper is outsite the cannula. ')
     if ans == "y":
-        dh_param_routine_cb(args.test_id)
+        dh_param_routine_cb(testid)
     else:
         exit(0)
 

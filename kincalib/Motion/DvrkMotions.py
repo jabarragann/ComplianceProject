@@ -38,7 +38,7 @@ class DvrkMotions:
 
     @staticmethod
     def generate_roll_motion(steps: int = 20) -> np.ndarray:
-        min_pitch = -1.2
+        min_pitch = -1.6
         max_pitch = -0.6
         trajectory = np.linspace(min_pitch, max_pitch, num=steps)
         return trajectory
@@ -85,7 +85,7 @@ class DvrkMotions:
         return np.array(insertion_trajectory)
 
     @staticmethod
-    def roll_trajectory(init_jp):
+    def roll_trajectory(init_jp, steps=20):
         jp = init_jp
         roll_traj = DvrkMotions.generate_roll_motion()
         roll_traj = list(product([jp[0]], [jp[1]], [jp[2]], roll_traj, [0], [0]))

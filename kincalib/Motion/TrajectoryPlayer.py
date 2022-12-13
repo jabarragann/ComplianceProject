@@ -237,7 +237,7 @@ class RandomJointTrajectory(Trajectory):
         q1_range = np.array([-0.60, 0.70])
         q2_range = np.array([-0.49, 0.47])
         q3_range = np.array([0.13, 0.22])
-        q4_range = np.array([-1.25, 0.0])
+        q4_range = np.array([-1.5, 0.0])
         q5_range = np.array([-1.34, 1.34])
         q6_range = np.array([-1.34, 1.34])
 
@@ -321,8 +321,9 @@ if __name__ == "__main__":
     # trajectory = Trajectory.from_ros_bag(rosbag_handle, sampling_factor=80)
 
     # trajectory = RandomJointTrajectory.generate_trajectory(50)
-    trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
+    # trajectory = SoftRandomJointTrajectory.generate_trajectory(100, samples_per_step=28)
     # trajectory = Trajectory.from_numpy(DvrkMotions.insertion_trajectory(init_jp, steps=20))
+    trajectory = Trajectory.from_numpy(DvrkMotions.roll_trajectory(init_jp, steps=20))
 
     log.info(f"Initial pt {np.array(trajectory.setpoints[0].position)}")
     log.info(f"Starting ts {trajectory.setpoints[0].header.stamp.to_sec()}")
@@ -332,6 +333,6 @@ if __name__ == "__main__":
 
     ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
     if ans == "y":
-        trajectory_player.replay_trajectory(execute_cb=True)
+        trajectory_player.replay_trajectory(execute_cb=True, delay=0.15)
     else:
         exit(0)

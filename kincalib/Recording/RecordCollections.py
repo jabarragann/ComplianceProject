@@ -16,22 +16,21 @@ class RecordCollectionTemplate:
         self.joint_record = JointRecord(jp_filename)
         self.pose_record = CartesianRecord(cp_filename)
 
-    def add_new_robot_data(
-        self, step, measured_js: MyJointState, setpoint_js: MyJointState, robot_cp: MyPoseStamped
-    ):
+    def add_new_robot_data(self, step, measured_js: MyJointState, setpoint_js: MyJointState, robot_cp: MyPoseStamped):
         self.joint_record.create_new_entry(step, measured_js, setpoint_js)
         self.pose_record.create_new_entry(step, "robot", "-1", robot_cp, setpoint_js)
 
-    def add_new_sensor_data(
+    def add_fiducials_poses(self, step, setpoint_js: MyJointState, fiducials_cp: List[MyPoseStamped]):
+        for fid_cp in fiducials_cp:
+            self.pose_record.create_new_entry(step, "fiducial", "-1", fid_cp, setpoint_js)
+
+    def add_tools_poses(
         self,
         step,
         setpoint_js: MyJointState,
-        fiducials_cp: List[MyPoseStamped],
         tools_cp: List[MyPoseStamped],
         tools_id_list: List[str],
     ):
-        for fid_cp in fiducials_cp:
-            self.pose_record.create_new_entry(step, "fiducial", "-1", fid_cp, setpoint_js)
         for tool_cp, id in zip(tools_cp, tools_id_list):
             self.pose_record.create_new_entry(step, "tool", id, tool_cp, setpoint_js)
 
@@ -82,9 +81,7 @@ class ExperimentRecordCollection(RecordCollectionTemplate):
             jp_filename = self.test_files / ("robot_jp.csv")
 
         if cp_filename.exists() or jp_filename.exists():
-            n = input(
-                f"Data was found in directory {cp_filename.parent}. Press (y/Y) to overwrite. "
-            )
+            n = input(f"Data was found in directory {cp_filename.parent}. Press (y/Y) to overwrite. ")
             if not (n == "y" or n == "Y"):
                 log.info("exiting the script")
                 exit(0)

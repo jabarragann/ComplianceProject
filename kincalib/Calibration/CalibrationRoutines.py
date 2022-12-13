@@ -5,7 +5,7 @@ from enum import Enum
 # Python
 from pathlib import Path
 from re import I
-from typing import Any, List
+from typing import Any, Callable, List
 
 # ros
 from kincalib.Motion.TrajectoryPlayer import SoftRandomJointTrajectory, Trajectory, TrajectoryPlayer
@@ -99,9 +99,7 @@ class WristCalibrationRoutine:
     def create_records(self, step_in_traj):
         self.delay = 0.15
         prefix = f"step{step_in_traj:03d}_wrist_motion_"
-        self.pitch_yaw_record_collection = self.RecordCollection(
-            self.root, prefix + "pitch_yaw", self.save
-        )
+        self.pitch_yaw_record_collection = self.RecordCollection(self.root, prefix + "pitch_yaw", self.save)
         self.roll_record_collection = self.RecordCollection(self.root, prefix + "roll", self.save)
 
         init_jp = self.replay_device.measured_jp()
@@ -150,6 +148,7 @@ class DhParamCalibrationRoutine:
     data_recorder_cb: DataRecorder
     save: bool
     root: Path
+    delay: float = 0.15
 
     class FilePrefixes(Enum):
         J1 = "j1_outer_yaw"
@@ -160,8 +159,8 @@ class DhParamCalibrationRoutine:
     class RecordCollection(RecordCollectionTemplate):
         def __init__(self, step: int, root: Path, file_preffix: str, save: bool):
             if save:
-                dir = root / "dh_calibration/{step}"
-                dir.mkdir(exist_ok=True)
+                dir = root / f"dh_calibration/{step:03d}"
+                dir.mkdir(parents=True, exist_ok=True)
                 jp_filename = dir / (file_preffix + "_jp_record.csv")
                 cp_filename = dir / (file_preffix + "_cp_record.csv")
                 super().__init__(jp_filename, cp_filename)
@@ -176,14 +175,16 @@ class DhParamCalibrationRoutine:
 
     def __call__(self, index):
         prefix: self.FilePrefixes
+        traj_generator: Callable
         for prefix, traj_generator in self.motions_list:
             init_jp = self.replay_device.measured_jp()
             collection = self.RecordCollection(index, self.root, prefix.value, self.save)
             self.data_recorder_cb.record_collection = collection
 
+            traj = Trajectory.from_numpy(traj_generator(init_jp, steps=22))
             TrajectoryPlayer(
                 self.replay_device,
-                traj_generator(init_jp, steps=22),
+                traj,
                 before_motion_loop_cb=[],
                 after_motion_cb=[self.data_recorder_cb],
             ).replay_trajectory(execute_cb=True, delay=self.delay)
