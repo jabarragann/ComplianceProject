@@ -32,9 +32,9 @@ def load_registration_data(root: Path) -> dict:
     dict_files = defaultdict(dict)  # Use step as keys. Each entry has a pitch and roll file.
     for f in (root / "pitch_roll_mov").glob("*"):
         step = int(re.findall("step[0-9]+", f.name)[0][4:])  # Not very reliable
-        if "pitch" in f.name:
+        if "pitch" in f.name and "cp" in f.name:
             dict_files[step]["pitch"] = pd.read_csv(f)
-        elif "roll" in f.name:
+        elif "roll" in f.name and "cp" in f.name:
             dict_files[step]["roll"] = pd.read_csv(f)
 
     return dict_files

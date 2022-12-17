@@ -10,8 +10,9 @@ from itertools import combinations
 
 
 def markerfile2triangles(filename: Path) -> List[Triangle3D]:
-    """Given a json file a marker return a list of 3D triangles. If marker contains 3 spheres it will return only 1 triangle.
-        If marker contains 4 spheres, it will return 4 triangles.
+    """Given a json file a marker return a list of 3D triangles. If marker contains 3 spheres it
+       will return only 1 triangle.
+    If marker contains 4 spheres, it will return 4 triangles.
 
     Args:
         filename (Path): [description]

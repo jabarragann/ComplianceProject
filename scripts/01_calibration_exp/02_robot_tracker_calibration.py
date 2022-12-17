@@ -172,6 +172,8 @@ class RobotTrackerCalibration:
         # Robot points
         # df with columns = [step,px,py,pz]
         robot_jp = root / "robot_mov" / "robot_jp.txt"
+        if not robot_jp.exists():
+            robot_jp = robot_jp.with_suffix(".csv")
         robot_jp = pd.read_csv(robot_jp)
         pitch_robot = RobotTrackerCalibration.pitch_orig_in_robot(robot_jp)
 

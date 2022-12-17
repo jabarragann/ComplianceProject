@@ -33,7 +33,7 @@ from kincalib.Entities.Frame import Frame
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 
-marker_file = Path("./share/custom_marker_id_112.json")
+marker_file = Path("./share/custom_marker_id_113.json")
 from kincalib.utils.Logger import Logger
 
 log = Logger(__name__).log
@@ -272,12 +272,16 @@ class JointEstimator:
 
 class CalibrationUtils:
     def create_roll_circles(roll_df) -> List[Circle3D]:
+        """
+        TODO: This function will now work only with the new format. Need to find away to
+        read new and old data.
+        """
         df = roll_df
-        roll = df.q4.unique()
+        roll = df["set_q4"].unique()
         marker_orig_arr = []  # shaft marker
         fid_arr = []  # Wrist fiducial
         for r in roll:
-            df_temp = df.loc[df["q4"] == r]
+            df_temp = df.loc[df["set_q4"] == r]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
             if len(pose_arr) > 0 and len(wrist_fiducials) > 0:
                 marker_orig_arr.append(list(pose_arr[0].p))
@@ -291,9 +295,14 @@ class CalibrationUtils:
         return roll_cir1, roll_cir2
 
     def create_yaw_pitch_circles(py_df) -> List[Circle3D]:
+        """
+        TODO: This function will now work only with the new format. Need to find away to
+        read new and old data.
+        """
+
         df = py_df
         # roll values
-        roll = df.q4.unique()
+        roll = df["set_q4"].unique()
 
         if len(roll) < 2:
             raise Exception("Not enough roll values for the 2 pitch circle calculations")
@@ -303,7 +312,7 @@ class CalibrationUtils:
         pitch_yaw_circles_dict = defaultdict(dict)
         for idx, r in enumerate(roll):
             # Calculate mean marker pose
-            df_temp = df.loc[(df["q4"] == r)]
+            df_temp = df.loc[(df["set_q4"] == r)]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
             if len(pose_arr) > 0:
                 mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)
@@ -311,13 +320,13 @@ class CalibrationUtils:
             else:
                 raise Exception("No marker pose found")
             # Calculate pitch circle
-            df_temp = df.loc[(df["q4"] == r) & (df["q6"] == 0.0)]
+            df_temp = df.loc[(df["set_q4"] == r) & (df["set_q6"] == 0.0)]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
             pitch_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
             pitch_yaw_circles_dict[idx]["pitch"] = pitch_cir
 
             # Calculate yaw circle
-            df_temp = df.loc[(df["q4"] == r) & (df["q5"] == 0.0)]
+            df_temp = df.loc[(df["set_q4"] == r) & (df["set_q5"] == 0.0)]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
             yaw_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
             pitch_yaw_circles_dict[idx]["yaw"] = yaw_cir
