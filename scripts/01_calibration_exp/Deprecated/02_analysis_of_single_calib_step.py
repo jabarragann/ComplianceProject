@@ -40,7 +40,7 @@ from kincalib.Geometry.geometry import (
 )
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 

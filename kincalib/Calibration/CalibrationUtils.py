@@ -29,7 +29,7 @@ from kincalib.utils.ExperimentUtils import (
     calculate_midpoints,
     separate_markerandfiducial,
 )
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 

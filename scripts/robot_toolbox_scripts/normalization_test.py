@@ -3,9 +3,9 @@ from roboticstoolbox.robot import DHRobot
 from numpy import pi
 import numpy as np
 from spatialmath import SE3
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 from spatialmath.base import trnorm
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 
 # OPEN an issue asking why the I need to renormalize my matrix twice in a row? This only happens when I use
 # my frame class.

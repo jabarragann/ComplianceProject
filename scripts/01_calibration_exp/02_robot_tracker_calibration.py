@@ -12,7 +12,7 @@ from rich.progress import track
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 # kincalib module imports
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 from kincalib.utils.Logger import Logger
 from kincalib.utils.ExperimentUtils import load_registration_data
 from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D, dist_circle3_plane

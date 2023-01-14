@@ -17,7 +17,7 @@ from kincalib.Calibration.CalibrationUtils import CalibrationUtils, JointEstimat
 from kincalib.Learning.InferencePipeline import InferencePipeline
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 from kincalib.utils.Logger import Logger
 
 log = Logger(__name__).log

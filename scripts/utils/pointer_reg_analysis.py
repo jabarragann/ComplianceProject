@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from PyKDL import Vector
 from kincalib.utils.CmnUtils import mean_std_str, mean_std_str_vect
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 from kincalib.utils.Logger import Logger
 from kincalib.utils.PyKDL2Dataframe import Series2PyKDLFrame
 

@@ -21,7 +21,7 @@ from sklearn.metrics import log_loss
 
 # ROS and DVRK imports
 import dvrk
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 import rospy
 
 # kincalib module imports

@@ -6,7 +6,7 @@ from kincalib.utils.CmnUtils import mean_std_str
 import numpy as np
 import matplotlib.pyplot as plt
 
-from kincalib.Entities.Frame import Frame
+from kincalib.Transforms.Frame import Frame
 from kincalib.utils.Logger import Logger
 
 log = Logger(__name__).log
