@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 import pandas as pd
 from abc import ABC, abstractclassmethod
@@ -10,6 +11,7 @@ from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.Entities.Msgs import MyJointState, MyPoseStamped
 
 log = Logger(__name__).log
+
 
 class Record(ABC):
     def __init__(self, df_cols, filename: Path) -> None:
@@ -48,7 +50,7 @@ class Record(ABC):
 
 
 class CartesianRecord(Record):
-    """ Header format
+    """Header format
 
     step: step in the trajectory
     set_qi:   Setpoint joint position
@@ -59,6 +61,7 @@ class CartesianRecord(Record):
 
     """
 
+    object_types = ("tool", "fiducial", "robot")
     df_setpoint_cols = ["set_q1", "set_q2", "set_q3", "set_q4", "set_q5", "set_q6"]
     df_info_cols = ["m_t", "m_id"]
     df_position_cols = ["px", "py", "pz"]
@@ -69,7 +72,13 @@ class CartesianRecord(Record):
     def __init__(self, filename: Path):
         super().__init__(CartesianRecord.df_cols, filename)
 
-    def create_new_entry(self, idx, obj_type: str, obj_id: str, measured_cp: MyPoseStamped, setpoint_jp: MyJointState):
+    def create_new_entry(
+        self, idx, obj_type: str, obj_id: str, measured_cp: MyPoseStamped, setpoint_jp: MyJointState
+    ):
+
+        if obj_type not in self.object_types:
+            raise ValueError(f"object type should be on of {self.object_types}")
+
         data = (
             [idx]
             + setpoint_jp.position.tolist()
@@ -101,7 +110,12 @@ class JointRecord(Record):
         super().__init__(JointRecord.df_cols, filename)
 
     def create_new_entry(self, idx, measure_jp: MyJointState, setpoint_jp: MyJointState):
-        data = [idx] + measure_jp.position.tolist() + measure_jp.effort.tolist() + setpoint_jp.position.tolist()
+        data = (
+            [idx]
+            + measure_jp.position.tolist()
+            + measure_jp.effort.tolist()
+            + setpoint_jp.position.tolist()
+        )
         data = np.array(data).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(data, columns=self.df_cols)
 
