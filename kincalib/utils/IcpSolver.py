@@ -62,7 +62,7 @@ def nearest_neighbor(src, dst):
         indices: dst indices of the nearest neighbor
     """
 
-    assert src.shape == dst.shape
+    # assert src.shape == dst.shape
 
     neigh = NearestNeighbors(n_neighbors=1)
     neigh.fit(dst)
@@ -85,7 +85,7 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         i: number of iterations to converge
     """
 
-    assert A.shape == B.shape
+    # assert A.shape == B.shape
 
     # get number of dimensions
     m = A.shape[1]
@@ -122,3 +122,48 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
     T, _, _ = best_fit_transform(A, src[:m, :].T)
 
     return T, distances, i
+
+
+if __name__ == "__main__":
+    from kincalib.Geometry.Plotter import Plotter3D
+    from kincalib.Transforms.Rotation import Rotation3D
+
+    np.random.seed(1)
+
+    plotter = Plotter3D()
+    N = 6
+
+    # Create random transformation
+    rot_ax = np.random.random(3)
+    rot_ax = rot_ax / np.linalg.norm(rot_ax)
+    theta = np.random.uniform(-np.pi, np.pi)
+    rotation = Rotation3D.from_rodrigues(theta * rot_ax)
+    print(f"theta {theta}")
+
+    # Create random point cloud
+    pt_A = np.random.random((3, N))
+    pt_B = rotation.R @ pt_A
+
+    # Randomize the order
+    permutation = np.random.permutation(N)
+    pt_B_new = pt_B[:, permutation]
+
+    # Calculate centroids
+    A_cent = pt_A.mean(axis=1)
+    B_cent = pt_B_new.mean(axis=1)
+    print(f"A centroid {A_cent}")
+    print(f"B centroid {B_cent}")
+
+    pt_A = pt_A - A_cent.reshape(3, 1)
+    pt_B_new = pt_B_new - B_cent.reshape(3, 1)
+
+    # Test ICP
+    plotter.scatter_3d(pt_A, label="A")
+    plotter.scatter_3d(pt_B_new, label="B")
+    plotter.plot()
+
+    T, d, I = icp(pt_A[:, :].T, pt_B_new.T)
+
+    print(T[:3, :3] - rotation)
+    print(I)
+    print(d)
