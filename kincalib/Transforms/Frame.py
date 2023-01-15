@@ -84,6 +84,10 @@ class Frame:
             raise TypeError
 
     @classmethod
+    def from_rotvec_and_position(cls, rot_vec: np.ndarray, pos_vec: np.ndarray) -> Frame:
+        return Frame(Rotation3D.from_rodrigues(rot_vec), pos_vec)
+
+    @classmethod
     def find_transformation_direct(cls: Type[Frame], A: np.ndarray, B: np.ndarray) -> Frame:
         """Given two point clouds, `A` and `B`, find the transformation matrix between them.
         Estimate both the rotation and position vectors of the transformation.
