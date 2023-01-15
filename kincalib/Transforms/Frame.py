@@ -5,26 +5,29 @@ from numpy.linalg import norm, svd, det
 import numpy as np
 from kincalib.utils.Logger import Logger
 import logging
+from kincalib.Transforms.Rotation import Rotation3D
 
 log = Logger(__name__).log
 
 
 class Frame:
-    def __init__(self, r: np.ndarray, p: np.ndarray, normalization_warning=False) -> None:
+    def __init__(
+        self, r: Union[np.ndarray, Rotation3D], p: np.ndarray, normalization_warning=False
+    ) -> None:
         """Create a frame with rotation `r` and translation `p`.
         Args:
             r (np.ndarray): Rotation.
             p (np.ndarray): translation.
         """
-        self.r = np.array(r)
+        self.r = Rotation3D(np.array(r))
 
-        if not self.is_rotation(r):
-            if normalization_warning:
-                log.warning(
-                    f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
-                )
-                log.warning(f"Renormalizing to a proper rotation matrix")
-            self.r = self.closest_to_rotation(r)
+        # if not self.is_rotation(r):
+        #     if normalization_warning:
+        #         log.warning(
+        #             f"Rotation matrix provided has not a determinant of 1\n{r}\ndet:{det(r):0.4f}"
+        #         )
+        #         log.warning(f"Renormalizing to a proper rotation matrix")
+        #     self.r = self.closest_to_rotation(r)
 
         self.p = np.array(p).reshape((3, 1))
 
@@ -74,7 +77,6 @@ class Frame:
                 assert (
                     other.shape[0] == 3
                 ), "Dimension error, points array should have a shape (3,N), where `N` is the number points."
-
             return (self.r @ other) + self.p
         elif isinstance(other, Frame):
             return Frame(self.r @ other.r, self.r @ other.p + self.p)

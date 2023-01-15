@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 
 _eps = np.finfo(np.float64).eps
@@ -21,11 +22,25 @@ class Rotation3D:
             )
         self._R = rot
 
+    @property
+    def T(self) -> Rotation3D:
+        """Transpose the rotation"""
+        return Rotation3D(self.R.T)
+
     def __str__(self) -> str:
-        return np.array2string(self._R, precision=4, sign=" ", suppress_small=True)
+        return np.array2string(self.R, precision=4, sign=" ", suppress_small=True)
+
+    def __array__(self):
+        return self.R
+
+    def __matmul__(self, other: Rotation3D) -> Rotation3D:
+        if not isinstance(other, Rotation3D):
+            raise ValueError("Required a 3D rotation")
+
+        return Rotation3D(self.R @ other.R)
 
     @classmethod
-    def from_rodrigues(cls, rot_vec: np.ndarray):
+    def from_rodrigues(cls, rot_vec: np.ndarray) -> Rotation3D:
         """Rotation about axis direction. The rotation angle is given by the norm of axis.
 
         See scipy rotation vectors
@@ -114,8 +129,20 @@ if __name__ == "__main__":
     print("Rodrigues")
     ax = np.array([0.0, 0.0, 0.5])
     R1 = Rotation3D.from_rodrigues(ax)
+    ax = np.array([0.5, 0.0, 0.5])
+    R2 = Rotation3D.from_rodrigues(ax)
     print(R1)
 
-    print("Failing....")
+    print("convert to numpy array")
+    print(np.array(R1))
+
+    print("Rotation multiplication")
+    print(R1.T @ R2.T @ R2 @ R1)
+
+    print("Failing rotation....")
     arr = np.ones((3, 3))
-    R = Rotation3D(arr)
+    try:
+        print(arr)
+        R = Rotation3D(arr)
+    except ValueError as e:
+        print(f"Error: {e}")
