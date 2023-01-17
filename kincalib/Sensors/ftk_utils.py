@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +8,93 @@ from kincalib.Geometry.geometry import Triangle3D
 import json
 from typing import List
 from itertools import combinations
+
+from dataclasses import dataclass
+
+
+@dataclass
+class DynamicReferenceFrame:
+    """Reference frame representation based on the segments between fiducials
+
+    see: Design and validation of an open-source library of dynamic reference
+    frames for research and education in optical tracking
+
+    """
+
+    tool_def: np.ndarray
+    n_fiducials: int
+
+    @dataclass
+    class Segment:
+        idx1: int
+        idx2: int
+        pt1: np.ndarray
+        pt2: np.ndarray
+
+        def __post_init__(self):
+            self.pt1 = self.pt1.squeeze()
+            self.pt2 = self.pt2.squeeze()
+            if self.pt1.shape != (3,) or self.pt2.shape != (3,):
+                raise ValueError("Points should be of size (3,)")
+            self.di = np.linalg.norm(self.pt1 - self.pt2)
+
+        def __str__(self):
+            return f"[({self.idx1},{self.idx2}),{self.di*1000:08.4f}mm]"
+
+    def __post_init__(self):
+        self.segment_list: List[DynamicReferenceFrame.Segment] = None
+        self.segment_list = self.obtain_tool_segments_list()
+
+    def __str__(self):
+        return "\n".join(map(str, self.segment_list))
+
+    def obtain_tool_segments_list(self):
+        if self.tool_def.shape != (3, self.n_fiducials):
+            raise ValueError(
+                "Tool def was not provided in correct format."
+                f"Expected array of shape {(3,self.n_fiducials)}"
+            )
+        idx = list(range(self.n_fiducials))
+        segment_list = []
+        for comb in combinations(idx, 2):
+            segment = self.Segment(
+                comb[0], comb[1], self.tool_def[:, comb[0]], self.tool_def[:, comb[1]]
+            )
+            segment_list.append(segment)
+
+        segment_list = sorted(segment_list, key=lambda seg: seg.di)
+
+        return segment_list
+
+    def similarity_score(self, other: DynamicReferenceFrame) -> float:
+        score = 0.0
+        for seg1, seg2 in zip(self.segment_list, other.segment_list):
+            score = abs(seg1.di - seg2.di)
+        return score
+
+    def identify_correspondances(other: DynamicReferenceFrame) -> np.ndarray:
+        pass
+
+
+class OpticalTrackingUtils:
+    @staticmethod
+    def obtain_tool_segments_list(tool_def: np.ndarray, n_fiducials: int):
+
+        if tool_def.shape != (3, n_fiducials):
+            raise ValueError(
+                "Tool def was not provided in correct format."
+                f"Expected array of shape {(3,n_fiducials)}"
+            )
+        idx = list(range(n_fiducials))
+        segment_list = []
+        for comb in combinations(idx, 2):
+            di = np.linalg.norm(tool_def[:, comb[0]] - tool_def[:, comb[1]])
+            segment_list.append([comb[0], comb[1], di])
+
+        # Sort by di
+        segment_list = sorted(segment_list, key=lambda x: x[2])
+
+        return segment_list
 
 
 def markerfile2triangles(filename: Path) -> List[Triangle3D]:
@@ -34,6 +122,32 @@ def markerfile2triangles(filename: Path) -> List[Triangle3D]:
     elif data["count"] == 4:
         print("ERROR: not implemented")
         exit(0)
+
+
+def identify_marker_fiducials(detected_fiducials: np.ndarray, tool_def: np.ndarray):
+    """Identify fiducials corresponding to tool definition
+
+    Parameters
+    ----------
+    detected_fiducials : np.ndarray
+        Detected fiducials in Tracker Frame (F)
+    tool_def : np.ndarray
+        Fiducials in Tool Frame (M). Obtain from tool definition file.
+
+    Returns
+    -------
+    T_TM
+        Transformation from Tool (M) to Tracker (T)
+    tool_fid_idx
+        idx corresponding to the tool fiducials
+    other_fid_idx
+        idx corresponding to fiducials not in the tool
+    """
+    T_TM = None
+    tool_fid_idx = None
+    other_fid_idx = None
+
+    return T_TM, tool_fid_idx, other_fid_idx
 
 
 def identify_marker(sorted_records: np.ndarray, reference_triangle: Triangle3D) -> dict:
