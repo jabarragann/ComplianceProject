@@ -48,7 +48,7 @@ class Frame:
 
     def __array__(self):
         out = np.eye(4, dtype=np.float32)
-        out[:3, :3] = self.r
+        out[:3, :3] = np.array(self.r)
         out[:3, 3] = self.p.squeeze()
         return out
 
