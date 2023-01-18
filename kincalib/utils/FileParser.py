@@ -55,7 +55,7 @@ def extract_fiducials_and_toolframe(
         Transformation from ToolFrame to trackerFrame
     """
 
-    cartesian_record = cartesian_record.loc[cartesian_record["step"] == 0]
+    cartesian_record = cartesian_record.loc[cartesian_record["step"] == step]
     fiducials = cartesian_record.loc[cartesian_record["m_t"] == "fiducial"]
     tool = cartesian_record.loc[cartesian_record["m_t"] == "tool"].iloc[0]
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     )
     data_file = pd.read_csv(data_file)
 
-    fid_loc, T_TM = extract_fiducials_and_toolframe(data_file, step=0)
+    fid_loc, T_TM = extract_fiducials_and_toolframe(data_file, step=10)
     print(f"fiducial in tracker\n {fid_loc}")
     print(f"Tool transformation\n {T_TM}")
 
@@ -114,3 +114,15 @@ if __name__ == "__main__":
     print(f"Model tool\n{defined_tool}")
     print(f"Best candidate\n{best_candidate_tool}")
     print(f"Similarity score\n{best_score*1000} mm")
+
+    corresponding_pt, idx = defined_tool.identify_correspondances(best_candidate_tool)
+    print("corresponding pt")
+    print(corresponding_pt)
+    print(idx)
+
+    print("in between frame")
+    new_T = Frame.find_transformation_direct(defined_tool.tool_def, corresponding_pt)
+
+    print(new_T - T_TM)
+    print(np.array2string(np.array(new_T - T_TM), precision=4, suppress_small=False))
+    print((np.isclose(new_T, T_TM)))

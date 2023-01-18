@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import defaultdict
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,6 +19,8 @@ class DynamicReferenceFrame:
 
     see: Design and validation of an open-source library of dynamic reference
     frames for research and education in optical tracking
+
+    https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5806031/
 
     """
 
@@ -72,7 +75,62 @@ class DynamicReferenceFrame:
             score = abs(seg1.di - seg2.di)
         return score
 
-    def identify_correspondances(other: DynamicReferenceFrame) -> np.ndarray:
+    def identify_correspondances(self, other: DynamicReferenceFrame) -> np.ndarray:
+        correspondance_dict = self.get_correspondances_dict(other)
+        reformated_corr = []
+        for k, v in correspondance_dict.items():
+            reformated_corr.append((k, v[0]))
+            if len(v) != 1:
+                raise Exception(
+                    "Inconsistent DynamicReferenceFrames. No point to point correspondance"
+                )
+        reformated_corr = sorted(reformated_corr, key=lambda x: x[0])
+
+        corr_idx = [c[1] for c in reformated_corr]
+        corresponding_pts = other.tool_def[:, corr_idx]
+
+        return corresponding_pts, corr_idx
+
+    def get_correspondances_dict(self, other: DynamicReferenceFrame) -> dict:
+        # Each entry in the dict can only have either 0,1, or 2 elements
+        node_correspondance = defaultdict(list)
+        raise_exception = False
+        for ref_seg, other_seg in zip(self.segment_list, other.segment_list):
+            for node in [ref_seg.idx1, ref_seg.idx2]:
+                if len(node_correspondance[node]) == 0:
+                    node_correspondance[node] = [other_seg.idx1, other_seg.idx2]
+                elif len(node_correspondance[node]) == 1:
+                    if not node_correspondance[node][0] in [other_seg.idx1, other_seg.idx2]:
+                        raise_exception = True
+                elif len(node_correspondance[node]) == 2:
+
+                    # Eliminate one of the options
+                    if (
+                        other_seg.idx1 in node_correspondance[node]
+                        and other_seg.idx2 in node_correspondance[node]
+                    ):
+                        raise_exception = True
+                    elif other_seg.idx1 in node_correspondance[node]:
+                        node_correspondance[node] = [other_seg.idx1]
+                    elif other_seg.idx2 in node_correspondance[node]:
+                        node_correspondance[node] = [other_seg.idx2]
+
+                    # Eliminate the taken option in other nodes
+                    taken = node_correspondance[node][0]
+                    for t in range(self.n_fiducials):
+                        if t != node:
+                            if taken in node_correspondance[t]:
+                                node_correspondance[t].remove(taken)
+                else:
+                    raise_exception = True
+
+                if raise_exception:
+                    raise Exception(
+                        "Inconsistent DynamicReferenceFrames. No point to point correspondance"
+                    )
+        return dict(node_correspondance)
+
+    def get_correspondances_dict_v2(self, other: DynamicReferenceFrame) -> dict:
         pass
 
 
@@ -221,6 +279,37 @@ def main1():
         log.info(dd)
 
 
-if __name__ == "__main__":
+def test_correspondance_function():
+    n_fiducials = 6
+    pt_A = np.random.random((3, n_fiducials))
+    tool = {"n_fiducials": n_fiducials, "pts": pt_A}
 
-    main1()
+    n_fiducials = tool["n_fiducials"]
+
+    rotation = Rotation3D.random_rotation()
+
+    # Create random point cloud
+    pt_A = tool["pts"]
+    pt_B = rotation.R @ pt_A
+    # pt_B = np.copy(pt_A)
+
+    permutation = list(np.random.permutation(n_fiducials))
+    # print(permutation)
+    pt_B = pt_B[:, permutation]
+
+    tool_A = DynamicReferenceFrame(pt_A, n_fiducials)
+    tool_B = DynamicReferenceFrame(pt_B, n_fiducials)
+
+    corresponding_pts, idx = tool_A.identify_correspondances(tool_B)
+    corresponding_pts = rotation.R.T @ corresponding_pts
+    print(permutation)
+    print(idx)
+    print(corresponding_pts - pt_A)
+    print(np.all(np.isclose(corresponding_pts, pt_A)))
+
+
+if __name__ == "__main__":
+    from kincalib.Transforms.Rotation import Rotation3D
+
+    # main1()
+    test_correspondance_function()
