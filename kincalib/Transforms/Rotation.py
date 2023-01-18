@@ -3,6 +3,10 @@ import numpy as np
 
 _eps = np.finfo(np.float64).eps
 
+##TODO list
+# TODO 1) Add support for point multiplication in __matmul__
+# TODO 2) Add method to calculate rot vec representation from matrix
+
 
 class Rotation3D:
     def __init__(self, rot: np.ndarray):
@@ -93,7 +97,7 @@ class Rotation3D:
 
     @staticmethod
     def trnorm(rot: np.ndarray):
-        """Convert matrix to proper rotation
+        """Convert to proper rotation matrix
         https://petercorke.github.io/spatialmath-python/func_3d.html?highlight=trnorm#spatialmath.base.transforms3d.trnorm
 
         Parameters
@@ -116,6 +120,14 @@ class Rotation3D:
         new_rot = np.stack((unitvec(n), unitvec(o), unitvec(a)), axis=1)
 
         return new_rot
+
+    @classmethod
+    def random_rotation(cls) -> Rotation3D:
+        """Create random rotation matrix from random rotation vector"""
+        rot_ax = np.random.random(3)
+        rot_ax = rot_ax / np.linalg.norm(rot_ax)
+        theta = np.random.uniform(-np.pi, np.pi)
+        return Rotation3D.from_rodrigues(theta * rot_ax)
 
 
 if __name__ == "__main__":

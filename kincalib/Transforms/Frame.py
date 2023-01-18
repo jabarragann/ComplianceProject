@@ -61,6 +61,12 @@ class Frame:
     def inv(self) -> Frame:
         return Frame(self.r.T, -(self.r.T @ self.p))
 
+    def __add__(self, other: Union[np.ndarray, Frame]):
+        return np.array(self) + np.array(other)
+
+    def __sub__(self, other: Union[np.ndarray, Frame]):
+        return np.array(self) - np.array(other)
+
     def __matmul__(self, other: Union[np.ndarray, Frame]) -> Frame:
         """[summary]
         Args:
