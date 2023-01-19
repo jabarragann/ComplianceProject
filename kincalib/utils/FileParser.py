@@ -36,7 +36,15 @@ def parse_atracsys_marker_def(path: Path) -> np.ndarray:
     return results
 
 
-def extract_fiducials_and_toolframe(
+def fid_and_toolframe_generator(cartesian_record: pd.DataFrame):
+    steps_list = cartesian_record["step"].unique()
+    for step in steps_list:
+        fiducials_location, T_TM = extract_fiducials_and_toolframe_on_step(cartesian_record, step)
+        if fiducial_loc is not None and T_TM is not None:
+            yield step, fiducials_location, T_TM
+
+
+def extract_fiducials_and_toolframe_on_step(
     cartesian_record: pd.DataFrame, step: int
 ) -> Tuple[np.ndarray, Frame]:
     """_summary_
@@ -57,8 +65,12 @@ def extract_fiducials_and_toolframe(
 
     cartesian_record = cartesian_record.loc[cartesian_record["step"] == step]
     fiducials = cartesian_record.loc[cartesian_record["m_t"] == "fiducial"]
-    tool = cartesian_record.loc[cartesian_record["m_t"] == "tool"].iloc[0]
+    tool = cartesian_record.loc[cartesian_record["m_t"] == "tool"]
 
+    if fiducials.shape[0] == 0 or tool.shape[0] == 0:
+        return None, None
+
+    tool = tool.iloc[0]
     fiducials_location = fiducials[CartesianRecord.df_position_cols].to_numpy().T
 
     tool_position = tool[CartesianRecord.df_position_cols].to_numpy().squeeze()
@@ -88,7 +100,7 @@ if __name__ == "__main__":
     )
     data_file = pd.read_csv(data_file)
 
-    fid_loc, T_TM = extract_fiducials_and_toolframe(data_file, step=10)
+    fid_loc, T_TM = extract_fiducials_and_toolframe_on_step(data_file, step=2)
     print(f"fiducial in tracker\n {fid_loc}")
     print(f"Tool transformation\n {T_TM}")
 
@@ -126,3 +138,29 @@ if __name__ == "__main__":
     print(new_T - T_TM)
     print(np.array2string(np.array(new_T - T_TM), precision=4, suppress_small=False))
     print((np.isclose(new_T, T_TM)))
+
+    estimated_fiducials = new_T @ defined_tool.tool_def
+    print(np.array2string(estimated_fiducials - corresponding_pt, suppress_small=False))
+    print(
+        np.array2string(
+            np.linalg.norm(estimated_fiducials - corresponding_pt, axis=0),
+            suppress_small=True,
+            precision=6,
+        )
+    )
+
+    # Summarized code
+    json_path = Path(
+        "/home/juan1995/research_juan/ComplianceProject/share/custom_marker_id_113.json"
+    )
+    fiducial_loc = parse_atracsys_marker_def(json_path)
+    segments_lengths = OpticalTrackingUtils.obtain_tool_segments_list(fiducial_loc, 4)
+    defined_tool = DynamicReferenceFrame(fiducial_loc, 4)
+
+    for step, fid_in_tracker, T in fid_and_toolframe_generator(data_file):
+        best_candidate_tool, best_score, subset_idx = defined_tool.identify_closest_subset(
+            fid_in_tracker
+        )
+        print(f"step {step}")
+        print(best_score)
+        print(subset_idx)

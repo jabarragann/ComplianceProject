@@ -7,7 +7,7 @@ from pathlib import Path
 from kincalib.utils.Logger import Logger
 from kincalib.Geometry.geometry import Triangle3D
 import json
-from typing import List
+from typing import List, Union
 from itertools import combinations
 
 from dataclasses import dataclass
@@ -102,45 +102,6 @@ class DynamicReferenceFrame:
 
         return corresponding_pts, corr_idx
 
-    # def get_correspondances_dict(self, other: DynamicReferenceFrame) -> dict:
-    #     # Each entry in the dict can only have either 0,1, or 2 elements
-    #     node_correspondance = defaultdict(list)
-    #     raise_exception = False
-    #     for ref_seg, other_seg in zip(self.segment_list, other.segment_list):
-    #         for node in [ref_seg.idx1, ref_seg.idx2]:
-    #             if len(node_correspondance[node]) == 0:
-    #                 node_correspondance[node] = [other_seg.idx1, other_seg.idx2]
-    #             elif len(node_correspondance[node]) == 1:
-    #                 if not node_correspondance[node][0] in [other_seg.idx1, other_seg.idx2]:
-    #                     raise_exception = True
-    #             elif len(node_correspondance[node]) == 2:
-
-    #                 # Eliminate one of the options
-    #                 if (
-    #                     other_seg.idx1 in node_correspondance[node]
-    #                     and other_seg.idx2 in node_correspondance[node]
-    #                 ):
-    #                     raise_exception = True
-    #                 elif other_seg.idx1 in node_correspondance[node]:
-    #                     node_correspondance[node] = [other_seg.idx1]
-    #                 elif other_seg.idx2 in node_correspondance[node]:
-    #                     node_correspondance[node] = [other_seg.idx2]
-
-    #                 # Eliminate the taken option in other nodes
-    #                 taken = node_correspondance[node][0]
-    #                 for t in range(self.n_fiducials):
-    #                     if t != node:
-    #                         if taken in node_correspondance[t]:
-    #                             node_correspondance[t].remove(taken)
-    #             else:
-    #                 raise_exception = True
-
-    #             if raise_exception:
-    #                 raise Exception(
-    #                     "Inconsistent DynamicReferenceFrames. No point to point correspondance"
-    #                 )
-    #     return dict(node_correspondance)
-
     def get_correspondances_dict(self, other: DynamicReferenceFrame) -> dict:
         """Identify correspondances by using subsets of 3 points."""
         node_correspondance = defaultdict(list)
@@ -170,6 +131,40 @@ class DynamicReferenceFrame:
                 best_score = score
                 best_segment = s
         return best_segment
+
+    def identify_closest_subset(
+        self, candidate_pt: np.ndarray
+    ) -> Union[DynamicReferenceFrame, float]:
+        """
+        Identify the closest subset of points to the current DynamicReference Frame
+
+        Parameters
+        ----------
+        candidate_pt: np.ndarray
+
+        Returns
+        -------
+        closest: DynamicRefenceFrame
+            DynamicReferenceFrame with the smallest similarity score to current object.
+        score: float
+            Similarity score between reference frames.
+        """
+
+        best_score = 1000000
+        best_candidate_tool = None
+        idx = list(range(candidate_pt.shape[1]))
+
+        for count, subset_idx in enumerate(combinations(idx, 4)):
+            fid_subset = candidate_pt[:, list(subset_idx)]
+            segments_lengths = OpticalTrackingUtils.obtain_tool_segments_list(fid_subset, 4)
+            candidate_tool = DynamicReferenceFrame(fid_subset, self.n_fiducials)
+
+            score = self.similarity_score(candidate_tool)
+            if score < best_score:
+                best_candidate_tool = candidate_tool
+                best_score = score
+
+        return best_candidate_tool, best_score, subset_idx
 
 
 class OpticalTrackingUtils:
