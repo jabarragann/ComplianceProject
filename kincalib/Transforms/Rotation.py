@@ -4,8 +4,8 @@ import numpy as np
 _eps = np.finfo(np.float64).eps
 
 ##TODO list
-# TODO 1) Add support for point multiplication in __matmul__
 # TODO 2) Add method to calculate rot vec representation from matrix
+# TODO 3) Code to validate input to __matmul__ is duplicated in Frame and Rot
 
 
 class Rotation3D:
@@ -38,6 +38,16 @@ class Rotation3D:
         return self.R
 
     def __matmul__(self, other: Rotation3D) -> Rotation3D:
+        if isinstance(other, np.ndarray):
+            if len(other.shape) == 1:
+                assert other.shape == (3,), "Dimension error, points array should have a shape (3,)"
+                other = other.reshape(3, 1)
+            elif len(other) > 2:
+                assert (
+                    other.shape[0] == 3
+                ), "Dimension error, points array should have a shape (3,N), where `N` is the number points."
+            return self.R @ other
+
         if not isinstance(other, Rotation3D):
             raise ValueError("Required a 3D rotation")
 
