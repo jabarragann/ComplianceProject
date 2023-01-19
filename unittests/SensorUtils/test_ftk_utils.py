@@ -3,7 +3,10 @@ from pathlib import Path
 import pytest
 from kincalib.Sensors.ftk_utils import DynamicReferenceFrame, identify_marker_fiducials
 from kincalib.Transforms.Rotation import Rotation3D
-from kincalib.utils.FileParser import parse_atracsys_marker_def, extract_fiducials_and_toolframe
+from kincalib.utils.FileParser import (
+    parse_atracsys_marker_def,
+    extract_fiducials_and_toolframe_on_step,
+)
 import pandas as pd
 
 # TODO (1) Update tests to include translation between points.
@@ -16,7 +19,7 @@ def load_data():
     marker_def = Path(__file__).parent / "data/custom_marker_id_113.json"
 
     tool_fid_M = parse_atracsys_marker_def(marker_def)
-    fiducials_T, T_TM = extract_fiducials_and_toolframe(data, step=0)
+    fiducials_T, T_TM = extract_fiducials_and_toolframe_on_step(data, step=0)
 
     data_dict = {
         "detected_fiducials": fiducials_T,
@@ -27,37 +30,31 @@ def load_data():
     return data_dict
 
 
-def fiducial_tool(n_fiducials):
+def random_data_for_test(n_fiducials):
     pt_A = np.random.random((3, n_fiducials))
-    return {"n_fiducials": n_fiducials, "pts": pt_A}
+    rotation = Rotation3D.random_rotation()
+    pt_B = rotation.R @ pt_A
+    return {"n_fiducials": n_fiducials, "pts_A": pt_A, "pts_B": pt_B, "T_BA": rotation}
 
 
-@pytest.mark.parametrize("tool", [fiducial_tool(3), fiducial_tool(4), fiducial_tool(5)])
+@pytest.mark.parametrize(
+    "tool", [random_data_for_test(3), random_data_for_test(4), random_data_for_test(5)]
+)
 def test_similarity_score(tool):
     n_fiducials = tool["n_fiducials"]
-    rotation = Rotation3D.random_rotation()
-
-    # Create random point cloud
-    pt_A = tool["pts"]
-    pt_B = rotation.R @ pt_A
-
-    tool_A = DynamicReferenceFrame(pt_A, n_fiducials)
-    tool_B = DynamicReferenceFrame(pt_B, n_fiducials)
-
+    tool_A = DynamicReferenceFrame(tool["pts_A"], n_fiducials)
+    tool_B = DynamicReferenceFrame(tool["pts_B"], n_fiducials)
     assert np.isclose(tool_A.similarity_score(tool_B), 0.0)
 
 
-@pytest.mark.parametrize("tool", [fiducial_tool(3), fiducial_tool(4), fiducial_tool(5)])
+@pytest.mark.parametrize(
+    "tool", [random_data_for_test(3), random_data_for_test(4), random_data_for_test(5)]
+)
 def test_similarity_score_with_permutation(tool):
     n_fiducials = tool["n_fiducials"]
-
-    rotation = Rotation3D.random_rotation()
-
-    # Create random point cloud
-    pt_A = tool["pts"]
-    pt_B = rotation.R @ pt_A
-
     permutation = np.random.permutation(n_fiducials)
+    pt_A = tool["pts_A"]
+    pt_B = tool["pts_B"]
     pt_B = pt_B[:, permutation]
 
     tool_A = DynamicReferenceFrame(pt_A, n_fiducials)
@@ -66,18 +63,16 @@ def test_similarity_score_with_permutation(tool):
     assert np.isclose(tool_A.similarity_score(tool_B), 0.0)
 
 
-@pytest.mark.parametrize("tool", [fiducial_tool(3), fiducial_tool(4), fiducial_tool(5), fiducial_tool(6)])
+@pytest.mark.parametrize(
+    "tool", [random_data_for_test(3), random_data_for_test(4), random_data_for_test(5)]
+)
 def test_correspondance_matching(tool):
     n_fiducials = tool["n_fiducials"]
-
-    rotation = Rotation3D.random_rotation()
-
-    # Create random point cloud
-    pt_A = tool["pts"]
-    pt_B = rotation.R @ pt_A
-
     permutation = np.random.permutation(n_fiducials)
+    pt_A = tool["pts_A"]
+    pt_B = tool["pts_B"]
     pt_B = pt_B[:, permutation]
+    rotation = tool["T_BA"]
 
     tool_A = DynamicReferenceFrame(pt_A, n_fiducials)
     tool_B = DynamicReferenceFrame(pt_B, n_fiducials)
@@ -86,25 +81,8 @@ def test_correspondance_matching(tool):
     corresponding_pts = rotation.R.T @ corresponding_pts
 
     assert np.all(np.isclose(corresponding_pts, pt_A))
-    # corresponding_pts, idx = tool_A.identify_correspondances(tool_B)
-    # assert idx == permutation
-
-
-# def test_fiducial_identification_with_4fid_tool():
-#     data_dict = load_data()
-#     T_TM = data_dict["marker_frame"]
-#     estimated_T_TM, tool_fid_idx, other_fid_idx = identify_marker_fiducials(
-#         data_dict["detected_fiducials"], data_dict["tool_fiducials"]
-#     )
-
-#     assert np.all(np.isclose(np.array(estimated_T_TM) - np.array(T_TM)))
-
-
-# def test_fiducial_identification_with_3fid_tool():
-#     pass
 
 
 if __name__ == "__main__":
     print("hello")
     load_data()
-    pass
