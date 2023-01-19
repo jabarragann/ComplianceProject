@@ -44,6 +44,17 @@ class DynamicReferenceFrame:
         def __str__(self):
             return f"[({self.idx1},{self.idx2}),{self.di*1000:08.4f}mm]"
 
+        def find_common_idx(self, other: DynamicReferenceFrame.Segment):
+            other_idx = [other.idx1, other.idx2]
+            if self.idx1 in other_idx and self.idx2 in other_idx:
+                return [other_idx]
+            elif self.idx1 in other_idx:
+                return self.idx1
+            elif self.idx2 in other_idx:
+                return self.idx2
+            else:
+                return None
+
     def __post_init__(self):
         self.segment_list: List[DynamicReferenceFrame.Segment] = None
         self.segment_list = self.obtain_tool_segments_list()
@@ -80,7 +91,7 @@ class DynamicReferenceFrame:
         reformated_corr = []
         for k, v in correspondance_dict.items():
             reformated_corr.append((k, v[0]))
-            if len(v) != 1:
+            if len(v) != 1 and v[0] is not None:
                 raise Exception(
                     "Inconsistent DynamicReferenceFrames. No point to point correspondance"
                 )
@@ -91,47 +102,74 @@ class DynamicReferenceFrame:
 
         return corresponding_pts, corr_idx
 
+    # def get_correspondances_dict(self, other: DynamicReferenceFrame) -> dict:
+    #     # Each entry in the dict can only have either 0,1, or 2 elements
+    #     node_correspondance = defaultdict(list)
+    #     raise_exception = False
+    #     for ref_seg, other_seg in zip(self.segment_list, other.segment_list):
+    #         for node in [ref_seg.idx1, ref_seg.idx2]:
+    #             if len(node_correspondance[node]) == 0:
+    #                 node_correspondance[node] = [other_seg.idx1, other_seg.idx2]
+    #             elif len(node_correspondance[node]) == 1:
+    #                 if not node_correspondance[node][0] in [other_seg.idx1, other_seg.idx2]:
+    #                     raise_exception = True
+    #             elif len(node_correspondance[node]) == 2:
+
+    #                 # Eliminate one of the options
+    #                 if (
+    #                     other_seg.idx1 in node_correspondance[node]
+    #                     and other_seg.idx2 in node_correspondance[node]
+    #                 ):
+    #                     raise_exception = True
+    #                 elif other_seg.idx1 in node_correspondance[node]:
+    #                     node_correspondance[node] = [other_seg.idx1]
+    #                 elif other_seg.idx2 in node_correspondance[node]:
+    #                     node_correspondance[node] = [other_seg.idx2]
+
+    #                 # Eliminate the taken option in other nodes
+    #                 taken = node_correspondance[node][0]
+    #                 for t in range(self.n_fiducials):
+    #                     if t != node:
+    #                         if taken in node_correspondance[t]:
+    #                             node_correspondance[t].remove(taken)
+    #             else:
+    #                 raise_exception = True
+
+    #             if raise_exception:
+    #                 raise Exception(
+    #                     "Inconsistent DynamicReferenceFrames. No point to point correspondance"
+    #                 )
+    #     return dict(node_correspondance)
+
     def get_correspondances_dict(self, other: DynamicReferenceFrame) -> dict:
-        # Each entry in the dict can only have either 0,1, or 2 elements
+        """Identify correspondances by using subsets of 3 points."""
         node_correspondance = defaultdict(list)
-        raise_exception = False
-        for ref_seg, other_seg in zip(self.segment_list, other.segment_list):
-            for node in [ref_seg.idx1, ref_seg.idx2]:
-                if len(node_correspondance[node]) == 0:
-                    node_correspondance[node] = [other_seg.idx1, other_seg.idx2]
-                elif len(node_correspondance[node]) == 1:
-                    if not node_correspondance[node][0] in [other_seg.idx1, other_seg.idx2]:
-                        raise_exception = True
-                elif len(node_correspondance[node]) == 2:
+        for t in range(self.n_fiducials):
+            corner_pt = self.tool_def[:, t]
+            pt1 = self.tool_def[:, (t + 1) % self.n_fiducials]
+            pt2 = self.tool_def[:, (t + 2) % self.n_fiducials]
 
-                    # Eliminate one of the options
-                    if (
-                        other_seg.idx1 in node_correspondance[node]
-                        and other_seg.idx2 in node_correspondance[node]
-                    ):
-                        raise_exception = True
-                    elif other_seg.idx1 in node_correspondance[node]:
-                        node_correspondance[node] = [other_seg.idx1]
-                    elif other_seg.idx2 in node_correspondance[node]:
-                        node_correspondance[node] = [other_seg.idx2]
+            d1 = np.linalg.norm(pt1 - corner_pt)
+            d2 = np.linalg.norm(pt2 - corner_pt)
 
-                    # Eliminate the taken option in other nodes
-                    taken = node_correspondance[node][0]
-                    for t in range(self.n_fiducials):
-                        if t != node:
-                            if taken in node_correspondance[t]:
-                                node_correspondance[t].remove(taken)
-                else:
-                    raise_exception = True
+            d1_corresp: DynamicReferenceFrame.Segment = other.find_closest_segment(d1)
+            d2_corresp: DynamicReferenceFrame.Segment = other.find_closest_segment(d2)
+            common_idx = d1_corresp.find_common_idx(d2_corresp)
 
-                if raise_exception:
-                    raise Exception(
-                        "Inconsistent DynamicReferenceFrames. No point to point correspondance"
-                    )
+            if type(common_idx) is int:
+                node_correspondance[t].append(common_idx)
+
         return dict(node_correspondance)
 
-    def get_correspondances_dict_v2(self, other: DynamicReferenceFrame) -> dict:
-        pass
+    def find_closest_segment(self, length: float) -> DynamicReferenceFrame.Segment:
+        best_segment = None
+        best_score = np.inf
+        for s in self.segment_list:
+            score = abs(s.di - length)
+            if score < best_score:
+                best_score = score
+                best_segment = s
+        return best_segment
 
 
 class OpticalTrackingUtils:

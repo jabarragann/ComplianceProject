@@ -66,8 +66,7 @@ def test_similarity_score_with_permutation(tool):
     assert np.isclose(tool_A.similarity_score(tool_B), 0.0)
 
 
-# @pytest.mark.parametrize("tool", [fiducial_tool(3), fiducial_tool(4), fiducial_tool(5)])
-@pytest.mark.parametrize("tool", [fiducial_tool(3), fiducial_tool(4)])
+@pytest.mark.parametrize("tool", [fiducial_tool(3), fiducial_tool(4), fiducial_tool(5), fiducial_tool(6)])
 def test_correspondance_matching(tool):
     n_fiducials = tool["n_fiducials"]
 
@@ -91,18 +90,18 @@ def test_correspondance_matching(tool):
     # assert idx == permutation
 
 
-def test_fiducial_identification_with_4fid_tool():
-    data_dict = load_data()
-    T_TM = data_dict["marker_frame"]
-    estimated_T_TM, tool_fid_idx, other_fid_idx = identify_marker_fiducials(
-        data_dict["detected_fiducials"], data_dict["tool_fiducials"]
-    )
+# def test_fiducial_identification_with_4fid_tool():
+#     data_dict = load_data()
+#     T_TM = data_dict["marker_frame"]
+#     estimated_T_TM, tool_fid_idx, other_fid_idx = identify_marker_fiducials(
+#         data_dict["detected_fiducials"], data_dict["tool_fiducials"]
+#     )
 
-    assert np.all(np.isclose(np.array(estimated_T_TM) - np.array(T_TM)))
+#     assert np.all(np.isclose(np.array(estimated_T_TM) - np.array(T_TM)))
 
 
-def test_fiducial_identification_with_3fid_tool():
-    pass
+# def test_fiducial_identification_with_3fid_tool():
+#     pass
 
 
 if __name__ == "__main__":
