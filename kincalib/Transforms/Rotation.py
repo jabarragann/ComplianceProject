@@ -1,5 +1,8 @@
 from __future__ import annotations
+from typing import Union
 import numpy as np
+
+from kincalib.Transforms.Validations import pt_cloud_format_validation
 
 _eps = np.finfo(np.float64).eps
 
@@ -37,21 +40,14 @@ class Rotation3D:
     def __array__(self):
         return self.R
 
-    def __matmul__(self, other: Rotation3D) -> Rotation3D:
+    def __matmul__(self, other: Union[Rotation3D, np.ndarray]) -> Rotation3D:
         if isinstance(other, np.ndarray):
-            if len(other.shape) == 1:
-                assert other.shape == (3,), "Dimension error, points array should have a shape (3,)"
-                other = other.reshape(3, 1)
-            elif len(other) > 2:
-                assert (
-                    other.shape[0] == 3
-                ), "Dimension error, points array should have a shape (3,N), where `N` is the number points."
+            other = pt_cloud_format_validation(other)
             return self.R @ other
-
-        if not isinstance(other, Rotation3D):
-            raise ValueError("Required a 3D rotation")
-
-        return Rotation3D(self.R @ other.R)
+        elif isinstance(other, Rotation3D):
+            return Rotation3D(self.R @ other.R)
+        else:
+            raise TypeError
 
     @classmethod
     def from_rodrigues(cls, rot_vec: np.ndarray) -> Rotation3D:

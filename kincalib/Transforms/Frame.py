@@ -3,6 +3,7 @@ from typing import Union
 from typing import Type
 from numpy.linalg import norm, svd, det
 import numpy as np
+from kincalib.Transforms.Validations import pt_cloud_format_validation
 from kincalib.utils.Logger import Logger
 import logging
 from kincalib.Transforms.Rotation import Rotation3D
@@ -74,15 +75,8 @@ class Frame:
         Returns:
             Frame: [description]
         """
-
         if isinstance(other, np.ndarray):
-            if len(other.shape) == 1:
-                assert other.shape == (3,), "Dimension error, points array should have a shape (3,)"
-                other = other.reshape(3, 1)
-            elif len(other) > 2:
-                assert (
-                    other.shape[0] == 3
-                ), "Dimension error, points array should have a shape (3,N), where `N` is the number points."
+            other = pt_cloud_format_validation(other)
             return (self.r @ other) + self.p
         elif isinstance(other, Frame):
             return Frame(self.r @ other.r, self.r @ other.p + self.p)
