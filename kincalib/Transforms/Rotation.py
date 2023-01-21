@@ -8,7 +8,6 @@ _eps = np.finfo(np.float64).eps
 
 ##TODO list
 # TODO 2) Add method to calculate rot vec representation from matrix
-# TODO 3) Code to validate input to __matmul__ is duplicated in Frame and Rot
 
 
 class Rotation3D:

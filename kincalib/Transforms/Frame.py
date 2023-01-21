@@ -20,7 +20,11 @@ class Frame:
             r (np.ndarray): Rotation.
             p (np.ndarray): translation.
         """
-        self.r = Rotation3D(np.array(r))
+
+        r = np.array(r).astype(np.float64)
+        p = np.array(p).astype(np.float64)
+
+        self.r = Rotation3D(r)
 
         # if not self.is_rotation(r):
         #     if normalization_warning:
