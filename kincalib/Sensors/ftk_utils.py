@@ -49,11 +49,11 @@ class DynamicReferenceFrame:
             if self.idx1 in other_idx and self.idx2 in other_idx:
                 return [other_idx]
             elif self.idx1 in other_idx:
-                return self.idx1
+                return [self.idx1]
             elif self.idx2 in other_idx:
-                return self.idx2
+                return [self.idx2]
             else:
-                return None
+                return []
 
     def __post_init__(self):
         self.segment_list: List[DynamicReferenceFrame.Segment] = None
@@ -83,7 +83,7 @@ class DynamicReferenceFrame:
     def similarity_score(self, other: DynamicReferenceFrame) -> float:
         score = 0.0
         for seg1, seg2 in zip(self.segment_list, other.segment_list):
-            score = abs(seg1.di - seg2.di)
+            score += abs(seg1.di - seg2.di)
         return score
 
     def identify_correspondances(self, other: DynamicReferenceFrame) -> np.ndarray:
@@ -117,8 +117,12 @@ class DynamicReferenceFrame:
             d2_corresp: DynamicReferenceFrame.Segment = other.find_closest_segment(d2)
             common_idx = d1_corresp.find_common_idx(d2_corresp)
 
-            if type(common_idx) is int:
-                node_correspondance[t].append(common_idx)
+            if len(common_idx) != 1:
+                raise RuntimeError("No valid correspondances found")
+
+            node_correspondance[t].append(common_idx[0])
+
+        # todo validate correspondance dict --> no repeated elements
 
         return dict(node_correspondance)
 
@@ -152,19 +156,20 @@ class DynamicReferenceFrame:
 
         best_score = 1000000
         best_candidate_tool = None
+        best_subset_idx = None
         idx = list(range(candidate_pt.shape[1]))
 
         for count, subset_idx in enumerate(combinations(idx, 4)):
             fid_subset = candidate_pt[:, list(subset_idx)]
-            segments_lengths = OpticalTrackingUtils.obtain_tool_segments_list(fid_subset, 4)
             candidate_tool = DynamicReferenceFrame(fid_subset, self.n_fiducials)
 
             score = self.similarity_score(candidate_tool)
             if score < best_score:
                 best_candidate_tool = candidate_tool
                 best_score = score
+                best_subset_idx = subset_idx
 
-        return best_candidate_tool, best_score, subset_idx
+        return best_candidate_tool, best_score, best_subset_idx
 
 
 class OpticalTrackingUtils:
