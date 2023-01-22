@@ -11,7 +11,7 @@ def test_ransac_circle3d():
 
     np.random.seed(0)
 
-    data = pd.read_csv(Path(__file__).parent / "data/data_ransac2.csv")
+    data = pd.read_csv(Path(__file__).parent / "test_data/data_ransac2.csv")
     data = data.to_numpy()
     model: Circle3D
     model, inliers_idx = Ransac.ransac(
