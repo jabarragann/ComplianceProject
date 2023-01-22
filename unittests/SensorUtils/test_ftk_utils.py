@@ -1,9 +1,13 @@
+from typing import Union
 import numpy as np
 from pathlib import Path
 import pytest
 from kincalib.Sensors.ftk_utils import DynamicReferenceFrame, identify_marker_fiducials
 from kincalib.Transforms.Rotation import Rotation3D
+from kincalib.utils.CmnUtils import FAIL_STR
+from kincalib.Transforms.Frame import Frame
 from kincalib.utils.FileParser import (
+    fid_and_toolframe_generator,
     parse_atracsys_marker_def,
     extract_fiducials_and_toolframe_on_step,
 )
@@ -14,20 +18,12 @@ import pandas as pd
 # TODO (3) Clean repeated code.
 
 
-def load_data():
-    data = pd.read_csv(Path(__file__).parent / "data/Tool113_Fiducials4_1.csv")
-    marker_def = Path(__file__).parent / "data/custom_marker_id_113.json"
+def load_real_data(data_filename: str, marker_def_filename: str) -> Union[pd.DataFrame, np.ndarray]:
+    data_file = pd.read_csv(Path(__file__).parent / f"data/{data_filename}")
+    marker_def = Path(__file__).parent / f"data/{marker_def_filename}"
+    marker_def = parse_atracsys_marker_def(marker_def)
 
-    tool_fid_M = parse_atracsys_marker_def(marker_def)
-    fiducials_T, T_TM = extract_fiducials_and_toolframe_on_step(data, step=0)
-
-    data_dict = {
-        "detected_fiducials": fiducials_T,
-        "tool_fiducials": tool_fid_M,
-        "marker_frame": T_TM,
-    }
-
-    return data_dict
+    return data_file, marker_def
 
 
 def random_data_for_test(n_fiducials):
@@ -83,6 +79,33 @@ def test_correspondance_matching(tool):
     assert np.all(np.isclose(corresponding_pts, pt_A))
 
 
+def test_correspondance_with_real_data():
+    data_file, tool_definition = load_real_data(
+        "Tool113_Fiducials4_1.csv", "custom_marker_id_113.json"
+    )
+
+    defined_tool = DynamicReferenceFrame(tool_definition, tool_definition.shape[1])
+
+    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data_file):
+        candidate_tool_in_T, best_score, subset_idx = defined_tool.identify_closest_subset(
+            fid_in_tracker
+        )
+        try:
+            corresponding_pt, corresponding_idx = defined_tool.identify_correspondances(
+                candidate_tool_in_T
+            )
+        except RuntimeError as e:
+            print(FAIL_STR(f"skipping step {step}. {e}"))
+            continue
+
+        estimated_T_TM = Frame.find_transformation_direct(defined_tool.tool_def, corresponding_pt)
+
+        estimated_pt = estimated_T_TM @ defined_tool.tool_def
+        error = np.linalg.norm(estimated_pt - corresponding_pt, axis=0)
+
+        e = 1e-3
+        assert np.all(error < e), ""
+
+
 if __name__ == "__main__":
-    print("hello")
-    load_data()
+    print("")

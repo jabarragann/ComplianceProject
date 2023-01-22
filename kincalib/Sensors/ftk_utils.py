@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from kincalib.utils.CmnUtils import ColorText
 from kincalib.utils.Logger import Logger
 from kincalib.Geometry.geometry import Triangle3D
 import json
@@ -88,13 +89,14 @@ class DynamicReferenceFrame:
 
     def identify_correspondances(self, other: DynamicReferenceFrame) -> np.ndarray:
         correspondance_dict = self.get_correspondances_dict(other)
+
+        if correspondance_dict is None:
+            raise RuntimeError("No valid correspondances found")
+
         reformated_corr = []
         for k, v in correspondance_dict.items():
             reformated_corr.append((k, v[0]))
-            if len(v) != 1 and v[0] is not None:
-                raise Exception(
-                    "Inconsistent DynamicReferenceFrames. No point to point correspondance"
-                )
+
         reformated_corr = sorted(reformated_corr, key=lambda x: x[0])
 
         corr_idx = [c[1] for c in reformated_corr]
@@ -103,8 +105,14 @@ class DynamicReferenceFrame:
         return corresponding_pts, corr_idx
 
     def get_correspondances_dict(self, other: DynamicReferenceFrame) -> dict:
-        """Identify correspondances by using subsets of 3 points."""
+        """Identify one to one correspondances by using subsets of 3 points.
+
+        Error in measurements can results in wrong correspondances
+        First implementation of this func can be found in commit eb69f7de7e4f
+        """
         node_correspondance = defaultdict(list)
+
+        taken_idx = []
         for t in range(self.n_fiducials):
             corner_pt = self.tool_def[:, t]
             pt1 = self.tool_def[:, (t + 1) % self.n_fiducials]
@@ -117,12 +125,11 @@ class DynamicReferenceFrame:
             d2_corresp: DynamicReferenceFrame.Segment = other.find_closest_segment(d2)
             common_idx = d1_corresp.find_common_idx(d2_corresp)
 
-            if len(common_idx) != 1:
-                raise RuntimeError("No valid correspondances found")
+            if len(common_idx) != 1 or common_idx in taken_idx:
+                return None
 
             node_correspondance[t].append(common_idx[0])
-
-        # todo validate correspondance dict --> no repeated elements
+            taken_idx.append(common_idx)
 
         return dict(node_correspondance)
 
@@ -154,7 +161,7 @@ class DynamicReferenceFrame:
             Similarity score between reference frames.
         """
 
-        best_score = 1000000
+        best_score = np.inf
         best_candidate_tool = None
         best_subset_idx = None
         idx = list(range(candidate_pt.shape[1]))
@@ -317,7 +324,7 @@ def main1():
         log.info(dd)
 
 
-def test_correspondance_function():
+def test_correspondance_function_with_random():
     n_fiducials = 6
     pt_A = np.random.random((3, n_fiducials))
     tool = {"n_fiducials": n_fiducials, "pts": pt_A}
@@ -346,8 +353,62 @@ def test_correspondance_function():
     print(np.all(np.isclose(corresponding_pts, pt_A)))
 
 
+def test_correspondance_function_with_real():
+    # Data loading
+    project_root = Path(__file__).parent.parent.parent
+    data_file = project_root / "unittests/SensorUtils/data/Tool113_Fiducials4_1.csv"
+    data_file = pd.read_csv(data_file)
+    json_path = project_root / Path("./share/custom_marker_id_113.json")
+    fiducial_loc = parse_atracsys_marker_def(json_path)
+
+    # Correspodance algorithm
+    segments_lengths = OpticalTrackingUtils.obtain_tool_segments_list(fiducial_loc, 4)
+    defined_tool = DynamicReferenceFrame(fiducial_loc, 4)
+
+    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data_file):
+        candidate_tool_in_T, best_score, subset_idx = defined_tool.identify_closest_subset(
+            fid_in_tracker
+        )
+        try:
+            corresponding_pt, corresponding_idx = defined_tool.identify_correspondances(
+                candidate_tool_in_T
+            )
+        except RuntimeError as e:
+            print(ColorText.FAIL_STR(f"skipping step {step}. {e}"))
+            continue
+
+        new_T_TM = Frame.find_transformation_direct(defined_tool.tool_def, corresponding_pt)
+
+        estimated_1 = T_TM @ defined_tool.tool_def
+        error1 = np.linalg.norm(estimated_1 - corresponding_pt, axis=0)
+        estimated_2 = new_T_TM @ defined_tool.tool_def
+        error2 = np.linalg.norm(estimated_2 - corresponding_pt, axis=0)
+
+        e = 1e-3
+        if np.any(error2 > e):
+            print(ColorText.INFO_STR(f"step {step}"))
+            print(f"best sim score {best_score:0.6f}")
+            print(f"subset idx {subset_idx}")
+            print(f"corresponding {corresponding_idx}")
+            print(
+                f"error with T matrix\n{np.array2string(error1,suppress_small=True, precision=8)}"
+            )
+            print(
+                f"error with estimated T\n{np.array2string(error2,suppress_small=True, precision=8)}"
+            )
+            print(f"fid_in_T\n{fid_in_tracker}")
+            print(f"tool_GT\n{estimated_1}")
+            print(f"estimated_tool\n{corresponding_pt}")
+
+
 if __name__ == "__main__":
     from kincalib.Transforms.Rotation import Rotation3D
+    from kincalib.Transforms.Frame import Frame
+    from kincalib.utils.CmnUtils import ColorText
+    from kincalib.utils.FileParser import fid_and_toolframe_generator, parse_atracsys_marker_def
 
     # main1()
-    test_correspondance_function()
+    # Test with random data
+    test_correspondance_function_with_random()
+    # Test with real data
+    test_correspondance_function_with_real()
