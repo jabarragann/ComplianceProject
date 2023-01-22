@@ -4,18 +4,12 @@ from pathlib import Path
 import pytest
 from kincalib.Sensors.ftk_utils import DynamicReferenceFrame, identify_marker_fiducials
 from kincalib.Transforms.Rotation import Rotation3D
-from kincalib.utils.CmnUtils import FAIL_STR
+from kincalib.utils.CmnUtils import ColorText
 from kincalib.Transforms.Frame import Frame
-from kincalib.utils.FileParser import (
-    fid_and_toolframe_generator,
-    parse_atracsys_marker_def,
-    extract_fiducials_and_toolframe_on_step,
-)
+from kincalib.utils.FileParser import fid_and_toolframe_generator, parse_atracsys_marker_def
 import pandas as pd
 
-# TODO (1) Update tests to include translation between points.
-# TODO (2) Update tests to include noise in one of the point cloud.
-# TODO (3) Clean repeated code.
+# todo Add more testing files with real data
 
 
 def load_real_data(data_filename: str, marker_def_filename: str) -> Union[pd.DataFrame, np.ndarray]:
@@ -79,10 +73,15 @@ def test_correspondance_matching(tool):
     assert np.all(np.isclose(corresponding_pts, pt_A))
 
 
-def test_correspondance_with_real_data():
-    data_file, tool_definition = load_real_data(
-        "Tool113_Fiducials4_1.csv", "custom_marker_id_113.json"
-    )
+@pytest.mark.parametrize(
+    "data_file,marker_file",
+    [
+        ("Tool113_Fiducials4_1.csv", "custom_marker_id_113.json"),
+        ("Tool112_Fiducials3_1.csv", "custom_marker_id_112.json"),
+    ],
+)
+def test_correspondance_with_real_data(data_file, marker_file):
+    data_file, tool_definition = load_real_data(data_file, marker_file)
 
     defined_tool = DynamicReferenceFrame(tool_definition, tool_definition.shape[1])
 
@@ -95,7 +94,7 @@ def test_correspondance_with_real_data():
                 candidate_tool_in_T
             )
         except RuntimeError as e:
-            print(FAIL_STR(f"skipping step {step}. {e}"))
+            print(ColorText.FAIL_STR(f"skipping step {step}. {e}"))
             continue
 
         estimated_T_TM = Frame.find_transformation_direct(defined_tool.tool_def, corresponding_pt)
@@ -103,7 +102,7 @@ def test_correspondance_with_real_data():
         estimated_pt = estimated_T_TM @ defined_tool.tool_def
         error = np.linalg.norm(estimated_pt - corresponding_pt, axis=0)
 
-        e = 1e-3
+        e = 1e-3  # errors below 1mm
         assert np.all(error < e), ""
 
 

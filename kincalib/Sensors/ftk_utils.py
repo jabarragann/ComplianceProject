@@ -227,7 +227,33 @@ def markerfile2triangles(filename: Path) -> List[Triangle3D]:
         exit(0)
 
 
-def identify_marker_fiducials(detected_fiducials: np.ndarray, tool_def: np.ndarray):
+def identify_marker_fiducials(detected_fiducials: np.ndarray, tool_def: np.ndarray, T_TM: Frame):
+    """Identify fiducials corresponding to tool definition
+
+    Parameters
+    ----------
+    detected_fiducials : np.ndarray
+        Detected fiducials in Tracker Frame (F)
+    tool_def : np.ndarray
+        Fiducials in Tool Frame (M). Obtain from tool definition file.
+
+    Returns
+    -------
+    T_TM
+        Transformation from Tool (M) to Tracker (T)
+    tool_fid_idx
+        idx corresponding to the tool fiducials
+    other_fid_idx
+        idx corresponding to fiducials not in the tool
+    """
+    T_TM = None
+    tool_fid_idx = None
+    other_fid_idx = None
+
+    return T_TM, tool_fid_idx, other_fid_idx
+
+
+def identify_marker_fiducials_and_transform(detected_fiducials: np.ndarray, tool_def: np.ndarray):
     """Identify fiducials corresponding to tool definition
 
     Parameters
@@ -357,13 +383,16 @@ def test_correspondance_function_with_real():
     # Data loading
     project_root = Path(__file__).parent.parent.parent
     data_file = project_root / "unittests/SensorUtils/data/Tool113_Fiducials4_1.csv"
-    data_file = pd.read_csv(data_file)
     json_path = project_root / Path("./share/custom_marker_id_113.json")
+
+    # data_file = project_root / "unittests/SensorUtils/data/Tool112_Fiducials3_1.csv"
+    # json_path = project_root / Path("./share/custom_marker_id_112.json")
+
+    data_file = pd.read_csv(data_file)
     fiducial_loc = parse_atracsys_marker_def(json_path)
 
     # Correspodance algorithm
-    segments_lengths = OpticalTrackingUtils.obtain_tool_segments_list(fiducial_loc, 4)
-    defined_tool = DynamicReferenceFrame(fiducial_loc, 4)
+    defined_tool = DynamicReferenceFrame(fiducial_loc, fiducial_loc.shape[1])
 
     for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data_file):
         candidate_tool_in_T, best_score, subset_idx = defined_tool.identify_closest_subset(
