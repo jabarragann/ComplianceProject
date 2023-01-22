@@ -13,8 +13,8 @@ import pandas as pd
 
 
 def load_real_data(data_filename: str, marker_def_filename: str) -> Union[pd.DataFrame, np.ndarray]:
-    data_file = pd.read_csv(Path(__file__).parent / f"data/{data_filename}")
-    marker_def = Path(__file__).parent / f"data/{marker_def_filename}"
+    data_file = pd.read_csv(Path(__file__).parent / f"test_data/{data_filename}")
+    marker_def = Path(__file__).parent / f"test_data/{marker_def_filename}"
     marker_def = parse_atracsys_marker_def(marker_def)
 
     return data_file, marker_def
