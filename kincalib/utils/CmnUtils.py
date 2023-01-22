@@ -1,4 +1,5 @@
 # Python imports
+from enum import Enum
 from pathlib import Path
 import time
 import argparse
@@ -25,6 +26,36 @@ from kincalib.utils.Logger import Logger
 
 log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
+
+
+class ColorText(Enum):
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
+    @classmethod
+    def toStr(cls, f):
+        return "{:.3f}".format(f)
+
+    @classmethod
+    def FAIL_STR(cls, val):
+        if type(val) != str:
+            val = cls.toStr(val)
+        valStr = cls.FAIL.value + val + cls.ENDC.value
+        return valStr
+
+    @classmethod
+    def INFO_STR(cls, val):
+        if type(val) != str:
+            val = cls.toStr(val)
+        valStr = cls.OKBLUE.value + val + cls.ENDC.value
+        return valStr
 
 
 def mean_std_str_vect(mean_vect, std_vect):
