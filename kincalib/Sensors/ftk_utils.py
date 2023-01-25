@@ -181,23 +181,115 @@ class DynamicReferenceFrame:
 
 class OpticalTrackingUtils:
     @staticmethod
-    def obtain_tool_segments_list(tool_def: np.ndarray, n_fiducials: int):
+    def identify_marker_fiducials(
+        detected_fiducials: np.ndarray, tool_def: np.ndarray, T_TM: Frame
+    ):
+        """Identify fiducials corresponding to tool definition
 
-        if tool_def.shape != (3, n_fiducials):
-            raise ValueError(
-                "Tool def was not provided in correct format."
-                f"Expected array of shape {(3,n_fiducials)}"
-            )
-        idx = list(range(n_fiducials))
-        segment_list = []
-        for comb in combinations(idx, 2):
-            di = np.linalg.norm(tool_def[:, comb[0]] - tool_def[:, comb[1]])
-            segment_list.append([comb[0], comb[1], di])
+        Parameters
+        ----------
+        detected_fiducials : np.ndarray
+            Detected fiducials in Tracker Frame (F)
+        tool_def : np.ndarray
+            Fiducials in Tool Frame (M). Obtain from tool definition file.
 
-        # Sort by di
-        segment_list = sorted(segment_list, key=lambda x: x[2])
+        Returns
+        -------
+        tool_fid_idx
+            idx corresponding to the tool fiducials
+        other_fid_idx
+            idx corresponding to fiducials not in the tool
+        """
 
-        return segment_list
+        tool_def_T = T_TM @ tool_def
+        tool_idx = OpticalTrackingUtils.find_closest_pt(tool_def_T, detected_fiducials)
+
+        all_idx = set(list(range(tool_def.shape[1])))
+        other_idx = list(all_idx.difference(tool_idx))
+        if np.all((tool_def_T - detected_fiducials[:, tool_idx]) < 1e-3):
+            return tool_idx, other_idx
+        else:
+            return None, None
+
+    @staticmethod
+    def find_closest_pt(pt, pt_cloud):
+        closest_idx = []
+        for i in range(pt.shape[1]):
+            dist = np.linalg.norm(pt[:, i].reshape((3, 1)) - pt_cloud, axis=0)
+            closest_idx.append(np.argmin(dist))
+        return closest_idx
+
+    @staticmethod
+    def identify_marker_fiducials_and_transform(
+        detected_fiducials: np.ndarray, tool_def: np.ndarray
+    ):
+        """Identify fiducials corresponding to tool definition and transform between them.
+
+        Parameters
+        ----------
+        detected_fiducials : np.ndarray
+            Detected fiducials in Tracker Frame (F)
+        tool_def : np.ndarray
+            Fiducials in Tool Frame (M). Obtain from tool definition file.
+
+        Returns
+        -------
+        T_TM
+            Transformation from Tool (M) to Tracker (T)
+        tool_fid_idx
+            idx corresponding to the tool fiducials
+        other_fid_idx
+            idx corresponding to fiducials not in the tool
+        """
+        T_TM = None
+        tool_fid_idx = None
+        other_fid_idx = None
+
+        raise NotImplementedError()
+
+        return T_TM, tool_fid_idx, other_fid_idx
+
+    @staticmethod
+    def identify_marker(sorted_records: np.ndarray, reference_triangle: Triangle3D) -> dict:
+        """Return idx of the of the spheres corresponding to the given triangle. This method will fail if you have multiple
+        triangles with the same size in your `sorted_records`. You might need to try something fancier if this is causing
+        problems.
+
+        Keys in return dic
+        - dict['marker'] --> marker fiducials
+        - dict['other'] --> Other fiducials
+
+        Args:
+            sorted_records (np.ndarray): Array containing the location of the fiducials. The shape of the array must be (`n`,3)
+                                        where `n` is the total number of fiducials detected.
+            reference_triangle (Triangle3D): [description]
+
+        Returns:
+            - dict: dictionary of indeces corresponding to the marker's fiducials and other fiducials.
+            - closest_triangle:
+
+        """
+        n = sorted_records.shape[0]  # Get number of records
+        # Get all possible triangles
+        min_area_diff = 999999  # Arbitrarily high
+        closest_triangle = None
+        closest_idx = None
+        for comb in combinations(list(range(n)), 3):
+            vert_list = [sorted_records[comb[0]], sorted_records[comb[1]], sorted_records[comb[2]]]
+            t = Triangle3D(vert_list)
+
+            # Compare againts reference triangle and find the candidates with similar area.
+            # IMPROVEMENT: If multiple candidates are found, use lenghts to find the closest to the reference.
+            if t.area - reference_triangle.area < min_area_diff:
+                min_area_diff = t.area - reference_triangle.area
+                closest_triangle = t
+                closest_idx = comb
+
+        # Return dictionary of indeces corresponding to the marker's fiducials and other fiducials
+        fid_dict = dict()
+        fid_dict["marker"] = closest_idx
+        fid_dict["other"] = [x for x in list(range(n)) if x not in closest_idx]
+        return fid_dict, closest_triangle
 
 
 def markerfile2triangles(filename: Path) -> List[Triangle3D]:

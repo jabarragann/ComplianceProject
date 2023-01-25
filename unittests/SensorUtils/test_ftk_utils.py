@@ -2,7 +2,11 @@ from typing import Union
 import numpy as np
 from pathlib import Path
 import pytest
-from kincalib.Sensors.ftk_utils import DynamicReferenceFrame, identify_marker_fiducials
+from kincalib.Sensors.ftk_utils import (
+    DynamicReferenceFrame,
+    OpticalTrackingUtils,
+    identify_marker_fiducials,
+)
 from kincalib.Transforms.Rotation import Rotation3D
 from kincalib.utils.CmnUtils import ColorText
 from kincalib.Transforms.Frame import Frame
@@ -106,5 +110,55 @@ def test_correspondance_with_real_data(data_file, marker_file):
         assert np.all(error < e), ""
 
 
+# OpticalTrackingUtils
+@pytest.mark.parametrize("size", [10, 20, 30])
+def test_closest_pt_ft_utils(size):
+    pt_cloud = np.random.random((3, size))
+    permutation = np.random.permutation(size).tolist()
+
+    pts = pt_cloud[:, permutation]
+    idx = OpticalTrackingUtils.find_closest_pt(pts, pt_cloud)
+    assert idx == permutation
+
+
+@pytest.mark.parametrize(
+    "data_file,marker_file",
+    [
+        ("Tool113_Fiducials4_1.csv", "custom_marker_id_113.json"),
+        ("Tool112_Fiducials3_1.csv", "custom_marker_id_112.json"),
+    ],
+)
+def test_identify_marker_fiducials(data_file, marker_file):
+    data, tool_def = load_real_data(data_file, marker_file)
+    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data):
+        tool_def_T = T_TM @ tool_def
+        marker_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
+            fid_in_tracker, tool_def, T_TM
+        )
+        if marker_idx is not None and other_idx is not None:
+            e = 1e-3  # errors below 1mm
+            error = tool_def_T - fid_in_tracker[:, marker_idx]
+            assert np.all(error < e), ""
+
+
+@pytest.mark.parametrize(
+    "data_file,marker_file",
+    [
+        ("Tool113_Fiducials4_1.csv", "custom_marker_id_113.json"),
+        ("Tool112_Fiducials3_1.csv", "custom_marker_id_112.json"),
+    ],
+)
+def test_other_different_from_tool_idx_in_marker_fiducials(data_file, marker_file):
+    data, tool_def = load_real_data(data_file, marker_file)
+    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data):
+        marker_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
+            fid_in_tracker, tool_def, T_TM
+        )
+        if marker_idx is not None and other_idx is not None:
+            for o in other_idx:
+                assert o not in marker_idx
+
+
 if __name__ == "__main__":
     print("")
+    test_identify_marker_fiducials("Tool113_Fiducials4_1.csv", "custom_marker_id_113.json")
