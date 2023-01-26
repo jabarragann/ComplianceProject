@@ -31,3 +31,7 @@ class RosConversion:
         frame: np.ndarray = pm.toMatrix(frame)
 
         return Rotation3D(frame[:3, :3])
+
+    @staticmethod
+    def frame_to_pykdl_frame(frame: Frame):
+        return pm.fromMatrix(np.array(frame))

@@ -23,6 +23,7 @@ from kincalib.utils.SavingUtilities import save_without_overwritting
 from kincalib.utils.RosbagUtils import RosbagUtils
 from kincalib.Transforms.Frame import Frame
 from kincalib.utils.Logger import Logger
+from kincalib.Entities.RosConversions import RosConversion
 
 log = Logger(__name__).log
 np.set_printoptions(precision=4, suppress=True, sign=" ")
@@ -81,7 +82,7 @@ def pykdl2frame(frame: PyKDL.Frame):
 
 
 def calculate_mean_frame(
-    frame_arr: List[PyKDL.Frame],
+    frame_list: List[PyKDL.Frame],
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """[summary]
 
@@ -92,11 +93,18 @@ def calculate_mean_frame(
         Tuple[np.ndarray,np.ndarray,np.ndarray]: mean_frame, position_std, orientation_std
     """
 
+    if len(frame_list) == 0:
+        raise ValueError("Cannot average empty lists")
+
     position = []
     orientation = []
-    for k in range(len(frame_arr)):
-        position.append(np.array(list(frame_arr[k].p)))
-        orientation.append(np.array(list(frame_arr[k].M.GetQuaternion())))
+    for k in range(len(frame_list)):
+        temp_frame = frame_list[k]
+        if isinstance(temp_frame, Frame):
+            temp_frame = RosConversion.frame_to_pykdl_frame
+
+        position.append(np.array(list(temp_frame.p)))
+        orientation.append(np.array(list(frame_list[k].M.GetQuaternion())))
 
     position_mean = np.array(position).mean(axis=0)
     orientation_mean = np.array(orientation).mean(axis=0)

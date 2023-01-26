@@ -23,6 +23,7 @@ from roboticstoolbox import DHRobot, RevoluteMDH
 
 # My modules
 from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
+from kincalib.Sensors.ftk_utils import OpticalTrackingUtils
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
     load_registration_data,
@@ -31,6 +32,10 @@ from kincalib.utils.ExperimentUtils import (
 )
 from kincalib.Transforms.Frame import Frame
 from kincalib.Motion.DvrkKin import DvrkPsmKin
+from kincalib.utils.FileParser import (
+    extract_fiducials_and_toolframe_on_step,
+    fid_and_toolframe_generator,
+)
 
 
 marker_file = Path("./share/custom_marker_id_113.json")
@@ -271,65 +276,74 @@ class JointEstimator:
 
 
 class CalibrationUtils:
-    def create_roll_circles(roll_df) -> List[Circle3D]:
-        """
-        TODO: This function will now work only with the new format. Need to find away to
-        read new and old data.
-        """
-        df = roll_df
-        roll = df["set_q4"].unique()
-        marker_orig_arr = []  # shaft marker
-        fid_arr = []  # Wrist fiducial
-        for r in roll:
-            df_temp = df.loc[df["set_q4"] == r]
-            pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-            if len(pose_arr) > 0 and len(wrist_fiducials) > 0:
-                marker_orig_arr.append(list(pose_arr[0].p))
-                fid_arr.append(wrist_fiducials)
+    def are_not_none(l: list):
+        return all([e is not None for e in l])
 
-        marker_orig_arr = np.array(marker_orig_arr)
-        fid_arr = np.array(fid_arr)
+    @classmethod
+    def extract_marker_and_fiducial_on_wrist(cls, roll_df, tool_def, marker_full_pose=False):
+        marker_arr = []  # shaft marker poses
+        wrist_fid_arr = []  # Wrist fiducial positions
+
+        for step, fiducials_loc, T_TM in fid_and_toolframe_generator(roll_df):
+            if cls.are_not_none([fiducials_loc, T_TM]):
+                tool_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
+                    fiducials_loc, tool_def, T_TM
+                )
+                if cls.are_not_none([tool_idx, other_idx]):
+                    wrist_fiducial = fiducials_loc[:, other_idx]
+                    wrist_fid_arr.append(wrist_fiducial.tolist())
+                    if marker_full_pose:
+                        marker_arr.append(T_TM)
+                    else:
+                        marker_arr.append(T_TM.p.tolist())
+
+        wrist_fid_arr = np.array(wrist_fid_arr).T
+        marker_arr = marker_arr if marker_full_pose else np.array(marker_arr)
+
+        return np.array(marker_arr), wrist_fid_arr
+
+    @classmethod
+    def create_roll_circles(cls, roll_df, tool_def) -> List[Circle3D]:
+        marker_orig_arr, wrist_fid_arr = cls.extract_marker_and_fiducial_on_wrist(roll_df, tool_def)
         roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
-        roll_cir2 = Circle3D.from_lstsq_fit(fid_arr)
+        roll_cir2 = Circle3D.from_lstsq_fit(wrist_fid_arr)
 
         return roll_cir1, roll_cir2
 
-    def create_yaw_pitch_circles(py_df) -> List[Circle3D]:
+    @classmethod
+    def create_yaw_pitch_circles(cls, df, tool_def) -> List[Circle3D]:
         """
         TODO: This function will now work only with the new format. Need to find away to
         read new and old data.
         """
 
-        df = py_df
-        # roll values
-        roll = df["set_q4"].unique()
+        roll_values = df["set_q4"].unique()
 
-        if len(roll) < 2:
-            raise Exception("Not enough roll values for the 2 pitch circle calculations")
+        if len(roll_values) < 2:
+            raise RuntimeError("Not enough roll values for the 2 pitch circle calculations")
 
-        pitch_arr = []
-        yaw_arr = []
         pitch_yaw_circles_dict = defaultdict(dict)
-        for idx, r in enumerate(roll):
+        for idx, r in enumerate(roll_values):
             # Calculate mean marker pose
             df_temp = df.loc[(df["set_q4"] == r)]
-            pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-            if len(pose_arr) > 0:
-                mean_pose, position_std, orientation_std = calculate_mean_frame(pose_arr)
+            marker_arr, _ = cls.extract_marker_and_fiducial_on_wrist(
+                df_temp, tool_def, marker_full_pose=True
+            )
+            if len(marker_arr) > 0:
+                mean_pose, position_std, orientation_std = calculate_mean_frame(marker_arr)
                 pitch_yaw_circles_dict[idx]["marker_pose"] = mean_pose
             else:
                 raise Exception("No marker pose found")
+
             # Calculate pitch circle
             df_temp = df.loc[(df["set_q4"] == r) & (df["set_q6"] == 0.0)]
-            pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-            pitch_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-            pitch_yaw_circles_dict[idx]["pitch"] = pitch_cir
+            _, wrist_fiducials = cls.extract_marker_and_fiducial_on_wrist(df_temp, tool_def)
+            pitch_yaw_circles_dict[idx]["pitch"] = Circle3D.from_lstsq_fit(wrist_fiducials)
 
             # Calculate yaw circle
             df_temp = df.loc[(df["set_q4"] == r) & (df["set_q5"] == 0.0)]
-            pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-            yaw_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-            pitch_yaw_circles_dict[idx]["yaw"] = yaw_cir
+            _, wrist_fiducials = cls.extract_marker_and_fiducial_on_wrist(df_temp, tool_def)
+            pitch_yaw_circles_dict[idx]["yaw"] = Circle3D.from_lstsq_fit(wrist_fiducials)
 
         return dict(pitch_yaw_circles_dict)
 

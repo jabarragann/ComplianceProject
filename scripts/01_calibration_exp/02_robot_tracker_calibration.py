@@ -13,6 +13,7 @@ from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 # kincalib module imports
 from kincalib.Transforms.Frame import Frame
+from kincalib.utils.FileParser import parse_atracsys_marker_def
 from kincalib.utils.Logger import Logger
 from kincalib.utils.ExperimentUtils import load_registration_data
 from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D, dist_circle3_plane
@@ -168,7 +169,7 @@ class RobotTrackerCalibration:
                             "yaw_fidx2_Y", "yaw_fidy2_Y", "yaw_fidz2_Y"]
     # fmt: on
 
-    def obtain_registration_data(root: Path):
+    def obtain_registration_data(root: Path, tool_def):
         # Robot points
         # df with columns = [step,px,py,pz]
         robot_jp = root / "robot_mov" / "robot_jp.txt"
@@ -180,7 +181,7 @@ class RobotTrackerCalibration:
         # Tracker points
         # df with columns = [step area tx, ty,tz]
         pitch_tracker, calibration_constants_df = RobotTrackerCalibration.pitch_orig_in_tracker(
-            root
+            root, tool_def
         )
 
         # combine df using step as index
@@ -220,7 +221,9 @@ class RobotTrackerCalibration:
 
         return df_results
 
-    def pitch_orig_in_tracker(root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def pitch_orig_in_tracker(
+        root: Path, tool_def: np.ndarray
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Calculate the pitch origin in tracker coordinates and the pitch in frame in marker
         coordinates. There exists a constant rigid transformation between the marker in the shaft and
         the pitch frame.
@@ -273,9 +276,13 @@ class RobotTrackerCalibration:
             else:
                 try:
                     # Get roll circles
-                    roll_cir1, roll_cir2 = calib.create_roll_circles(dict_files[step]["roll"])
+                    roll_cir1, roll_cir2 = calib.create_roll_circles(
+                        dict_files[step]["roll"], tool_def
+                    )
                     # Get pitch and yaw circles
-                    pitch_yaw_circles = calib.create_yaw_pitch_circles(dict_files[step]["pitch"])
+                    pitch_yaw_circles = calib.create_yaw_pitch_circles(
+                        dict_files[step]["pitch"], tool_def
+                    )
 
                     # pitch orig in tracker
                     m1, m2, m3 = calib.calculate_pitch_origin(
@@ -461,6 +468,8 @@ def main():
     log_level = args.log
     log = Logger("pitch_exp_analize2", log_level=log_level).log
     root = Path(args.root)
+    tool_def_path = "/home/juan1995/research_juan/ComplianceProject/share/custom_marker_id_113.json"
+    tool_def = parse_atracsys_marker_def(tool_def_path)
 
     # Paths
     registration_data_path = Path(args.dstdir) / root.name if args.dstdir is not None else root
@@ -478,7 +487,7 @@ def main():
         (
             registration_df,
             calibration_constants_df,
-        ) = RobotTrackerCalibration.obtain_registration_data(root)
+        ) = RobotTrackerCalibration.obtain_registration_data(root, tool_def)
         # Save df
         registration_df.to_csv(
             registration_data_path / "robot_tracker_registration.csv", index=None
