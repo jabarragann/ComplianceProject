@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import argparse
+import traceback
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -13,6 +14,7 @@ from kincalib.Motion.DvrkKin import DvrkPsmKin
 
 # kincalib module imports
 from kincalib.Transforms.Frame import Frame
+from kincalib.Transforms.Rotation import Rotation3D
 from kincalib.utils.FileParser import parse_atracsys_marker_def
 from kincalib.utils.Logger import Logger
 from kincalib.utils.ExperimentUtils import load_registration_data
@@ -49,6 +51,10 @@ def calculate_registration(df: pd.DataFrame, root: Path):
 
     # Choose entries were the area is lower is than 6mm
     df = df.loc[df["area"] < global_area_threshold]
+
+    if df.shape[0] < 6:
+        raise RuntimeError("Not enough data to perform registration between robot and tracker")
+
     robot_p = df[["rpx", "rpy", "rpz"]].to_numpy().T
     tracker_p = df[["tpx", "tpy", "tpz"]].to_numpy().T
     log.info(f"Points used for the registration {robot_p.shape[1]}")
@@ -139,7 +145,7 @@ def calculate_final_calibration(calibration_constants_df) -> Tuple[Frame, dict]:
     pitch2marker_T[:3, 2] = roll_axis_median
     pitch2marker_T[:3, 3] = pitch_orig_median
 
-    T_MP = Frame.init_from_matrix(pitch2marker_T)
+    T_MP = Frame.init_from_matrix(pitch2marker_T, trnorm=True)
     return T_MP, calibration_dict
 
 
@@ -275,6 +281,7 @@ class RobotTrackerCalibration:
                 log.warning(f"files for step {step} are not available")
             else:
                 try:
+                    log.info(f"processing step {step}")
                     # Get roll circles
                     roll_cir1, roll_cir2 = calib.create_roll_circles(
                         dict_files[step]["roll"], tool_def
@@ -316,9 +323,12 @@ class RobotTrackerCalibration:
                     pitch_orig_T_list.append(pitch_orig_T_dict)
                     calibration_const_list.append(calibration_dict)
 
-                except Exception as e:
+                except RuntimeError as e:
                     log.error(f"Error in circles creation on step {step}")
                     log.error(e)
+                    # print(traceback.format_exc())
+                except IndexError as e:
+                    log.error(f"No data for step {step}")
 
         if len(pitch_orig_T_list) == 0:
             raise Exception("No calibration files found")
@@ -374,7 +384,7 @@ class RobotTrackerCalibration:
             T_TJ[:3, 1] = cross_product(yaw_cir.normal, pitch_cir.normal)
             T_TJ[:3, 2] = yaw_cir.normal
             T_TJ[:3, 3] = yaw_orig_M
-            T_TJ = Frame.init_from_matrix(T_TJ)
+            T_TJ = Frame(r=Rotation3D.trnorm(T_TJ[:3, :3]), p=T_TJ[:3, 3])
 
             # Get fiducial in yaw coordinates==>
             # Changed calculated the fid_T:
@@ -426,20 +436,20 @@ class RobotTrackerCalibration:
         T_TM1 = utils.pykdl2frame(pitch_yaw_circles[0]["marker_pose"])
         pitch_orig1 = (T_TM1.inv() @ pitch_orig_T).squeeze()
 
-        pitch_ax1 = T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal
+        pitch_ax1 = (T_TM1.inv().r @ pitch_yaw_circles[0]["pitch"].normal).squeeze()
         pitch_ax1 = pitch_ax1 / np.linalg.norm(pitch_ax1)
 
-        roll_ax1 = T_TM1.inv().r @ roll_circle.normal
+        roll_ax1 = (T_TM1.inv().r @ roll_circle.normal).squeeze()
         roll_ax1 = roll_ax1 / np.linalg.norm(roll_ax1)
 
         # On roll pose 2
         T_TM2 = utils.pykdl2frame(pitch_yaw_circles[1]["marker_pose"])
         pitch_orig2 = (T_TM2.inv() @ pitch_orig_T).squeeze()
 
-        pitch_ax2 = T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal
+        pitch_ax2 = (T_TM2.inv().r @ pitch_yaw_circles[1]["pitch"].normal).squeeze()
         pitch_ax2 = pitch_ax2 / np.linalg.norm(pitch_ax2)
 
-        roll_ax2 = T_TM2.inv().r @ roll_circle.normal
+        roll_ax2 = (T_TM2.inv().r @ roll_circle.normal).squeeze()
         roll_ax2 = roll_ax2 / np.linalg.norm(roll_ax2)
 
         # fmt: off
@@ -468,7 +478,7 @@ def main():
     log_level = args.log
     log = Logger("pitch_exp_analize2", log_level=log_level).log
     root = Path(args.root)
-    tool_def_path = "/home/juan1995/research_juan/ComplianceProject/share/custom_marker_id_113.json"
+    tool_def_path = "/home/juan1995/research_juan/ComplianceProject/share/custom_marker_id_112.json"
     tool_def = parse_atracsys_marker_def(tool_def_path)
 
     # Paths
@@ -517,8 +527,8 @@ def main():
 
     # Load json
     registration_dict = json.load(open(new_name, "r"))
-    T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
-    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+    T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]),trnorm=True)
+    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]),trnorm=True)
     log.info(f"Robot to Tracker\n{T_RT}")
     log.info(f"Pitch to marker\n{T_MP}")
 

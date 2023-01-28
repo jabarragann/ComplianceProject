@@ -155,6 +155,7 @@ def test_other_different_from_tool_idx_in_marker_fiducials(data_file, marker_fil
             fid_in_tracker, tool_def, T_TM
         )
         if marker_idx is not None and other_idx is not None:
+            assert len(other_idx) != 0
             for o in other_idx:
                 assert o not in marker_idx
 

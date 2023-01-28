@@ -101,10 +101,10 @@ def calculate_mean_frame(
     for k in range(len(frame_list)):
         temp_frame = frame_list[k]
         if isinstance(temp_frame, Frame):
-            temp_frame = RosConversion.frame_to_pykdl_frame
+            temp_frame = RosConversion.frame_to_pykdl_frame(temp_frame)
 
         position.append(np.array(list(temp_frame.p)))
-        orientation.append(np.array(list(frame_list[k].M.GetQuaternion())))
+        orientation.append(np.array(list(temp_frame.M.GetQuaternion())))
 
     position_mean = np.array(position).mean(axis=0)
     orientation_mean = np.array(orientation).mean(axis=0)

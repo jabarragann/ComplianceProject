@@ -37,7 +37,7 @@ class Frame:
         self.p = np.array(p).reshape((3, 1))
 
     @classmethod
-    def init_from_matrix(cls, m: np.ndarray) -> Frame:
+    def init_from_matrix(cls, m: np.ndarray, trnorm: bool = False) -> Frame:
         """Create instance from homogenous transformation matrix
 
         Args:
@@ -47,9 +47,12 @@ class Frame:
             Frame: _description_
         """
         if not all(np.array(m.shape) == [4, 4]):
-            raise ("Not a 4x4 homogenous transformation matrix")
+            raise ValueError("Not a 4x4 homogenous transformation matrix")
 
-        return cls(m[:3, :3], m[:3, 3])
+        if trnorm:
+            return cls(Rotation3D.trnorm(m[:3, :3]), m[:3, 3])
+        else:
+            return cls(m[:3, :3], m[:3, 3])
 
     def __array__(self):
         out = np.eye(4, dtype=np.float32)

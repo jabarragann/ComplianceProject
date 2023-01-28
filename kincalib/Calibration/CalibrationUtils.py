@@ -24,6 +24,7 @@ from roboticstoolbox import DHRobot, RevoluteMDH
 # My modules
 from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.Sensors.ftk_utils import OpticalTrackingUtils
+from kincalib.Transforms.Validations import pt_cloud_format_validation
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
     load_registration_data,
@@ -290,17 +291,17 @@ class CalibrationUtils:
                     fiducials_loc, tool_def, T_TM
                 )
                 if cls.are_not_none([tool_idx, other_idx]):
-                    wrist_fiducial = fiducials_loc[:, other_idx]
-                    wrist_fid_arr.append(wrist_fiducial.tolist())
+                    wrist_fiducial = fiducials_loc[:, other_idx].squeeze().tolist()
+                    wrist_fid_arr.append(wrist_fiducial)
                     if marker_full_pose:
                         marker_arr.append(T_TM)
                     else:
-                        marker_arr.append(T_TM.p.tolist())
+                        marker_arr.append(T_TM.p.squeeze().tolist())
 
-        wrist_fid_arr = np.array(wrist_fid_arr).T
+        wrist_fid_arr = np.array(wrist_fid_arr)
         marker_arr = marker_arr if marker_full_pose else np.array(marker_arr)
 
-        return np.array(marker_arr), wrist_fid_arr
+        return marker_arr, wrist_fid_arr
 
     @classmethod
     def create_roll_circles(cls, roll_df, tool_def) -> List[Circle3D]:
@@ -317,10 +318,10 @@ class CalibrationUtils:
         read new and old data.
         """
 
-        roll_values = df["set_q4"].unique()
+        roll_values = df["set_q4"].round(decimals=6).unique()
 
-        if len(roll_values) < 2:
-            raise RuntimeError("Not enough roll values for the 2 pitch circle calculations")
+        if len(roll_values) != 2:
+            raise RuntimeError("Data in wrong format. There should be two roll values per file.")
 
         pitch_yaw_circles_dict = defaultdict(dict)
         for idx, r in enumerate(roll_values):
@@ -333,15 +334,15 @@ class CalibrationUtils:
                 mean_pose, position_std, orientation_std = calculate_mean_frame(marker_arr)
                 pitch_yaw_circles_dict[idx]["marker_pose"] = mean_pose
             else:
-                raise Exception("No marker pose found")
+                raise RuntimeError("No marker pose found")
 
             # Calculate pitch circle
-            df_temp = df.loc[(df["set_q4"] == r) & (df["set_q6"] == 0.0)]
+            df_temp = df.loc[(np.isclose(df["set_q4"], r)) & (np.isclose(df["set_q6"], 0.0))]
             _, wrist_fiducials = cls.extract_marker_and_fiducial_on_wrist(df_temp, tool_def)
             pitch_yaw_circles_dict[idx]["pitch"] = Circle3D.from_lstsq_fit(wrist_fiducials)
 
             # Calculate yaw circle
-            df_temp = df.loc[(df["set_q4"] == r) & (df["set_q5"] == 0.0)]
+            df_temp = df.loc[(np.isclose(df["set_q4"], r)) & (np.isclose(df["set_q5"], 0.0))]
             _, wrist_fiducials = cls.extract_marker_and_fiducial_on_wrist(df_temp, tool_def)
             pitch_yaw_circles_dict[idx]["yaw"] = Circle3D.from_lstsq_fit(wrist_fiducials)
 

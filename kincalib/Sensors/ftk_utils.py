@@ -7,11 +7,14 @@ from pathlib import Path
 from kincalib.utils.CmnUtils import ColorText
 from kincalib.utils.Logger import Logger
 from kincalib.Geometry.geometry import Triangle3D
+from kincalib.utils.Logger import Logger
 import json
 from typing import List, Union
 from itertools import combinations
 
 from dataclasses import dataclass
+
+log = Logger("__name__").log
 
 
 @dataclass
@@ -204,11 +207,15 @@ class OpticalTrackingUtils:
         tool_def_T = T_TM @ tool_def
         tool_idx = OpticalTrackingUtils.find_closest_pt(tool_def_T, detected_fiducials)
 
-        all_idx = set(list(range(tool_def.shape[1])))
+        all_idx = set(list(range(detected_fiducials.shape[1])))
         other_idx = list(all_idx.difference(tool_idx))
-        if np.all(np.linalg.norm(tool_def_T - detected_fiducials[:, tool_idx], axis=0) < 1e-3):
+        error = np.linalg.norm(tool_def_T - detected_fiducials[:, tool_idx], axis=0)
+        if np.all(error < 1e-3):
             return tool_idx, other_idx
         else:
+            log.warning(
+                f"Tracker processing warning: between detected and model (mm) \n{np.array2string(error*1000,precision=3)}"
+            )
             return None, None
 
     @staticmethod

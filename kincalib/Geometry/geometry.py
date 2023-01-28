@@ -359,6 +359,9 @@ class Circle3D:
             Circle3D: Circle that minimizes the lstsq problem
         """
 
+        assert (
+            samples.shape[1] == 3
+        ), f"sample points need a shape of (N,3). Current shape {samples.shape}"
         P_mean = samples.mean(axis=0)
         P_centered = samples - P_mean
 
