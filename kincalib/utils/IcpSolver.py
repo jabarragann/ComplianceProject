@@ -137,7 +137,7 @@ if __name__ == "__main__":
     rot_ax = np.random.random(3)
     rot_ax = rot_ax / np.linalg.norm(rot_ax)
     theta = np.random.uniform(-np.pi, np.pi)
-    rotation = Rotation3D.from_rodrigues(theta * rot_ax)
+    rotation = Rotation3D.from_rotvec(theta * rot_ax)
     print(f"theta {theta}")
 
     # Create random point cloud

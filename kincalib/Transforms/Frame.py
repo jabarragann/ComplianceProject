@@ -92,7 +92,7 @@ class Frame:
 
     @classmethod
     def from_rotvec_and_position(cls, rot_vec: np.ndarray, pos_vec: np.ndarray) -> Frame:
-        return Frame(Rotation3D.from_rodrigues(rot_vec), pos_vec)
+        return Frame(Rotation3D.from_rotvec(rot_vec), pos_vec)
 
     @classmethod
     def find_transformation_direct(cls: Type[Frame], A: np.ndarray, B: np.ndarray) -> Frame:

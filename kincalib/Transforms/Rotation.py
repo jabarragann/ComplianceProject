@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Union
 import numpy as np
-
+from scipy.spatial.transform import Rotation as scipy_rotation
 from kincalib.Transforms.Validations import pt_cloud_format_validation
 
 _eps = np.finfo(np.float64).eps
@@ -49,8 +49,9 @@ class Rotation3D:
             raise TypeError
 
     @classmethod
-    def from_rodrigues(cls, rot_vec: np.ndarray) -> Rotation3D:
-        """Rotation about axis direction. The rotation angle is given by the norm of axis.
+    def from_rotvec(cls, rot_vec: np.ndarray) -> Rotation3D:
+        """Create a SO3 Rotation matrix from axis-angle representation.
+         The rotation angle is given by the norm of axis.
 
         See scipy rotation vectors
 
@@ -74,6 +75,9 @@ class Rotation3D:
         I = np.eye(3, 3)
 
         return Rotation3D(I + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K))
+
+    def as_rotvec(self):
+        return scipy_rotation.from_matrix(self.R).as_rotvec()
 
     @staticmethod
     def skew(x: np.ndarray):
@@ -132,7 +136,7 @@ class Rotation3D:
         rot_ax = np.random.random(3)
         rot_ax = rot_ax / np.linalg.norm(rot_ax)
         theta = np.random.uniform(-np.pi, np.pi)
-        return Rotation3D.from_rodrigues(theta * rot_ax)
+        return Rotation3D.from_rotvec(theta * rot_ax)
 
 
 if __name__ == "__main__":
@@ -145,9 +149,9 @@ if __name__ == "__main__":
 
     print("Rodrigues")
     ax = np.array([0.0, 0.0, 0.5])
-    R1 = Rotation3D.from_rodrigues(ax)
+    R1 = Rotation3D.from_rotvec(ax)
     ax = np.array([0.5, 0.0, 0.5])
-    R2 = Rotation3D.from_rodrigues(ax)
+    R2 = Rotation3D.from_rotvec(ax)
     print(R1)
 
     print("convert to numpy array")
@@ -163,3 +167,16 @@ if __name__ == "__main__":
         R = Rotation3D(arr)
     except ValueError as e:
         print(f"Error: {e}")
+
+    print("Convert from axis-rep to matrix and viceversa")
+    ax = np.array([0.5, 0.5, 0.5])
+    ax = ax / np.linalg.norm(ax)
+    angle = 45 * np.pi / 180
+    R = Rotation3D.from_rotvec(ax * angle)
+    est_axis = R.as_rotvec()
+    est_angle = np.linalg.norm(est_axis)
+    est_axis = est_axis / est_angle
+
+    print(f"matrix \n{R}")
+    print(f"axis original     {ax}\naxis recalculated {est_axis}")
+    print(f"angle original     {angle}\nangle recalculated {est_angle}")

@@ -26,6 +26,6 @@ def test_inproper_rotation_matrices(not_rot_matrix):
 )
 def test_rodriges_against_scipy(rot_vec):
     scipy_rot = R.from_rotvec(rot_vec).as_matrix()
-    my_rot = Rotation3D.from_rodrigues(rot_vec).R
+    my_rot = Rotation3D.from_rotvec(rot_vec).R
 
     assert np.all(np.isclose(scipy_rot, my_rot))
