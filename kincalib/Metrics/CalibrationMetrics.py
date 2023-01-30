@@ -76,7 +76,10 @@ class CalibrationMetrics:
 
         cp_error = tracker_cp - robot_cp
         cp_error = cp_error.apply(np.linalg.norm, 1)
+        self.cp_error_max = cp_error.max(axis=0)
+        self.cp_error_min = cp_error.min(axis=0)
         self.cp_error_mean = cp_error.mean(axis=0)
+        self.cp_error_median = cp_error.median(axis=0)
         self.cp_error_std = cp_error.std(axis=0)
 
         # Calculate orientation errors
@@ -110,4 +113,21 @@ class CalibrationMetrics:
                 self.jp_error_mean[5] * 180 / np.pi, self.jp_error_std[5] * 180 / np.pi
             ),
             cartesian=mean_std_str(self.cp_error_mean * 1000, self.cp_error_std * 1000),
+        )
+
+    def cartesian_error_full_dict(self):
+        """Create error dict that can be used for the CompleteTable in TableGenerator .
+
+        ```
+        table.add_data(dict(type="robot", max=3, min=5, mean=4, median=5, std=6))
+        ```
+        """
+        format_func = lambda x: f"{x*1000:0.4f}"
+        return dict(
+            type=self.joints_source + "(mm)",
+            max=format_func(self.cp_error_max),
+            min=format_func(self.cp_error_min),
+            mean=format_func(self.cp_error_mean),
+            median=format_func(self.cp_error_median),
+            std=format_func(self.cp_error_std),
         )

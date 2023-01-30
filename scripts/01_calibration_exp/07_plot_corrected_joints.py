@@ -15,7 +15,7 @@ from kincalib.Metrics.RegistrationError import FRE, get_wrist_fiducials_cp
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.Logger import Logger
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils, TrackerJointsEstimator
-from kincalib.Metrics.TableGenerator import FRETable, ResultsTable
+from kincalib.Metrics.TableGenerator import CompleteResultsTable, FRETable, ResultsTable
 from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics 
 from kincalib.utils.CmnUtils import mean_std_str
 
@@ -119,6 +119,10 @@ def main(testid: int):
     net_dict = network_error_metrics.create_error_dict() 
     table.add_data(net_dict)
 
+    complete_table = CompleteResultsTable()
+    complete_table.add_multiple_entries([robot_error_metrics.cartesian_error_full_dict(),
+     network_error_metrics.cartesian_error_full_dict()])
+
     # ----------------
     # calculate FRE
     # ----------------
@@ -175,6 +179,7 @@ def main(testid: int):
     print(f"* model path: {model_path}\n")
     print(f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})")
     print(f"\n{table.get_full_table()}\n")
+    print(f"\n{complete_table.get_full_table()}\n")
 
     print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
     print(f"\n{fre_table.get_full_table()}\n")
