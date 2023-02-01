@@ -122,8 +122,8 @@ def main(testid: int):
         diff_std = diff.std(axis=0)
 
         # Calculate cartesian errors calculate cartesian positions from robot_valid and tracker_valid
-        robot_cp = CalibrationUtils.calculate_cartesian(robot_valid)
-        tracker_cp = CalibrationUtils.calculate_cartesian(tracker_valid)
+        robot_cp = CalibrationUtils.calculate_robot_position(robot_valid)
+        tracker_cp = CalibrationUtils.calculate_robot_position(tracker_valid)
         cp_error = tracker_cp - robot_cp
         mean_error = cp_error.apply(np.linalg.norm, 1)
 

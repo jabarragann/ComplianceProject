@@ -113,10 +113,10 @@ def main():
                 opt = opt_data.loc[opt_data["step"] == step]["q56res"].item()
 
                 # calculate cartesian positions
-                robot_cp = CalibrationUtils.calculate_cartesian(
+                robot_cp = CalibrationUtils.calculate_robot_position(
                     np.array(rq).reshape(1, 6)
                 ).to_numpy()
-                tracker_cp = CalibrationUtils.calculate_cartesian(
+                tracker_cp = CalibrationUtils.calculate_robot_position(
                     np.array(tq).reshape(1, 6)
                 ).to_numpy()
 

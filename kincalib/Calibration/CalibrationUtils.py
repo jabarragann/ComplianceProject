@@ -24,6 +24,7 @@ from roboticstoolbox import DHRobot, RevoluteMDH
 # My modules
 from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
 from kincalib.Sensors.ftk_utils import OpticalTrackingUtils
+from kincalib.Transforms.Rotation import Rotation3D
 from kincalib.Transforms.Validations import pt_cloud_format_validation
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
@@ -89,9 +90,9 @@ class TrackerJointsEstimator:
         # Load calibration values
         root = Path(self.calibration_file)
         registration_dict = json.load(open(root / "registration_values.json", "r"))
-        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]))
+        T_TR = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]), trnorm=True)
         T_RT = T_TR.inv()
-        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]))
+        T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]), trnorm=True)
         T_PM = T_MP.inv()
         self.wrist_fid_Y = np.array(registration_dict["fiducial_in_jaw"])
 
@@ -513,16 +514,54 @@ class CalibrationUtils:
         # axes.set_xticks([i * 5 for i in range(110 // 5)])
         # plt.show()
 
-    def calculate_cartesian(joints: np.ndarray):
+    def calculate_robot_pose(joints: np.ndarray) -> np.ndarray:
         psm_model = DvrkPsmKin()
         cartesian_pose = psm_model.fkine(joints)
 
-        # Analyse only the position accuracy of the robot
+        cartesian_result = np.zeros((len(cartesian_pose.data), 4, 4))
+        for idx, p in enumerate(cartesian_pose.data):
+            cartesian_result[idx, :, :] = p
+
+        return cartesian_result
+
+    @classmethod
+    def calculate_robot_position(cls, joints: np.ndarray, robot_pose_array=None) -> pd.DataFrame:
+        if robot_pose_array is None:
+            robot_pose_array = cls.calculate_robot_pose(joints)
+
         cols = ["X", "Y", "Z"]
         cartesian_df = pd.DataFrame(columns=cols)
-        for p in cartesian_pose.data:
-            posi = p[:3, 3]
+        for idx in range(robot_pose_array.shape[0]):
+            posi = robot_pose_array[idx, :3, 3]
             new_df = pd.DataFrame(posi.reshape(1, -1), columns=cols)
             cartesian_df = pd.concat((cartesian_df, new_df))
 
         return cartesian_df
+
+    @classmethod
+    def calculate_robot_rotations(
+        cls, joints: np.ndarray, robot_pose_array=None
+    ) -> List[Rotation3D]:
+        if robot_pose_array is None:
+            robot_pose_array = cls.calculate_robot_pose(joints)
+
+        rotations_list = []
+        for idx in range(robot_pose_array.shape[0]):
+            roti = robot_pose_array[idx, :3, :3]
+            rotations_list.append(Rotation3D(roti))
+
+        return rotations_list
+
+    @classmethod
+    def calculate_rotations_difference(
+        cls, rotation_list_a: List[Rotation3D], rotation_list_b: List[Rotation3D]
+    ) -> np.ndarray:
+        if len(rotation_list_a) != len(rotation_list_b):
+            raise ValueError("lists need to have same number of arguments")
+
+        result = []
+        for ra, rb in zip(rotation_list_a, rotation_list_b):
+            r_in_between = rb.T @ ra
+            rot_vec = r_in_between.as_rotvec()
+            result.append(np.linalg.norm(rot_vec) * 180 / np.pi)
+        return np.array(result).squeeze()

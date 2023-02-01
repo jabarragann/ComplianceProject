@@ -120,8 +120,11 @@ def main(testid: int):
     table.add_data(net_dict)
 
     complete_table = CompleteResultsTable()
-    complete_table.add_multiple_entries([robot_error_metrics.cartesian_error_full_dict(),
-     network_error_metrics.cartesian_error_full_dict()])
+    complete_table.add_multiple_entries([robot_error_metrics.get_error_full_dict("position"),
+    network_error_metrics.get_error_full_dict("position")])
+
+    complete_table.add_multiple_entries([robot_error_metrics.get_error_full_dict("rotation"),
+    network_error_metrics.get_error_full_dict("rotation")])
 
     # ----------------
     # calculate FRE

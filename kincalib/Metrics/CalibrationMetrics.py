@@ -48,20 +48,11 @@ class CalibrationMetrics:
     # Class variables
     joints_cols = ["q1", "q2", "q3", "q4", "q5", "q6"]
     gt_cols = ["tq1", "tq2", "tq3", "tq4", "tq5", "tq6"]
+    filter_threshold = 0.003
 
     def __post_init__(self):
 
-        threshold = 0.003
-
-        # Use the residual to filter tracker values with high errors.
-        valid_steps = self.gt_error_df.loc[self.gt_error_df["q56res"] < threshold]["step"]
-        joints_valid = self.joints_df.loc[self.joints_df["step"].isin(valid_steps)].loc[
-            :, self.joints_cols
-        ]
-        gt_valid = self.gt_joints_df.loc[self.gt_joints_df["step"].isin(valid_steps)].loc[
-            :, self.gt_cols
-        ]
-
+        joints_valid, gt_valid = self.__filter_data()
         joints_valid = joints_valid.to_numpy()
         gt_valid = gt_valid.to_numpy()
 
@@ -71,18 +62,57 @@ class CalibrationMetrics:
         self.jp_error_std = self.joint_error.std(axis=0)
 
         # Calculate cartesian space errors
-        robot_cp = CalibrationUtils.calculate_cartesian(joints_valid)
-        tracker_cp = CalibrationUtils.calculate_cartesian(gt_valid)
+        robot_cp = CalibrationUtils.calculate_robot_position(joints_valid)
+        tracker_cp = CalibrationUtils.calculate_robot_position(gt_valid)
 
-        cp_error = tracker_cp - robot_cp
-        cp_error = cp_error.apply(np.linalg.norm, 1)
-        self.cp_error_max = cp_error.max(axis=0)
-        self.cp_error_min = cp_error.min(axis=0)
-        self.cp_error_mean = cp_error.mean(axis=0)
-        self.cp_error_median = cp_error.median(axis=0)
-        self.cp_error_std = cp_error.std(axis=0)
+        self.pos_error = tracker_cp - robot_cp
+        self.pos_error = self.pos_error.apply(np.linalg.norm, 1)
+        # self.cp_error_max = self.pos_error.max(axis=0)
+        # self.cp_error_min = self.pos_error.min(axis=0)
+        # self.cp_error_mean = self.pos_error.mean(axis=0)
+        # self.cp_error_median = np.median(self.pos_error, axis=0)
+        # self.cp_error_std = self.pos_error.std(axis=0)
 
         # Calculate orientation errors
+        robot_rot = CalibrationUtils.calculate_robot_rotations(joints_valid)
+        tracker_rot = CalibrationUtils.calculate_robot_rotations(gt_valid)
+
+        self.rot_error = CalibrationUtils.calculate_rotations_difference(robot_rot, tracker_rot)
+        # self.rot_error_max = self.rot_error.max(axis=0)
+        # self.rot_error_min = self.rot_error.min(axis=0)
+        # self.rot_error_mean = self.rot_error.mean(axis=0)
+        # self.rot_error_median = np.median(self.rot_error, axis=0)
+        # self.rot_error_std = self.rot_error.std(axis=0)
+
+        self.calculate_aggregated_metrics()
+
+    def calculate_aggregated_metrics(self):
+        self.pos_error_metrics = self.__calculate_aggregates(self.pos_error)
+        self.rot_error_metrics = self.__calculate_aggregates(self.rot_error)
+        self.joint_error_metrics = self.__calculate_aggregates(self.joint_error)
+
+    def __calculate_aggregates(self, error_vec: np.ndarray):
+        metrics_dict = {}
+        metrics_dict["max"] = error_vec.max(axis=0)
+        metrics_dict["min"] = error_vec.min(axis=0)
+        metrics_dict["mean"] = error_vec.mean(axis=0)
+        metrics_dict["median"] = np.median(error_vec, axis=0)
+        metrics_dict["std"] = error_vec.std(axis=0)
+        return metrics_dict
+
+    def __filter_data(self):
+        # Use the residual data to filter tracker values with high errors.
+        valid_steps = self.gt_error_df.loc[self.gt_error_df["q56res"] < self.filter_threshold][
+            "step"
+        ]
+        joints_valid = self.joints_df.loc[self.joints_df["step"].isin(valid_steps)].loc[
+            :, self.joints_cols
+        ]
+        gt_valid = self.gt_joints_df.loc[self.gt_joints_df["step"].isin(valid_steps)].loc[
+            :, self.gt_cols
+        ]
+
+        return joints_valid, gt_valid
 
     def create_error_dict(self):
         """Create error dict that can be used to aggregate the analysis of multiple trajectories.
@@ -93,41 +123,89 @@ class CalibrationMetrics:
         ```
         """
 
-        # q3 uses mm the rest of the joints rad.
         return dict(
             type=self.joints_source,
             q1=mean_std_str(
-                self.jp_error_mean[0] * 180 / np.pi, self.jp_error_std[0] * 180 / np.pi
+                self.joint_error_metrics["mean"][0] * 180 / np.pi,
+                self.joint_error_metrics["std"][0] * 180 / np.pi,
             ),
             q2=mean_std_str(
-                self.jp_error_mean[1] * 180 / np.pi, self.jp_error_std[1] * 180 / np.pi
+                self.joint_error_metrics["mean"][1] * 180 / np.pi,
+                self.joint_error_metrics["std"][1] * 180 / np.pi,
             ),
-            q3=mean_std_str(self.jp_error_mean[2] * 1000, self.jp_error_std[2] * 1000),
+            q3=mean_std_str(  # q3 uses mm the rest of the joints rad.
+                self.joint_error_metrics["mean"][2] * 1000,
+                self.joint_error_metrics["std"][2] * 1000,
+            ),
             q4=mean_std_str(
-                self.jp_error_mean[3] * 180 / np.pi, self.jp_error_std[3] * 180 / np.pi
+                self.joint_error_metrics["mean"][3] * 180 / np.pi,
+                self.joint_error_metrics["std"][3] * 180 / np.pi,
             ),
             q5=mean_std_str(
-                self.jp_error_mean[4] * 180 / np.pi, self.jp_error_std[4] * 180 / np.pi
+                self.joint_error_metrics["mean"][4] * 180 / np.pi,
+                self.joint_error_metrics["std"][4] * 180 / np.pi,
             ),
             q6=mean_std_str(
-                self.jp_error_mean[5] * 180 / np.pi, self.jp_error_std[5] * 180 / np.pi
+                self.joint_error_metrics["mean"][5] * 180 / np.pi,
+                self.joint_error_metrics["std"][5] * 180 / np.pi,
             ),
-            cartesian=mean_std_str(self.cp_error_mean * 1000, self.cp_error_std * 1000),
+            cartesian=mean_std_str(
+                self.pos_error_metrics["mean"] * 1000,
+                self.pos_error_metrics["std"] * 1000,
+            ),
         )
 
-    def cartesian_error_full_dict(self):
-        """Create error dict that can be used for the CompleteTable in TableGenerator .
+    # def cartesian_error_full_dict(self):
+    #     """Create error dict that can be used for the CompleteTable in TableGenerator .
 
+    #     ```
+    #     table.add_data(dict(type="robot", max=3, min=5, mean=4, median=5, std=6))
+    #     ```
+    #     """
+    #     format_func = lambda x: f"{x*1000:0.4f}"
+    #     return dict(
+    #         type=self.joints_source + "(mm)",
+    #         max=format_func(self.cp_error_max),
+    #         min=format_func(self.cp_error_min),
+    #         mean=format_func(self.cp_error_mean),
+    #         median=format_func(self.cp_error_median),
+    #         std=format_func(self.cp_error_std),
+    #     )
+
+    def get_error_full_dict(self, type: str) -> dict:
+        """Create error dict that can be used for the CompleteTable in
+        TableGenerator.
+
+        Produces a dictionary with the following keys
         ```
-        table.add_data(dict(type="robot", max=3, min=5, mean=4, median=5, std=6))
+        dict(type="robot", max=3, min=5, mean=4, median=5, std=6)
         ```
+
+        Parameters
+        ----------
+        type : str
+            either `position` or `rotation`
+
+        Returns
+        -------
+        metric_dict: dict
+
         """
-        format_func = lambda x: f"{x*1000:0.4f}"
+        if type == "position":
+            format_func = lambda x: f"{x*1000:0.4f}"
+            return self.__create_error_dict(self.pos_error_metrics, "(mm)", format_func)
+        elif type == "rotation":
+            format_func = lambda x: f"{x:0.4f}"
+            return self.__create_error_dict(self.rot_error_metrics, "(deg)", format_func)
+        else:
+            raise ValueError("type needs to be either `position` or `rotation`")
+
+    def __create_error_dict(self, metric_dict, units_str, format_func):
         return dict(
-            type=self.joints_source + "(mm)",
-            max=format_func(self.cp_error_max),
-            min=format_func(self.cp_error_min),
-            mean=format_func(self.cp_error_mean),
-            median=format_func(self.cp_error_median),
-            std=format_func(self.cp_error_std),
+            type=self.joints_source + units_str,
+            max=format_func(metric_dict["max"]),
+            min=format_func(metric_dict["min"]),
+            mean=format_func(metric_dict["mean"]),
+            median=format_func(metric_dict["median"]),
+            std=format_func(metric_dict["std"]),
         )

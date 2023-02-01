@@ -115,7 +115,9 @@ class Trajectory:
         log.info("Trajectory report:")
         # report out of order setpoints
         if self.out_of_order_counter > 0:
-            self.log.info("-- Found and removed %i out of order setpoints" % (self.out_of_order_counter))
+            self.log.info(
+                "-- Found and removed %i out of order setpoints" % (self.out_of_order_counter)
+            )
 
         # convert to mm
         bbmin = self.bbmin * 1000.0
@@ -126,11 +128,15 @@ class Trajectory:
         )
 
         # compute duration
-        duration = self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
+        duration = (
+            self.setpoints[-1].header.stamp.to_sec() - self.setpoints[0].header.stamp.to_sec()
+        )
         self.log.info("-- Duration of trajectory: %f seconds" % (duration))
 
         # Number of poses
-        self.log.info("-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t))
+        self.log.info(
+            "-- Found %i setpoints using topic %s" % (len(self.setpoints), self.setpoint_js_t)
+        )
         if len(self.setpoints) == 0:
             self.log.error("-- No trajectory found!")
 
@@ -153,7 +159,9 @@ class Trajectory:
         return int(len(self.setpoints) / self.sampling_factor)
 
     @classmethod
-    def from_ros_bag(cls, rosbag_handle: RosbagUtils, namespace="PSM2", sampling_factor: int = 1) -> Trajectory:
+    def from_ros_bag(
+        cls, rosbag_handle: RosbagUtils, namespace="PSM2", sampling_factor: int = 1
+    ) -> Trajectory:
         bbmin = np.zeros(3)
         bbmax = np.zeros(3)
         last_message_time = 0.0
@@ -291,7 +299,9 @@ class SoftRandomJointTrajectory(RandomJointTrajectory):
 
             # Calculate distance between start and end point
             joints = np.vstack((np.array(init_jp).reshape(1, 6), np.array(new_jp).reshape(1, 6)))
-            cp_positions = CalibrationUtils.calculate_cartesian(joints)[["X", "Y", "Z"]].to_numpy()
+            cp_positions = CalibrationUtils.calculate_robot_position(joints)[
+                ["X", "Y", "Z"]
+            ].to_numpy()
             dist = np.linalg.norm(cp_positions[0, :] - cp_positions[1, :])
 
             # Set number of samples proportional to the distance between start and end. At least use 2 samples
@@ -335,7 +345,9 @@ if __name__ == "__main__":
 
     trajectory_player = TrajectoryPlayer(arm, trajectory, before_motion_loop_cb=[])
 
-    ans = input('Press "y" to start data collection trajectory. Only replay trajectories that you know. ')
+    ans = input(
+        'Press "y" to start data collection trajectory. Only replay trajectories that you know. '
+    )
     if ans == "y":
         trajectory_player.replay_trajectory(execute_cb=True, delay=0.15)
     else:
