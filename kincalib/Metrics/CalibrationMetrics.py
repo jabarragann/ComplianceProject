@@ -58,31 +58,17 @@ class CalibrationMetrics:
 
         # Calculate joints space errors
         self.joint_error = np.abs(joints_valid - gt_valid)
-        self.jp_error_mean = self.joint_error.mean(axis=0)
-        self.jp_error_std = self.joint_error.std(axis=0)
 
         # Calculate cartesian space errors
         robot_cp = CalibrationUtils.calculate_robot_position(joints_valid)
         tracker_cp = CalibrationUtils.calculate_robot_position(gt_valid)
-
         self.pos_error = tracker_cp - robot_cp
         self.pos_error = self.pos_error.apply(np.linalg.norm, 1)
-        # self.cp_error_max = self.pos_error.max(axis=0)
-        # self.cp_error_min = self.pos_error.min(axis=0)
-        # self.cp_error_mean = self.pos_error.mean(axis=0)
-        # self.cp_error_median = np.median(self.pos_error, axis=0)
-        # self.cp_error_std = self.pos_error.std(axis=0)
 
         # Calculate orientation errors
         robot_rot = CalibrationUtils.calculate_robot_rotations(joints_valid)
         tracker_rot = CalibrationUtils.calculate_robot_rotations(gt_valid)
-
         self.rot_error = CalibrationUtils.calculate_rotations_difference(robot_rot, tracker_rot)
-        # self.rot_error_max = self.rot_error.max(axis=0)
-        # self.rot_error_min = self.rot_error.min(axis=0)
-        # self.rot_error_mean = self.rot_error.mean(axis=0)
-        # self.rot_error_median = np.median(self.rot_error, axis=0)
-        # self.rot_error_std = self.rot_error.std(axis=0)
 
         self.calculate_aggregated_metrics()
 
@@ -111,7 +97,6 @@ class CalibrationMetrics:
         gt_valid = self.gt_joints_df.loc[self.gt_joints_df["step"].isin(valid_steps)].loc[
             :, self.gt_cols
         ]
-
         return joints_valid, gt_valid
 
     def create_error_dict(self):
@@ -154,23 +139,6 @@ class CalibrationMetrics:
                 self.pos_error_metrics["std"] * 1000,
             ),
         )
-
-    # def cartesian_error_full_dict(self):
-    #     """Create error dict that can be used for the CompleteTable in TableGenerator .
-
-    #     ```
-    #     table.add_data(dict(type="robot", max=3, min=5, mean=4, median=5, std=6))
-    #     ```
-    #     """
-    #     format_func = lambda x: f"{x*1000:0.4f}"
-    #     return dict(
-    #         type=self.joints_source + "(mm)",
-    #         max=format_func(self.cp_error_max),
-    #         min=format_func(self.cp_error_min),
-    #         mean=format_func(self.cp_error_mean),
-    #         median=format_func(self.cp_error_median),
-    #         std=format_func(self.cp_error_std),
-    #     )
 
     def get_error_full_dict(self, type: str) -> dict:
         """Create error dict that can be used for the CompleteTable in
