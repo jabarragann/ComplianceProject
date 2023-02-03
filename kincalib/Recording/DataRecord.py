@@ -4,6 +4,7 @@ import pandas as pd
 from abc import ABC, abstractclassmethod
 import numpy as np
 from typing import List
+from kincalib.Calibration.CalibrationEntities import CalibrationParameters
 
 # Custom
 from kincalib.utils.Logger import Logger
@@ -49,11 +50,55 @@ class Record(ABC):
             self.df.to_csv(self.filename, index=None)
 
 
+class CircleFittingRecord(Record):
+    """Header format
+
+    step: step in the trajectory
+
+    roll1_n: number of points used to fit circle
+    roll2_n: number of points used to fit circle
+    pitch_n: number of points used to fit circle
+    yaw_n: number of points used to fit circle
+
+    roll1_error: residual error of circle
+    roll2_error: residual error of circle
+    pitch_error: residual error of circle
+    yaw_error: residual error of circle
+
+    """
+
+    df_n_cols = ["roll1_n", "roll2_n", "pitch_n", "yaw_n"]
+    df_error_cols = ["roll1_error", "roll2_error", "pitch_error", "yaw_error"]
+    df_cols = ["step"] + df_n_cols + df_error_cols
+
+    def __init__(self, filename: Path):
+        super().__init__(CircleFittingRecord.df_cols, filename)
+
+    def create_new_entry(self, step, calib_object: CalibrationParameters):
+        n_values = [
+            calib_object.roll_1_circle.n,
+            calib_object.roll_2_circle.n,
+            calib_object.pitch_circle.n,
+            calib_object.yaw_circle.n,
+        ]
+        error_values = [
+            calib_object.roll_1_circle.error,
+            calib_object.roll_2_circle.error,
+            calib_object.pitch_circle.error,
+            calib_object.yaw_circle.error,
+        ]
+
+        data = [step] + n_values + error_values
+        data = np.array(data).reshape((1, self.cols_len))
+        new_pt = pd.DataFrame(data, columns=self.df_cols)
+        self.df = pd.concat((self.df, new_pt))
+
+
 class CartesianRecord(Record):
     """Header format
 
     step: step in the trajectory
-    set_qi:   Setpoint joint position
+    set_qi: Setpoint joint position
     m_t: type of object. This can be 'm' (marker), 'f' (fiducial) or 'r' (robot)
     m_id: obj id. This is only meaningful for markers and fiducials
     px,py,pz: position of frame

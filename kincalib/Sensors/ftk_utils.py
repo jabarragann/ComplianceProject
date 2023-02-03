@@ -210,7 +210,7 @@ class OpticalTrackingUtils:
         all_idx = set(list(range(detected_fiducials.shape[1])))
         other_idx = list(all_idx.difference(tool_idx))
         error = np.linalg.norm(tool_def_T - detected_fiducials[:, tool_idx], axis=0)
-        if np.all(error < 1e-3):
+        if np.all(error < 1.1e-3):
             return tool_idx, other_idx
         else:
             log.warning(

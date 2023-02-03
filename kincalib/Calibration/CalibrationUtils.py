@@ -1,7 +1,5 @@
 # Python modules
 import json
-from re import I
-from numpy import sin, cos
 from scipy.optimize import dual_annealing
 from dataclasses import dataclass
 from typing import List, Tuple
@@ -16,26 +14,19 @@ import tf_conversions.posemath as pm
 
 # Robotics toolbox
 from roboticstoolbox import ET
-import roboticstoolbox as rtb
-from spatialmath import SE3
 from spatialmath.base import trnorm
-from roboticstoolbox import DHRobot, RevoluteMDH
 
 # My modules
-from kincalib.Geometry.geometry import Circle3D, Line3D, dist_circle3_plane
+from kincalib.Geometry.geometry import Circle3D, Line3D
 from kincalib.Sensors.ftk_utils import OpticalTrackingUtils
 from kincalib.Transforms.Rotation import Rotation3D
-from kincalib.Transforms.Validations import pt_cloud_format_validation
 from kincalib.utils.CmnUtils import calculate_mean_frame
 from kincalib.utils.ExperimentUtils import (
-    load_registration_data,
-    calculate_midpoints,
     separate_markerandfiducial,
 )
 from kincalib.Transforms.Frame import Frame
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.FileParser import (
-    extract_fiducials_and_toolframe_on_step,
     fid_and_toolframe_generator,
 )
 

@@ -258,7 +258,7 @@ class Circle3D:
 
         return pts
 
-    def dist_pt2circle(self, pts: np.ndarray) -> list[float]:
+    def dist_pt2circle(self, pts: np.ndarray) -> np.ndarray:
         """Calculated euclidean distance from set of points to the circle 3D model.
 
         Algorithm described in

@@ -17,7 +17,7 @@ from kincalib.Transforms.Frame import Frame
 from kincalib.Transforms.Rotation import Rotation3D
 from kincalib.utils.FileParser import parse_atracsys_marker_def
 from kincalib.utils.Logger import Logger
-from kincalib.utils.ExperimentUtils import load_registration_data
+from kincalib.Calibration.CalibrationDataParser import CalibrationDataParser
 from kincalib.Geometry.geometry import Line3D, Circle3D, Triangle3D, dist_circle3_plane
 import kincalib.utils.CmnUtils as utils
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as calib
@@ -269,8 +269,9 @@ class RobotTrackerCalibration:
         """
 
         # pitch orig in tracker
-
-        dict_files = load_registration_data(root)  # Use the step as the dictionary key
+        dict_files = CalibrationDataParser.load_registration_data(
+            root
+        )  # Use the step as the dictionary key
         keys = sorted(list(dict_files.keys()))
 
         calibration_const_list = []
@@ -527,8 +528,8 @@ def main():
 
     # Load json
     registration_dict = json.load(open(new_name, "r"))
-    T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]),trnorm=True)
-    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]),trnorm=True)
+    T_RT = Frame.init_from_matrix(np.array(registration_dict["robot2tracker_T"]), trnorm=True)
+    T_MP = Frame.init_from_matrix(np.array(registration_dict["pitch2marker_T"]), trnorm=True)
     log.info(f"Robot to Tracker\n{T_RT}")
     log.info(f"Pitch to marker\n{T_MP}")
 

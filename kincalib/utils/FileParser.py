@@ -1,5 +1,3 @@
-from enum import Enum
-from itertools import combinations
 import json
 from pathlib import Path
 from typing import Tuple
@@ -7,7 +5,6 @@ import numpy as np
 import pandas as pd
 from kincalib.Entities.RosConversions import RosConversion
 from kincalib.Recording.DataRecord import CartesianRecord
-from kincalib.Sensors.ftk_utils import DynamicReferenceFrame, OpticalTrackingUtils
 from kincalib.Transforms.Frame import Frame
 
 
