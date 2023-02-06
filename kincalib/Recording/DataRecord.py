@@ -64,6 +64,7 @@ class CircleFittingRecord(Record):
     roll2_error: residual error of circle
     pitch_error: residual error of circle
     yaw_error: residual error of circle
+    has_all_circles: bool
 
     """
 
@@ -76,7 +77,7 @@ class CircleFittingRecord(Record):
         "pitch2_error",
         "yaw2_error",
     ]
-    df_cols = ["step"] + df_n_cols + df_error_cols
+    df_cols = ["step"] + df_n_cols + df_error_cols + ["has_all_circles"]
 
     def __init__(self, filename: Path):
         super().__init__(CircleFittingRecord.df_cols, filename)
@@ -99,7 +100,7 @@ class CircleFittingRecord(Record):
             calib_object.yaw_circle2.error * 1000,
         ]
 
-        data = [step] + n_values + error_values
+        data = [step] + n_values + error_values + [calib_object.has_all_circles()]
         data = np.array(data).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(data, columns=self.df_cols)
         self.df = pd.concat((self.df, new_pt))

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Type
 import numpy as np
 from kincalib.Geometry.geometry import Circle3D
@@ -15,6 +15,8 @@ class FittedCircle:
     n: int
     error: float
 
+    initialized: bool = field(init=False, default=False)
+
     @classmethod
     def from_samples(cls, samples: np.ndarray) -> FittedCircle:
 
@@ -26,7 +28,11 @@ class FittedCircle:
         error = circle.dist_pt2circle(samples.T).squeeze()
 
         assert error.shape[0] == samples.shape[0]
-        return FittedCircle(circle, n, error.mean())
+
+        fitted_circ = FittedCircle(circle, n, error.mean())
+        fitted_circ.initialized = True
+
+        return fitted_circ
 
     @classmethod
     def create_empty(cls) -> FittedCircle:
@@ -112,6 +118,14 @@ class CircleFittingMetrics:
         empty_c = FittedCircle.create_empty()
         return cls(None, empty_c, empty_c, empty_c, empty_c, empty_c, empty_c, None, None)
 
+    def has_all_circles(self):
+        results = []
+        for attr, val in self.__dict__.items():  # Loop through attributes
+            if isinstance(val, FittedCircle):
+                val: FittedCircle
+                results.append(val.initialized)
+        return all(results)
+
 
 @dataclass
 class CalibrationParameters:
@@ -124,3 +138,11 @@ class CalibrationParameters:
     pitch2yaw2: float
     wrist_fid_in_yawframe1: np.ndarray
     wrist_fid_in_yawframe2: np.ndarray
+
+
+if __name__ == "__main__":
+
+    circle_metrics = CircleFittingMetrics.create_empty()
+
+    for attr, val in circle_metrics.__dict__.items():
+        print(f"{attr} = {val}, ({isinstance(val,FittedCircle)})")
