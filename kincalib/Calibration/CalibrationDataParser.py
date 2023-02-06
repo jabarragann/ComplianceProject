@@ -8,7 +8,11 @@ import numpy as np
 import pandas as pd
 import os
 from kincalib.Calibration.CalibrationUtils import CalibrationUtils as cu
-from kincalib.Calibration.CalibrationEntities import CalibrationParameters, CalibrationData
+from kincalib.Calibration.CalibrationEntities import (
+    CircleFittingMetrics,
+    CalibrationData,
+)
+from kincalib.Recording.DataRecord import CircleFittingRecord
 from kincalib.utils.Logger import Logger
 
 log = Logger("__name__").log
@@ -73,7 +77,7 @@ class CalibrationDataParser:
         for idx, r in enumerate(roll_values):
             temp_dict[idx]["tool_pose"] = self.__extract_calib_tool_pose_arr(pitch_yaw_df, r)
             temp_dict[idx]["pitch"] = self.__extract_calib_pitch_arr(pitch_yaw_df, r)
-            temp_dict[idx]["arr"] = self.__extract_calib_yaw_arr(pitch_yaw_df, r)
+            temp_dict[idx]["yaw"] = self.__extract_calib_yaw_arr(pitch_yaw_df, r)
 
         temp_dict = dict(temp_dict)
         self.__fill_calib_data_with_pitch_yaw(temp_dict, calib_data)
@@ -117,11 +121,6 @@ class CalibrationDataParser:
         return wrist_fiducials
 
 
-@dataclass
-class CalibrationConstantCalculator:
-    pass
-
-
 def main():
     from kincalib.utils.FileParser import parse_atracsys_marker_def
 
@@ -130,11 +129,20 @@ def main():
     tool_def = parse_atracsys_marker_def(tool_def_path)
 
     data_parser = CalibrationDataParser(root, tool_def)
+    dst_dir = root / "registration_results"
     calib_data_dict = data_parser.parse_all_data()
+
+    fitting_circles_record = CircleFittingRecord(dst_dir / "circle_fitting.csv")
+
     # print(calib_data_dict)
     for k in calib_data_dict.keys():
         print(f"{k}")
         print(f"{calib_data_dict[k]}")
+        circle_metrics = calib_data_dict[k].fit_circle()
+        # print(circle_metrics.pitch_circle1.error * 1000)
+        fitting_circles_record.create_new_entry(k, circle_metrics)
+
+    fitting_circles_record.to_csv(safe_save=False)
 
 
 if __name__ == "__main__":

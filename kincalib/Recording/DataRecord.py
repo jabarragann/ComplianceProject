@@ -4,7 +4,7 @@ import pandas as pd
 from abc import ABC, abstractclassmethod
 import numpy as np
 from typing import List
-from kincalib.Calibration.CalibrationEntities import CalibrationParameters
+from kincalib.Calibration.CalibrationEntities import CircleFittingMetrics
 
 # Custom
 from kincalib.utils.Logger import Logger
@@ -67,25 +67,36 @@ class CircleFittingRecord(Record):
 
     """
 
-    df_n_cols = ["roll1_n", "roll2_n", "pitch_n", "yaw_n"]
-    df_error_cols = ["roll1_error", "roll2_error", "pitch_error", "yaw_error"]
+    df_n_cols = ["roll1_n", "roll2_n", "pitch1_n", "yaw1_n", "pitch2_n", "yaw2_n"]
+    df_error_cols = [
+        "roll1_error",
+        "roll2_error",
+        "pitch1_error",
+        "yaw1_error",
+        "pitch2_error",
+        "yaw2_error",
+    ]
     df_cols = ["step"] + df_n_cols + df_error_cols
 
     def __init__(self, filename: Path):
         super().__init__(CircleFittingRecord.df_cols, filename)
 
-    def create_new_entry(self, step, calib_object: CalibrationParameters):
+    def create_new_entry(self, step, calib_object: CircleFittingMetrics):
         n_values = [
             calib_object.roll_1_circle.n,
             calib_object.roll_2_circle.n,
-            calib_object.pitch_circle.n,
-            calib_object.yaw_circle.n,
+            calib_object.pitch_circle1.n,
+            calib_object.yaw_circle1.n,
+            calib_object.pitch_circle2.n,
+            calib_object.yaw_circle2.n,
         ]
         error_values = [
-            calib_object.roll_1_circle.error,
-            calib_object.roll_2_circle.error,
-            calib_object.pitch_circle.error,
-            calib_object.yaw_circle.error,
+            calib_object.roll_1_circle.error * 1000,
+            calib_object.roll_2_circle.error * 1000,
+            calib_object.pitch_circle1.error * 1000,
+            calib_object.yaw_circle1.error * 1000,
+            calib_object.pitch_circle2.error * 1000,
+            calib_object.yaw_circle2.error * 1000,
         ]
 
         data = [step] + n_values + error_values
