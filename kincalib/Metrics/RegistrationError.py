@@ -4,20 +4,24 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import spatialmath
+from kincalib.Calibration.CalibrationUtils import CalibrationUtils
 from kincalib.utils.ExperimentUtils import separate_markerandfiducial
 from kincalib.Transforms.Frame import Frame
 
 np.set_printoptions(precision=4, suppress=True, sign=" ")
 
 
-def get_wrist_fiducials_cp(robot_cp):
-    fiducials_cp = robot_cp.loc[robot_cp["m_t"] == "f"]
+def get_wrist_fiducials_cp(robot_cp, tool_def: np.ndarray):
+    fiducials_cp = robot_cp.loc[robot_cp["m_t"] == "fiducial"]
     steps = fiducials_cp["step"].unique().reshape((-1, 1))
-    _, wrist_fiducials = separate_markerandfiducial(
-        None, Path("./share/custom_marker_id_112.json"), df=fiducials_cp
+    # _, wrist_fiducials = separate_markerandfiducial(
+    #     None, Path("./share/custom_marker_id_112.json"), df=fiducials_cp
+    # )
+    _, wrist_fiducials = CalibrationUtils.extract_all_markers_and_wrist_fiducials(
+        robot_cp, tool_def, marker_full_pose=True
     )
     wrist_fiducial_cp = pd.DataFrame(
-        np.hstack((steps, wrist_fiducials.T)), columns=["step", "x", "y", "z"]
+        np.hstack((steps, wrist_fiducials)), columns=["step", "x", "y", "z"]
     )
     return wrist_fiducial_cp
 

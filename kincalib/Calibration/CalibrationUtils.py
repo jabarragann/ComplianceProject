@@ -2,7 +2,7 @@
 import json
 from scipy.optimize import dual_annealing
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import numpy as np
 from collections import defaultdict
 import pandas as pd
@@ -21,13 +21,11 @@ from kincalib.Geometry.geometry import Circle3D, Line3D
 from kincalib.Sensors.ftk_utils import OpticalTrackingUtils
 from kincalib.Transforms.Rotation import Rotation3D
 from kincalib.utils.CmnUtils import calculate_mean_frame
-from kincalib.utils.ExperimentUtils import (
-    separate_markerandfiducial,
-)
 from kincalib.Transforms.Frame import Frame
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.FileParser import (
-    fid_and_toolframe_generator,
+    cartesian_record_parser,
+    extract_fiducials_and_toolframe_on_step,
 )
 
 
@@ -89,11 +87,14 @@ class TrackerJointsEstimator:
 
         self.j_estimator = JointEstimator(T_RT, T_MP, self.wrist_fid_Y)
 
-    def calculate_joints(self, robot_jp_df, robot_cp_df, use_progress_bar=True):
+    def calculate_joints(
+        self, robot_jp_df, robot_cp_df, tool_def: np.ndarray, use_progress_bar=True
+    ):
         robot_df, tracker_df, opt_df = CalibrationUtils.obtain_true_joints_v2(
             self.j_estimator,
             robot_jp_df,
             robot_cp_df,
+            tool_def,
             use_progress_bar=use_progress_bar,
         )
         return robot_df, tracker_df, opt_df
@@ -273,18 +274,25 @@ class CalibrationUtils:
         return all([e is not None for e in l])
 
     @classmethod
-    def extract_marker_and_fiducial_on_wrist(cls, roll_df, tool_def, marker_full_pose=False):
+    def extract_all_markers_and_wrist_fiducials(
+        cls, cartesian_df, tool_def, on_step=None, marker_full_pose=False
+    ):
         marker_arr = []  # shaft marker poses
         wrist_fid_arr = []  # Wrist fiducial positions
 
-        for step, fiducials_loc, T_TM in fid_and_toolframe_generator(roll_df):
+        if on_step is not None:
+            fid_loc, T_TM = extract_fiducials_and_toolframe_on_step(cartesian_df, on_step)
+            record_iterator = [(on_step, fid_loc, T_TM)]
+
+        else:  # Get all values
+            record_iterator = cartesian_record_parser(cartesian_df)
+
+        for step, fiducials_loc, T_TM in record_iterator:
             if cls.are_not_none([fiducials_loc, T_TM]):
-                tool_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
-                    fiducials_loc, tool_def, T_TM
-                )
-                if cls.are_not_none([tool_idx, other_idx]):
-                    wrist_fiducial = fiducials_loc[:, other_idx].squeeze().tolist()
-                    wrist_fid_arr.append(wrist_fiducial)
+                successful, wrist_fid = cls.obtain_wrist_fiducial(fiducials_loc, tool_def, T_TM)
+
+                if successful:
+                    wrist_fid_arr.append(wrist_fid.tolist())
                     if marker_full_pose:
                         marker_arr.append(T_TM)
                     else:
@@ -296,8 +304,25 @@ class CalibrationUtils:
         return marker_arr, wrist_fid_arr
 
     @classmethod
+    def obtain_wrist_fiducial(
+        cls, detected_fiducials: np.ndarray, tool_def: np.ndarray, T_TM: Frame
+    ) -> Tuple[Union[bool, np.ndarray]]:
+
+        wrist_fid = None
+        tool_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
+            detected_fiducials, tool_def, T_TM
+        )
+        success = cls.are_not_none([tool_idx, other_idx])
+
+        if success:
+            wrist_fid = detected_fiducials[:, other_idx].squeeze()
+        return success, wrist_fid
+
+    @classmethod
     def create_roll_circles(cls, roll_df, tool_def) -> List[Circle3D]:
-        marker_orig_arr, wrist_fid_arr = cls.extract_marker_and_fiducial_on_wrist(roll_df, tool_def)
+        marker_orig_arr, wrist_fid_arr = cls.extract_all_markers_and_wrist_fiducials(
+            roll_df, tool_def
+        )
         roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
         roll_cir2 = Circle3D.from_lstsq_fit(wrist_fid_arr)
 
@@ -319,7 +344,7 @@ class CalibrationUtils:
         for idx, r in enumerate(roll_values):
             # Calculate mean marker pose
             df_temp = df.loc[(df["set_q4"] == r)]
-            marker_arr, _ = cls.extract_marker_and_fiducial_on_wrist(
+            marker_arr, _ = cls.extract_all_markers_and_wrist_fiducials(
                 df_temp, tool_def, marker_full_pose=True
             )
             if len(marker_arr) > 0:
@@ -330,12 +355,12 @@ class CalibrationUtils:
 
             # Calculate pitch circle
             df_temp = df.loc[(np.isclose(df["set_q4"], r)) & (np.isclose(df["set_q6"], 0.0))]
-            _, wrist_fiducials = cls.extract_marker_and_fiducial_on_wrist(df_temp, tool_def)
+            _, wrist_fiducials = cls.extract_all_markers_and_wrist_fiducials(df_temp, tool_def)
             pitch_yaw_circles_dict[idx]["pitch"] = Circle3D.from_lstsq_fit(wrist_fiducials)
 
             # Calculate yaw circle
             df_temp = df.loc[(np.isclose(df["set_q4"], r)) & (np.isclose(df["set_q5"], 0.0))]
-            _, wrist_fiducials = cls.extract_marker_and_fiducial_on_wrist(df_temp, tool_def)
+            _, wrist_fiducials = cls.extract_all_markers_and_wrist_fiducials(df_temp, tool_def)
             pitch_yaw_circles_dict[idx]["yaw"] = Circle3D.from_lstsq_fit(wrist_fiducials)
 
         return dict(pitch_yaw_circles_dict)
@@ -379,6 +404,7 @@ class CalibrationUtils:
         estimator: JointEstimator,
         robot_jp: pd.DataFrame,
         robot_cp: pd.DataFrame,
+        tool_def: np.ndarray,
         use_progress_bar: bool = True,
     ) -> pd.DataFrame:
         """Calculates joints based on tracker information.
@@ -432,8 +458,10 @@ class CalibrationUtils:
 
             # Read tracker data
             df_temp = robot_cp[robot_cp["step"] == step]
-            marker_file = Path("./share/custom_marker_id_112.json")
-            pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
+            # marker_file = Path("./share/custom_marker_id_112.json")
+            pose_arr, wrist_fiducials = CalibrationUtils.extract_all_markers_and_wrist_fiducials(
+                df_temp, tool_def, on_step=step, marker_full_pose=True
+            )
             if len(pose_arr) == 0:
                 log.warning(f"Marker pose in {step} not found")
                 continue
@@ -441,7 +469,9 @@ class CalibrationUtils:
                 log.warning(f"Wrist fiducial in {step} not found")
                 continue
             assert len(pose_arr) == 1, "There should only be one marker pose at each step."
-            T_TM = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
+            assert isinstance(pose_arr[0], Frame)
+            # T_TM = Frame.init_from_matrix(pm.toMatrix(pose_arr[0]))
+            T_TM = pose_arr[0]
 
             # Calculate q1, q2 and q3
             tq1, tq2, tq3 = estimator.estimate_q123(T_TM)
@@ -482,10 +512,10 @@ class CalibrationUtils:
         for i in range(6):
             # fmt:off
             axes[i].set_title(f"joint {i+1} ({unit})")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, color="blue")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, color="orange")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, color="blue")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, color="orange")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
             # fmt:on
         axes[0].legend()
 

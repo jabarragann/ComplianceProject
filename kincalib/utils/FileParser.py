@@ -33,7 +33,7 @@ def parse_atracsys_marker_def(path: Path) -> np.ndarray:
     return results
 
 
-def fid_and_toolframe_generator(cartesian_record: pd.DataFrame):
+def cartesian_record_parser(cartesian_record: pd.DataFrame):
     steps_list = cartesian_record["step"].unique()
     for step in steps_list:
         fiducials_location, T_TM = extract_fiducials_and_toolframe_on_step(cartesian_record, step)

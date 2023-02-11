@@ -1,27 +1,21 @@
 # Python imports
-from dataclasses import dataclass
-import json
 from pathlib import Path
 import argparse
-from re import I
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-import spatialmath
 
 # kincalib module imports
 from kincalib.Metrics.CalibrationMetrics import CalibrationMetrics
 from kincalib.Metrics.RegistrationError import FRE, get_wrist_fiducials_cp
-from kincalib.Metrics.TableGenerator import FRETable, ResultsTable
+from kincalib.Metrics.TableGenerator import CompleteResultsTable, FRETable, ResultsTable
 from kincalib.Motion.DvrkKin import DvrkPsmKin
 from kincalib.utils.CmnUtils import mean_std_str
-from kincalib.utils.ExperimentUtils import separate_markerandfiducial
+from kincalib.utils.FileParser import parse_atracsys_marker_def
 from kincalib.utils.Logger import Logger
-from kincalib.Transforms.Frame import Frame
 from kincalib.Calibration.CalibrationUtils import (
     CalibrationUtils,
-    JointEstimator,
     TrackerJointsEstimator,
 )
 
@@ -47,15 +41,18 @@ def main(testid: int):
 
     tracker_joints_estimator = TrackerJointsEstimator(root / "registration_results")
 
+    tool_def_path = "/home/juan1995/research_juan/ComplianceProject/share/custom_marker_id_112.json"
+    tool_def = parse_atracsys_marker_def(tool_def_path)
+
     # Src paths
     if args.testdata:  # Test trajectories
         data_p = Path(args.datadir) if args.datadir is not None else root
         robot_jp_p = data_p / f"test_trajectories/{testid:02d}" / "robot_jp.txt"
-        robot_cp_p = data_p / f"test_trajectories/{testid:02d}" / "robot_cp.txt"
+        robot_cp_p = data_p / f"test_trajectories/{testid:02d}" / "robot_cp.csv"
     else:  # Calibration points
         data_p = root / "robot_mov"
         robot_jp_p = data_p / "robot_jp.txt"
-        robot_cp_p = data_p / "robot_cp.txt"
+        robot_cp_p = data_p / "robot_cp.csv"
 
     # Dst paths
     if args.testdata:
@@ -85,7 +82,9 @@ def main(testid: int):
         robot_jp = pd.read_csv(robot_jp_p)
         robot_cp = pd.read_csv(robot_cp_p)
 
-        robot_df, tracker_df, opt_df = tracker_joints_estimator.calculate_joints(robot_jp, robot_cp)
+        robot_df, tracker_df, opt_df = tracker_joints_estimator.calculate_joints(
+            robot_jp, robot_cp, tool_def
+        )
 
         robot_df.to_csv(dst_p / "robot_joints.txt", index=False)
         tracker_df.to_csv(dst_p / "tracker_joints.txt", index=False)
@@ -105,38 +104,46 @@ def main(testid: int):
     table = ResultsTable()
     table.add_data(robot_error_metrics.create_error_dict())
 
+    complete_table = CompleteResultsTable()
+    complete_table.add_multiple_entries(
+        [
+            robot_error_metrics.get_error_full_dict("position"),
+            robot_error_metrics.get_error_full_dict("rotation"),
+        ]
+    )
+
     # ----------------
     # calculate FRE
     # ----------------
 
-    # Get wrist fiducials data
-    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp)
-    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
+    # # Get wrist fiducials data
+    # wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp, tool_def)
+    # wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
 
-    tool_offset = np.identity(4)
-    tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
-    psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
+    # tool_offset = np.identity(4)
+    # tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
+    # psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
 
-    # robot data
-    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
-    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
+    # # robot data
+    # robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
+    # robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
 
-    # tracker data
-    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
-    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
+    # # tracker data
+    # tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
+    # tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
 
-    robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
-    robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
-    tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
-    tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
+    # robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
+    # robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
+    # tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
+    # tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
 
-    fre_table = FRETable()
-    fre_table.add_data(
-        dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
-    )
-    fre_table.add_data(
-        dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
-    )
+    # fre_table = FRETable()
+    # fre_table.add_data(
+    #     dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
+    # )
+    # fre_table.add_data(
+    #     dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
+    # )
 
     # ------------------
     # Results report
@@ -149,9 +156,10 @@ def main(testid: int):
         f"Difference from ground truth (Tracker values) (N={robot_error_metrics.joint_error.shape[0]})"
     )
     print(f"\n{table.get_full_table()}\n")
+    print(f"\n{complete_table.get_full_table()}\n")
 
-    print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
-    print(f"\n{fre_table.get_full_table()}\n")
+    # print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
+    # print(f"\n{fre_table.get_full_table()}\n")
 
     # plot
     if args.plot:

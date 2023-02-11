@@ -493,7 +493,7 @@ def test_correspondance_function_with_real():
     # Correspodance algorithm
     defined_tool = DynamicReferenceFrame(fiducial_loc, fiducial_loc.shape[1])
 
-    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data_file):
+    for step, fid_in_tracker, T_TM in cartesian_record_parser(data_file):
         candidate_tool_in_T, best_score, subset_idx = defined_tool.identify_closest_subset(
             fid_in_tracker
         )
@@ -533,7 +533,7 @@ if __name__ == "__main__":
     from kincalib.Transforms.Rotation import Rotation3D
     from kincalib.Transforms.Frame import Frame
     from kincalib.utils.CmnUtils import ColorText
-    from kincalib.utils.FileParser import fid_and_toolframe_generator, parse_atracsys_marker_def
+    from kincalib.utils.FileParser import cartesian_record_parser, parse_atracsys_marker_def
 
     # main1()
     # Test with random data

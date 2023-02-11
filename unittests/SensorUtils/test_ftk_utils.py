@@ -10,7 +10,7 @@ from kincalib.Sensors.ftk_utils import (
 from kincalib.Transforms.Rotation import Rotation3D
 from kincalib.utils.CmnUtils import ColorText
 from kincalib.Transforms.Frame import Frame
-from kincalib.utils.FileParser import fid_and_toolframe_generator, parse_atracsys_marker_def
+from kincalib.utils.FileParser import cartesian_record_parser, parse_atracsys_marker_def
 import pandas as pd
 
 # todo Add more testing files with real data
@@ -89,7 +89,7 @@ def test_correspondance_with_real_data(data_file, marker_file):
 
     defined_tool = DynamicReferenceFrame(tool_definition, tool_definition.shape[1])
 
-    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data_file):
+    for step, fid_in_tracker, T_TM in cartesian_record_parser(data_file):
         candidate_tool_in_T, best_score, subset_idx = defined_tool.identify_closest_subset(
             fid_in_tracker
         )
@@ -130,7 +130,7 @@ def test_closest_pt_ft_utils(size):
 )
 def test_identify_marker_fiducials(data_file, marker_file):
     data, tool_def = load_real_data(data_file, marker_file)
-    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data):
+    for step, fid_in_tracker, T_TM in cartesian_record_parser(data):
         tool_def_T = T_TM @ tool_def
         marker_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
             fid_in_tracker, tool_def, T_TM
@@ -150,7 +150,7 @@ def test_identify_marker_fiducials(data_file, marker_file):
 )
 def test_other_different_from_tool_idx_in_marker_fiducials(data_file, marker_file):
     data, tool_def = load_real_data(data_file, marker_file)
-    for step, fid_in_tracker, T_TM in fid_and_toolframe_generator(data):
+    for step, fid_in_tracker, T_TM in cartesian_record_parser(data):
         marker_idx, other_idx = OpticalTrackingUtils.identify_marker_fiducials(
             fid_in_tracker, tool_def, T_TM
         )

@@ -61,7 +61,7 @@ class CalibrationDataParser:
         return calib_data
 
     def parse_roll_data(self, roll_df, calib_data: CalibrationData):
-        tool_arr, wrist_fid_arr = cu.extract_marker_and_fiducial_on_wrist(roll_df, self.tool_def)
+        tool_arr, wrist_fid_arr = cu.extract_all_markers_and_wrist_fiducials(roll_df, self.tool_def)
         calib_data.roll_tool_arr = tool_arr
         calib_data.roll_wrist_fid_arr = wrist_fid_arr
 
@@ -101,7 +101,7 @@ class CalibrationDataParser:
 
     def __extract_calib_tool_pose_arr(self, pitch_yaw_df, r):
         df_temp = pitch_yaw_df.loc[np.isclose(pitch_yaw_df["set_q4"], r)]
-        tool_arr, _ = cu.extract_marker_and_fiducial_on_wrist(
+        tool_arr, _ = cu.extract_all_markers_and_wrist_fiducials(
             df_temp, self.tool_def, marker_full_pose=True
         )
         return tool_arr
@@ -110,14 +110,14 @@ class CalibrationDataParser:
         df_temp = pitch_yaw_df.loc[
             (np.isclose(pitch_yaw_df["set_q4"], r)) & (np.isclose(pitch_yaw_df["set_q6"], 0.0))
         ]
-        _, wrist_fiducials = cu.extract_marker_and_fiducial_on_wrist(df_temp, self.tool_def)
+        _, wrist_fiducials = cu.extract_all_markers_and_wrist_fiducials(df_temp, self.tool_def)
         return wrist_fiducials
 
     def __extract_calib_yaw_arr(self, pitch_yaw_df, r):
         df_temp = pitch_yaw_df.loc[
             (np.isclose(pitch_yaw_df["set_q4"], r)) & (np.isclose(pitch_yaw_df["set_q5"], 0.0))
         ]
-        _, wrist_fiducials = cu.extract_marker_and_fiducial_on_wrist(df_temp, self.tool_def)
+        _, wrist_fiducials = cu.extract_all_markers_and_wrist_fiducials(df_temp, self.tool_def)
         return wrist_fiducials
 
 
