@@ -125,7 +125,8 @@ def main():
     root = Path(args.root)
 
     # Paths
-    registration_data_path = Path(args.dstdir) / root.name if args.dstdir is not None else root
+    # registration_data_path = Path(args.dstdir) / root.name if args.dstdir is not None else root
+    registration_data_path = root
     registration_data_path = registration_data_path / "registration_results/"
     registration_data_path.mkdir(parents=True, exist_ok=True)
     log.info(f"Look for registration data in {registration_data_path}")
@@ -141,7 +142,7 @@ if __name__ == "__main__":
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-23-trajrand", 
                     help="root dir") 
-    parser.add_argument('--dstdir', default='./data3newcalib', help='directory to save results')
+    # parser.add_argument('--dstdir', default='./data3newcalib', help='directory to save results')
 
     # parser.add_argument( "-r", "--root", type=str, default="./data/03_replay_trajectory/d04-rec-20-trajsoft", 
     #                 help="root dir") 
