@@ -7,9 +7,11 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple
 from rich.progress import track
+from kincalib.Calibration.CalibrationEntities import CircleFittingMetrics
 
 # ROS and DVRK imports
 from kincalib.Motion.DvrkKin import DvrkPsmKin
+from kincalib.Recording.DataRecord import CircleFittingRecord
 
 # kincalib module imports
 from kincalib.utils.Frame import Frame
@@ -265,6 +267,10 @@ class RobotTrackerCalibration:
         calibration_const_list = []
         pitch_orig_T_list = []
 
+        circle_metrics_record = CircleFittingRecord(
+            root / "registration_results/circle_metrics.csv"
+        )
+
         for step in track(keys, "Computing pitch origin in tracker coordinates"):
             if len(list(dict_files[step].keys())) < 2:
                 log.warning(f"files for step {step} are not available")
@@ -307,6 +313,15 @@ class RobotTrackerCalibration:
                     pitch_orig_T_list.append(pitch_orig_T_dict)
                     calibration_const_list.append(calibration_dict)
 
+                    circle_metrics = CircleFittingMetrics.create_empty()
+                    circle_metrics.pitch1.circle = pitch_yaw_circles[0]["pitch"]
+                    circle_metrics.pitch2.circle = pitch_yaw_circles[1]["pitch"]
+                    circle_metrics.yaw1.circle = pitch_yaw_circles[0]["yaw"]
+                    circle_metrics.yaw2.circle = pitch_yaw_circles[1]["yaw"]
+                    circle_metrics.roll1.circle = roll_cir1
+                    circle_metrics.roll1.circle = roll_cir2
+                    circle_metrics_record.create_new_entry(step, circle_metrics)
+
                 except Exception as e:
                     log.error(f"Error in circles creation on step {step}")
                     log.error(e)
@@ -314,6 +329,7 @@ class RobotTrackerCalibration:
         if len(pitch_orig_T_list) == 0:
             raise Exception("No calibration files found")
 
+        circle_metrics_record.to_csv(safe_save=False)
         pitch_orig_T_df = pd.DataFrame(pitch_orig_T_list)
         calibration_constants_df = pd.DataFrame(calibration_const_list)
 
