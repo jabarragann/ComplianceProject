@@ -8,9 +8,11 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple
 from rich.progress import track
+from kincalib.Calibration.CalibrationEntities import CalibrationData
 
 # ROS and DVRK imports
 from kincalib.Motion.DvrkKin import DvrkPsmKin
+from kincalib.Recording.DataRecord import CircleFittingRecord
 
 # kincalib module imports
 from kincalib.Transforms.Frame import Frame
@@ -277,6 +279,10 @@ class RobotTrackerCalibration:
         calibration_const_list = []
         pitch_orig_T_list = []
 
+        circle_metrics_record = CircleFittingRecord(
+            root / "registration_results/circle_fitting.csv"
+        )
+
         for step in track(keys, "Computing pitch origin in tracker coordinates"):
             if len(list(dict_files[step].keys())) < 2:
                 log.warning(f"files for step {step} are not available")
@@ -292,37 +298,66 @@ class RobotTrackerCalibration:
                         dict_files[step]["pitch"], tool_def
                     )
 
-                    # pitch orig in tracker
-                    m1, m2, m3 = calib.calculate_pitch_origin(
-                        roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
-                    )
-                    triangle = Triangle3D([m1, m2, m3])
-                    area = triangle.calculate_area(scale=1000)  # In mm^2
-                    pitch_ori_T = triangle.calculate_centroid()
+                    calib_data = CalibrationData.create_empty()
+                    calib_data.pitch_wrist_fid_arr1 = pitch_yaw_circles[0]["pitch"]
+                    calib_data.pitch_wrist_fid_arr2 = pitch_yaw_circles[1]["pitch"]
+                    calib_data.yaw_wrist_fid_arr1 = pitch_yaw_circles[0]["yaw"]
+                    calib_data.yaw_wrist_fid_arr2 = pitch_yaw_circles[1]["yaw"]
+                    calib_data.roll_tool_arr = roll_cir1
+                    calib_data.roll_wrist_fid_arr = roll_cir2
+                    circle_metrics = calib_data.fit_circle()
 
-                    pitch_orig_T_dict = {
-                        "step": step,
-                        "area": area,
-                        "tpx": pitch_ori_T[0],
-                        "tpy": pitch_ori_T[1],
-                        "tpz": pitch_ori_T[2],
+                    pitch_yaw_circles = {
+                        0: {
+                            "pitch": circle_metrics.pitch1.circle,
+                            "yaw": circle_metrics.yaw1.circle,
+                            "marker_pose": pitch_yaw_circles[0]["marker_pose"],
+                        },
+                        1: {
+                            "pitch": circle_metrics.pitch2.circle,
+                            "yaw": circle_metrics.yaw2.circle,
+                            "marker_pose": pitch_yaw_circles[1]["marker_pose"],
+                        },
                     }
+                    roll_cir1 = circle_metrics.roll1.circle
+                    roll_cir2 = circle_metrics.roll2.circle
 
-                    # Calculate calibration constants
-                    calibration_dict1 = RobotTrackerCalibration.calculate_axes_in_marker(
-                        pitch_ori_T, pitch_yaw_circles, roll_cir1
-                    )
+                    if circle_metrics.has_all_circles():
+                        # pitch orig in tracker
+                        m1, m2, m3 = calib.calculate_pitch_origin(
+                            roll_cir1, pitch_yaw_circles[0]["pitch"], pitch_yaw_circles[1]["pitch"]
+                        )
+                        triangle = Triangle3D([m1, m2, m3])
+                        area = triangle.calculate_area(scale=1000)  # In mm^2
+                        pitch_ori_T = triangle.calculate_centroid()
 
-                    # Estimate wrist fiducial in yaw origin
-                    # todo get the fiducial measurement from robot_cp_temp.
-                    calibration_dict2 = RobotTrackerCalibration.calculate_fiducial_from_yaw(
-                        pitch_ori_T, pitch_yaw_circles, roll_cir2
-                    )
+                        pitch_orig_T_dict = {
+                            "step": step,
+                            "area": area,
+                            "tpx": pitch_ori_T[0],
+                            "tpy": pitch_ori_T[1],
+                            "tpz": pitch_ori_T[2],
+                        }
 
-                    calibration_dict = {"step": step, **calibration_dict1, **calibration_dict2}
+                        # Calculate calibration constants
+                        calibration_dict1 = RobotTrackerCalibration.calculate_axes_in_marker(
+                            pitch_ori_T, pitch_yaw_circles, roll_cir1
+                        )
 
-                    pitch_orig_T_list.append(pitch_orig_T_dict)
-                    calibration_const_list.append(calibration_dict)
+                        # Estimate wrist fiducial in yaw origin
+                        # todo get the fiducial measurement from robot_cp_temp.
+                        calibration_dict2 = RobotTrackerCalibration.calculate_fiducial_from_yaw(
+                            pitch_ori_T, pitch_yaw_circles, roll_cir2
+                        )
+
+                        calibration_dict = {"step": step, **calibration_dict1, **calibration_dict2}
+
+                        pitch_orig_T_list.append(pitch_orig_T_dict)
+                        calibration_const_list.append(calibration_dict)
+                        circle_metrics_record.create_new_entry(step, circle_metrics)
+
+                    else:
+                        log.info(f"missing circles in step {step}")
 
                 except RuntimeError as e:
                     log.error(f"Error in circles creation on step {step}")
@@ -336,6 +371,7 @@ class RobotTrackerCalibration:
 
         pitch_orig_T_df = pd.DataFrame(pitch_orig_T_list)
         calibration_constants_df = pd.DataFrame(calibration_const_list)
+        circle_metrics_record.to_csv(safe_save=False)
 
         return pitch_orig_T_df, calibration_constants_df
 

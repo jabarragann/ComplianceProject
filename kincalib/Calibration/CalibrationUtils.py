@@ -323,8 +323,11 @@ class CalibrationUtils:
         marker_orig_arr, wrist_fid_arr = cls.extract_all_markers_and_wrist_fiducials(
             roll_df, tool_def
         )
-        roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
-        roll_cir2 = Circle3D.from_lstsq_fit(wrist_fid_arr)
+        # roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
+        # roll_cir2 = Circle3D.from_lstsq_fit(wrist_fid_arr)
+
+        roll_cir1 = marker_orig_arr
+        roll_cir2 = wrist_fid_arr
 
         return roll_cir1, roll_cir2
 
@@ -356,12 +359,14 @@ class CalibrationUtils:
             # Calculate pitch circle
             df_temp = df.loc[(np.isclose(df["set_q4"], r)) & (np.isclose(df["set_q6"], 0.0))]
             _, wrist_fiducials = cls.extract_all_markers_and_wrist_fiducials(df_temp, tool_def)
-            pitch_yaw_circles_dict[idx]["pitch"] = Circle3D.from_lstsq_fit(wrist_fiducials)
+            # pitch_yaw_circles_dict[idx]["pitch"] = Circle3D.from_lstsq_fit(wrist_fiducials)
+            pitch_yaw_circles_dict[idx]["pitch"] = wrist_fiducials
 
             # Calculate yaw circle
             df_temp = df.loc[(np.isclose(df["set_q4"], r)) & (np.isclose(df["set_q5"], 0.0))]
             _, wrist_fiducials = cls.extract_all_markers_and_wrist_fiducials(df_temp, tool_def)
-            pitch_yaw_circles_dict[idx]["yaw"] = Circle3D.from_lstsq_fit(wrist_fiducials)
+            # pitch_yaw_circles_dict[idx]["yaw"] = Circle3D.from_lstsq_fit(wrist_fiducials)
+            pitch_yaw_circles_dict[idx]["yaw"] = wrist_fiducials
 
         return dict(pitch_yaw_circles_dict)
 
