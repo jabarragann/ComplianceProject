@@ -80,6 +80,7 @@ class CalibrationData:
         ]
 
         for metric, data in association_list:
+            assert hasattr(circle_m, metric), f"{metric} is not a FittedCircle attr"
             if self.is_data_valid(data):
                 fitted = FittedCircle.from_samples(data)
                 setattr(circle_m, metric, fitted)
