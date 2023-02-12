@@ -343,7 +343,7 @@ class CalibrationUtils:
         pitch_yaw_circles_dict = defaultdict(dict)
         for idx, r in enumerate(roll_values):
             # Calculate mean marker pose
-            df_temp = df.loc[(df["set_q4"] == r)]
+            df_temp = df.loc[np.isclose(df["set_q4"], r)]
             marker_arr, _ = cls.extract_all_markers_and_wrist_fiducials(
                 df_temp, tool_def, marker_full_pose=True
             )
