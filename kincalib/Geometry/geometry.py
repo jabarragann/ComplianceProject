@@ -9,8 +9,10 @@ from kincalib.utils.Logger import Logger
 import pandas as pd
 from numpy import linalg, cross, dot
 from kincalib.Geometry.Circle2D import Circle2d
+from kincalib.utils.Logger import Logger
 
 np.set_printoptions(precision=3, suppress=True)
+log = Logger("geometry").log
 
 
 def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -175,10 +177,23 @@ class Circle3D:
             raise Exception("Circle parameters not initilized")
 
         # Orthogonal vectors to n (Used to generate sample points)
-        random_vect = np.array([self.normal[2], self.normal[0], self.normal[1]])
-        self.a = cross_product(random_vect, self.normal)
-        self.a = self.a / norm(self.a)
+        # random_vect = np.array([self.normal[2], self.normal[0], self.normal[1]])
+        # self.a = cross_product(random_vect, self.normal)
+        # self.a = self.a / norm(self.a)
+        # self.b = np.cross(self.a, self.normal)
+
+        # Orthogonal vectors to n
+        s = 0.5
+        t = 0.5
+        self.a = t * np.array([-self.normal[2] / self.normal[0], 0, 1]) + s * np.array(
+            [-self.normal[1] / self.normal[0], 1, 0]
+        )
+        self.a /= norm(self.a)
         self.b = np.cross(self.a, self.normal)
+
+        assert np.isclose(self.a.dot(self.normal), 0.0)
+        assert np.isclose(self.b.dot(self.normal), 0.0)
+        assert np.isclose(self.b.dot(self.a), 0.0)
 
     def __str__(self):
         s1 = ""
