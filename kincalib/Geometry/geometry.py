@@ -249,6 +249,44 @@ class Circle3D:
         r = np.sqrt(c[2] + xc**2 + yc**2)
         return xc, yc, r
 
+    def dist_pt2circle(self, pts: np.ndarray) -> np.ndarray:
+        """Calculated euclidean distance from set of points to the circle 3D model.
+        Algorithm described in
+        https://math.stackexchange.com/questions/31049/distance-from-a-point-to-circles-closest-point
+        Parameters
+        ----------
+        pts : np.ndarray
+            3D point cloud as a numpy array (3,N)
+        Returns
+        -------
+        dist_vect : List[float]
+            distance from point to circle
+        Raises
+        ------
+        Exception
+            _description_
+        """
+
+        if self.radius is None or self.center is None:
+            raise Exception("No available parameters. Fit the model first.")
+
+        # (1) Calculate distance to circle's plane
+        d = -np.sum(np.multiply(self.normal, self.center))
+        circle_plane = Plane3D(self.normal, d)
+        dist_pt2plane = circle_plane.dist2point(pts)
+        # (2) Calculate distance of projected points to circle
+        # https://stackoverflow.com/questions/9605556/how-to-project-a-point-onto-a-plane-in-3d
+        v = pts - self.center.reshape((3, 1))
+        scales = self.normal.reshape((1, 3)) @ v
+        projected_pt = pts - scales * self.normal.reshape((3, 1))
+        dist_circle2proj = (
+            np.linalg.norm(self.center.reshape((3, 1)) - projected_pt, axis=0) - self.radius
+        )
+        # (3) Calculate distance
+        dist_pt = np.sqrt(np.square(dist_circle2proj) + np.square(dist_pt2plane))
+
+        return dist_pt
+
 
 class Plane3D:
     def __init__(self, normal, d):

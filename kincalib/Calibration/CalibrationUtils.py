@@ -285,10 +285,11 @@ class CalibrationUtils:
 
         marker_orig_arr = np.array(marker_orig_arr)
         fid_arr = np.array(fid_arr)
-        roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
-        roll_cir2 = Circle3D.from_lstsq_fit(fid_arr)
-
-        return roll_cir1, roll_cir2
+        # roll_cir1 = Circle3D.from_lstsq_fit(marker_orig_arr)
+        # roll_cir2 = Circle3D.from_lstsq_fit(fid_arr)
+        roll_cir1_data = marker_orig_arr
+        roll_cir2_data = fid_arr
+        return roll_cir1_data, roll_cir2_data
 
     def create_yaw_pitch_circles(py_df) -> List[Circle3D]:
         df = py_df
@@ -314,13 +315,14 @@ class CalibrationUtils:
             df_temp = df.loc[(df["q4"] == r) & (df["q6"] == 0.0)]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
             pitch_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-            pitch_yaw_circles_dict[idx]["pitch"] = pitch_cir
+            # pitch_yaw_circles_dict[idx]["pitch"] = pitch_cir
+            pitch_yaw_circles_dict[idx]["pitch"] = wrist_fiducials.T
 
             # Calculate yaw circle
             df_temp = df.loc[(df["q4"] == r) & (df["q5"] == 0.0)]
             pose_arr, wrist_fiducials = separate_markerandfiducial(None, marker_file, df=df_temp)
-            yaw_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
-            pitch_yaw_circles_dict[idx]["yaw"] = yaw_cir
+            # yaw_cir = Circle3D.from_lstsq_fit(wrist_fiducials.T)
+            pitch_yaw_circles_dict[idx]["yaw"] = wrist_fiducials.T
 
         return dict(pitch_yaw_circles_dict)
 
