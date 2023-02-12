@@ -116,34 +116,33 @@ def main(testid: int):
     # calculate FRE
     # ----------------
 
-    # # Get wrist fiducials data
-    # wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp, tool_def)
-    # wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
+    # robot data
+    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
+    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
+    # tracker data
+    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
+    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
 
-    # tool_offset = np.identity(4)
-    # tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
-    # psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
+    # Get wrist fiducials data
+    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp, tool_def)
+    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
 
-    # # robot data
-    # robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
-    # robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
+    tool_offset = np.identity(4)
+    tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
+    psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
 
-    # # tracker data
-    # tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
-    # tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
+    robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
+    robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
+    tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
+    tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
 
-    # robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
-    # robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
-    # tracker_joints_FRE = FRE(wrist_fiducial_dict, tracker_dict)
-    # tracker_reg_errors = tracker_joints_FRE.calculate_fre() * 1000
-
-    # fre_table = FRETable()
-    # fre_table.add_data(
-    #     dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
-    # )
-    # fre_table.add_data(
-    #     dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
-    # )
+    fre_table = FRETable()
+    fre_table.add_data(
+        dict(type="robot", fre=mean_std_str(robot_reg_errors.mean(), robot_reg_errors.std()))
+    )
+    fre_table.add_data(
+        dict(type="tracker", fre=mean_std_str(tracker_reg_errors.mean(), tracker_reg_errors.std()))
+    )
 
     # ------------------
     # Results report
@@ -158,8 +157,8 @@ def main(testid: int):
     print(f"\n{table.get_full_table()}\n")
     print(f"\n{complete_table.get_full_table()}\n")
 
-    # print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
-    # print(f"\n{fre_table.get_full_table()}\n")
+    print(f"Registration error (FRE) (N={robot_reg_errors.shape[0]})")
+    print(f"\n{fre_table.get_full_table()}\n")
 
     # plot
     if args.plot:

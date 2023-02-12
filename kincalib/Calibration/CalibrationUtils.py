@@ -275,10 +275,11 @@ class CalibrationUtils:
 
     @classmethod
     def extract_all_markers_and_wrist_fiducials(
-        cls, cartesian_df, tool_def, on_step=None, marker_full_pose=False
+        cls, cartesian_df, tool_def, on_step=None, return_steps=False, marker_full_pose=False
     ):
         marker_arr = []  # shaft marker poses
         wrist_fid_arr = []  # Wrist fiducial positions
+        steps = []
 
         if on_step is not None:
             fid_loc, T_TM = extract_fiducials_and_toolframe_on_step(cartesian_df, on_step)
@@ -292,14 +293,19 @@ class CalibrationUtils:
                 successful, wrist_fid = cls.obtain_wrist_fiducial(fiducials_loc, tool_def, T_TM)
 
                 if successful:
+                    steps.append(step)
                     wrist_fid_arr.append(wrist_fid.tolist())
                     if marker_full_pose:
                         marker_arr.append(T_TM)
                     else:
                         marker_arr.append(T_TM.p.squeeze().tolist())
 
+        steps = np.array(steps)
         wrist_fid_arr = np.array(wrist_fid_arr)
         marker_arr = marker_arr if marker_full_pose else np.array(marker_arr)
+
+        if return_steps:
+            return steps, marker_arr, wrist_fid_arr
 
         return marker_arr, wrist_fid_arr
 
@@ -517,10 +523,10 @@ class CalibrationUtils:
         for i in range(6):
             # fmt:off
             axes[i].set_title(f"joint {i+1} ({unit})")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, color="blue")
-            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"rq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, color="orange")
-            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"tq{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, color="blue")
+            axes[i].plot(robot_df['step'].to_numpy(), robot_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="blue", label="robot")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, color="orange")
+            axes[i].plot(robot_df['step'].to_numpy(),tracker_df[f"q{i+1}"].to_numpy()*scale, marker="*", linestyle="None", color="orange", label="tracker")
             # fmt:on
         axes[0].legend()
 
