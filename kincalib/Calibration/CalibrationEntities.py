@@ -71,12 +71,12 @@ class CalibrationData:
     def fit_circle(self) -> CircleFittingMetrics:
         circle_m = CircleFittingMetrics.create_empty()
         association_list = [
-            ("roll_1_circle", self.roll_tool_arr),
-            ("roll_2_circle", self.roll_wrist_fid_arr),
-            ("pitch_circle1", self.pitch_wrist_fid_arr1),
-            ("pitch_circle2", self.pitch_wrist_fid_arr2),
-            ("yaw_circle1", self.yaw_wrist_fid_arr1),
-            ("yaw_circle2", self.yaw_wrist_fid_arr2),
+            ("roll1", self.roll_tool_arr),
+            ("roll2", self.roll_wrist_fid_arr),
+            ("pitch1", self.pitch_wrist_fid_arr1),
+            ("pitch2", self.pitch_wrist_fid_arr2),
+            ("yaw1", self.yaw_wrist_fid_arr1),
+            ("yaw2", self.yaw_wrist_fid_arr2),
         ]
 
         for metric, data in association_list:
@@ -102,13 +102,13 @@ class CalibrationData:
 @dataclass
 class CircleFittingMetrics:
     step: int
-    roll_1_circle: FittedCircle
-    roll_2_circle: FittedCircle
+    roll1: FittedCircle
+    roll2: FittedCircle
 
-    pitch_circle1: FittedCircle
-    yaw_circle1: FittedCircle
-    pitch_circle2: FittedCircle
-    yaw_circle2: FittedCircle
+    pitch1: FittedCircle
+    yaw1: FittedCircle
+    pitch2: FittedCircle
+    yaw2: FittedCircle
 
     tool_frame1: Frame
     tool_frame2: Frame

@@ -1,10 +1,11 @@
 from enum import Enum
+from itertools import product
 from pathlib import Path
 import pandas as pd
 from abc import ABC, abstractclassmethod
 import numpy as np
 from typing import List
-from kincalib.Calibration.CalibrationEntities import CircleFittingMetrics
+from kincalib.Calibration.CalibrationEntities import CircleFittingMetrics, FittedCircle
 
 # Custom
 from kincalib.utils.Logger import Logger
@@ -66,6 +67,16 @@ class CircleFittingRecord(Record):
     yaw_error: residual error of circle
     has_all_circles: bool
 
+    Circle information -> circleName_coordinate. For example,
+    roll1_x: roll1's x coordinate of center
+    roll1_y: roll1's y coordinate of center
+    roll1_z: roll1's z coordinate of center
+    roll1_nx: roll1's x coordinate of normal
+    roll1_nx: roll1's y coordinate of normal
+    roll1_nx: roll1's z coordinate of normal
+
+
+
     """
 
     df_n_cols = ["roll1_n", "roll2_n", "pitch1_n", "yaw1_n", "pitch2_n", "yaw2_n"]
@@ -80,27 +91,55 @@ class CircleFittingRecord(Record):
     df_cols = ["step"] + df_n_cols + df_error_cols + ["has_all_circles"]
 
     def __init__(self, filename: Path):
-        super().__init__(CircleFittingRecord.df_cols, filename)
+        self.init_circle_info_cols()
+        super().__init__(self.df_cols, filename)
+
+    def init_circle_info_cols(self):
+        self.circle_names = ["roll1", "roll2", "pitch1", "pitch2", "yaw1", "yaw2"]
+        self.circle_comp = ["x", "y", "z", "nx", "ny", "nz"]
+
+        self.circle_cols = []
+        for n in self.circle_names:
+            for name, comp in product([n], self.circle_comp):
+                self.circle_cols.append(name + "_" + comp)
+
+        assert len(self.circle_cols) == 36, f"{len(self.circle_cols)} cols given"
+
+        self.df_cols += self.circle_cols
+
+    def get_circles_to_list(self, calib_object: CircleFittingMetrics):
+        metrics = []
+        for circle_n in self.circle_names:
+            cir: FittedCircle = getattr(calib_object, circle_n)
+            if cir.circle is not None:
+                metrics += [t for t in cir.circle.center.squeeze().tolist()]
+                metrics += [t for t in cir.circle.normal.squeeze().tolist()]
+            else:
+                metrics += [0, 0, 0, 0, 0, 0]
+
+        assert len(metrics) == 36
+        return metrics
 
     def create_new_entry(self, step, calib_object: CircleFittingMetrics):
         n_values = [
-            calib_object.roll_1_circle.n,
-            calib_object.roll_2_circle.n,
-            calib_object.pitch_circle1.n,
-            calib_object.yaw_circle1.n,
-            calib_object.pitch_circle2.n,
-            calib_object.yaw_circle2.n,
+            calib_object.roll1.n,
+            calib_object.roll2.n,
+            calib_object.pitch1.n,
+            calib_object.yaw1.n,
+            calib_object.pitch2.n,
+            calib_object.yaw2.n,
         ]
         error_values = [
-            calib_object.roll_1_circle.error * 1000,
-            calib_object.roll_2_circle.error * 1000,
-            calib_object.pitch_circle1.error * 1000,
-            calib_object.yaw_circle1.error * 1000,
-            calib_object.pitch_circle2.error * 1000,
-            calib_object.yaw_circle2.error * 1000,
+            calib_object.roll1.error * 1000,
+            calib_object.roll2.error * 1000,
+            calib_object.pitch1.error * 1000,
+            calib_object.yaw1.error * 1000,
+            calib_object.pitch2.error * 1000,
+            calib_object.yaw2.error * 1000,
         ]
 
-        data = [step] + n_values + error_values + [calib_object.has_all_circles()]
+        circle_metrics = self.get_circles_to_list(calib_object)
+        data = [step] + n_values + error_values + [calib_object.has_all_circles()] + circle_metrics
         data = np.array(data).reshape((1, self.cols_len))
         new_pt = pd.DataFrame(data, columns=self.df_cols)
         self.df = pd.concat((self.df, new_pt))

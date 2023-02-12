@@ -149,7 +149,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt:off
     parser.add_argument( "-r", "--root", type=str, 
-                       default="~/temp/calib_test/test/d04-rec-20-trajsoft/",
+                       default="~/temp/calib_test/test/d04-rec-20-trajsoft-newfmt/",
                        help="root dir") 
     # fmt:on
 
