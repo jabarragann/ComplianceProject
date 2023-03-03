@@ -176,6 +176,9 @@ def main(args):
     results_df = pd.concat(results)
 
     # plot
+    rc_params = dict(top=0.96, bottom=0.15, left=0.125, right=0.9, hspace=0.2, wspace=0.2)
+    plt.rcParams.update({"font.size": 18})
+
     results_df["errors"] *= 1000
     fig, ax = plt.subplots(1, 1, figsize=(15, 5))
 
@@ -183,15 +186,16 @@ def main(args):
     sns.barplot(x="test_id", y="errors", hue="type", ci="sd", data=results_df, capsize=0.1, ax=ax)
     # palette="husl",
     # ax.set_xlabel("Test id")
-    ax.set_xlabel("")
-    ax.set_ylabel("Mean registration error (mm)", fontsize=12, labelpad=12)
+    ax.set_xlabel("Registration experiment attempt")
+    ax.set_ylabel("FRE (mm)", labelpad=12)
     # ax.set_title(f"Phantom registration experiment ({args.modelname})\n{Path(args.root).name}")
     ax.set_facecolor("white")
     ax.set_yticks(list(range(0, 5)))
     # ax.set_yticklabels(fontsize=20)
     ax.grid(visible="major")
-    ax.tick_params(axis="y", labelsize=10)
+    ax.tick_params(axis="y", labelsize=15)
     # plt.yticks(fontsize=20)
+    plt.subplots_adjust(**rc_params)
     plt.show()
 
 

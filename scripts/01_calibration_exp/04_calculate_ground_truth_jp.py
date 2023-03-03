@@ -117,19 +117,19 @@ def main(testid: int):
     # ----------------
 
     # robot data
-    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
-    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
-    # tracker data
-    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
-    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
-
-    # Get wrist fiducials data
-    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp, tool_def)
-    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
 
     tool_offset = np.identity(4)
     tool_offset[:3, 3] = tracker_joints_estimator.wrist_fid_Y
     psm_kin = DvrkPsmKin(tool_offset=tool_offset).fkine
+    robot_df = robot_df.rename(lambda x: x.replace("rq", "q"), axis=1)
+    tracker_df = tracker_df.rename(lambda x: x.replace("tq", "q"), axis=1)
+
+    # tracker data
+    tracker_dict = dict(mode="joint", data=tracker_df, fk=psm_kin)
+    robot_dict = dict(mode="joint", data=robot_df, fk=psm_kin)
+    # Get wrist fiducials data
+    wrist_fiducial_cp = get_wrist_fiducials_cp(robot_cp, tool_def)
+    wrist_fiducial_dict = dict(mode="cartesian", data=wrist_fiducial_cp)
 
     robot_joints_FRE = FRE(wrist_fiducial_dict, robot_dict)
     robot_reg_errors = robot_joints_FRE.calculate_fre() * 1000
